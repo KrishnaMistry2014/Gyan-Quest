@@ -1,0 +1,341 @@
+{
+  "class1": {
+    "english": [
+      "https://ncert.nic.in/textbook/pdf/aemr101.pdf",
+      "https://ncert.nic.in/textbook/pdf/aemr102.pdf",
+      "https://ncert.nic.in/textbook/pdf/aemr103.pdf",
+      "https://ncert.nic.in/textbook/pdf/aemr104.pdf",
+      "https://ncert.nic.in/textbook/pdf/aemr105.pdf",
+      "https://ncert.nic.in/textbook/pdf/aemr106.pdf",
+      "https://ncert.nic.in/textbook/pdf/aemr107.pdf",
+      "https://ncert.nic.in/textbook/pdf/aemr108.pdf",
+      "https://ncert.nic.in/textbook/pdf/aemr109.pdf"
+    ],
+    "maths": [
+      "https://ncert.nic.in/textbook/pdf/aejm101.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm102.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm103.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm104.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm105.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm106.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm107.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm108.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm109.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm110.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm111.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm112.pdf",
+      "https://ncert.nic.in/textbook/pdf/aejm113.pdf"
+    ]
+  },
+  "class2": {
+    "english": [
+      "https://ncert.nic.in/textbook/pdf/bemr101.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr102.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr103.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr104.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr105.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr106.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr107.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr108.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr109.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr110.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr111.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr112.pdf",
+      "https://ncert.nic.in/textbook/pdf/bemr113.pdf"
+    ],
+    "maths": [
+      "https://ncert.nic.in/textbook/pdf/bejm101.pdf",
+      "https://ncert.nic.in/textbook/pdf/bejm102.pdf",
+      "https://ncert.nic.in/textbook/pdf/bejm103.pdf",
+      "https://ncert.nic.in/textbook/pdf/bejm104.pdf",
+      "https://ncert.nic.in/textbook/pdf/bejm105.pdf",
+      "https://ncert.nic.in/textbook/pdf/bejm106.pdf",
+      "https://ncert.nic.in/textbook/pdf/bejm107.pdf",
+      "https://ncert.nic.in/textbook/pdf/bejm108.pdf",
+      "https://ncert.nic.in/textbook/pdf/bejm109.pdf",
+      "https://ncert.nic.in/textbook/pdf/bejm110.pdf",
+      "https://ncert.nic.in/textbook/pdf/bejm111.pdf"
+    ]
+  },
+  "class3": {
+    "english": [
+      "https://ncert.nic.in/textbook/pdf/cesa101.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa102.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa103.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa104.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa105.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa106.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa107.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa108.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa109.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa110.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa111.pdf",
+      "https://ncert.nic.in/textbook/pdf/cesa112.pdf"
+    ],
+    "maths": [
+      "https://ncert.nic.in/textbook/pdf/cemm101.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm102.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm103.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm104.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm105.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm106.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm107.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm108.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm109.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm110.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm111.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm112.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm113.pdf",
+      "https://ncert.nic.in/textbook/pdf/cemm114.pdf"
+    ]
+  },
+  "class4": {
+    "english": [
+      "https://ncert.nic.in/textbook/pdf/desa101.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa102.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa103.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa104.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa105.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa106.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa107.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa108.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa109.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa110.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa111.pdf",
+      "https://ncert.nic.in/textbook/pdf/desa112.pdf"
+    ],
+    "maths": [
+      "https://ncert.nic.in/textbook/pdf/demm101.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm102.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm103.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm104.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm105.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm106.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm107.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm108.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm109.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm110.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm111.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm112.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm113.pdf",
+      "https://ncert.nic.in/textbook/pdf/demm114.pdf"
+    ]
+  },
+  "class5": {
+    "english": [
+      "https://ncert.nic.in/textbook/pdf/eesa101.pdf",
+      "https://ncert.nic.in/textbook/pdf/eesa102.pdf",
+      "https://ncert.nic.in/textbook/pdf/eesa103.pdf",
+      "https://ncert.nic.in/textbook/pdf/eesa104.pdf",
+      "https://ncert.nic.in/textbook/pdf/eesa105.pdf",
+      "https://ncert.nic.in/textbook/pdf/eesa106.pdf",
+      "https://ncert.nic.in/textbook/pdf/eesa107.pdf",
+      "https://ncert.nic.in/textbook/pdf/eesa108.pdf",
+      "https://ncert.nic.in/textbook/pdf/eesa109.pdf",
+      "https://ncert.nic.in/textbook/pdf/eesa110.pdf"
+    ],
+    "maths": [
+      "https://ncert.nic.in/textbook/pdf/eemm101.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm102.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm103.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm104.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm105.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm106.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm107.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm108.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm109.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm110.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm111.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm112.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm113.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm114.pdf",
+      "https://ncert.nic.in/textbook/pdf/eemm115.pdf"
+    ]
+  },
+  "class6": {
+    "english": [
+      "https://ncert.nic.in/textbook/pdf/fepr101.pdf",
+      "https://ncert.nic.in/textbook/pdf/fepr102.pdf",
+      "https://ncert.nic.in/textbook/pdf/fepr103.pdf",
+      "https://ncert.nic.in/textbook/pdf/fepr104.pdf",
+      "https://ncert.nic.in/textbook/pdf/fepr105.pdf"
+    ],
+    "maths": [
+      "https://ncert.nic.in/textbook/pdf/fegp101.pdf",
+      "https://ncert.nic.in/textbook/pdf/fegp102.pdf",
+      "https://ncert.nic.in/textbook/pdf/fegp103.pdf",
+      "https://ncert.nic.in/textbook/pdf/fegp104.pdf",
+      "https://ncert.nic.in/textbook/pdf/fegp105.pdf",
+      "https://ncert.nic.in/textbook/pdf/fegp106.pdf",
+      "https://ncert.nic.in/textbook/pdf/fegp107.pdf",
+      "https://ncert.nic.in/textbook/pdf/fegp108.pdf",
+      "https://ncert.nic.in/textbook/pdf/fegp109.pdf",
+      "https://ncert.nic.in/textbook/pdf/fegp110.pdf"
+    ],
+    "socialScience": [
+      "https://ncert.nic.in/textbook/pdf/fees101.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees102.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees103.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees104.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees105.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees106.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees107.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees108.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees109.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees110.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees111.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees112.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees113.pdf",
+      "https://ncert.nic.in/textbook/pdf/fees114.pdf"
+    ],
+    "science": [
+      "https://ncert.nic.in/textbook/pdf/fecu101.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu102.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu103.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu104.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu105.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu106.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu107.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu108.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu109.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu110.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu111.pdf",
+      "https://ncert.nic.in/textbook/pdf/fecu112.pdf"
+    ]
+  },
+  "class7": {
+    "english": [
+      "https://ncert.nic.in/textbook/pdf/gepr101.pdf",
+      "https://ncert.nic.in/textbook/pdf/gepr102.pdf",
+      "https://ncert.nic.in/textbook/pdf/gepr103.pdf",
+      "https://ncert.nic.in/textbook/pdf/gepr104.pdf",
+      "https://ncert.nic.in/textbook/pdf/gepr105.pdf"
+    ],
+    "maths": {
+      "book1": [
+        "https://ncert.nic.in/textbook/pdf/gegp101.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp102.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp103.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp104.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp105.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp106.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp107.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp108.pdf"
+      ],
+      "book2": [
+        "https://ncert.nic.in/textbook/pdf/gegp201.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp202.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp203.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp204.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp205.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp206.pdf",
+        "https://ncert.nic.in/textbook/pdf/gegp207.pdf"
+      ]
+    },
+    "socialScience": {
+      "book1": [
+        "https://ncert.nic.in/textbook/pdf/gees101.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees102.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees103.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees104.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees105.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees106.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees107.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees108.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees109.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees110.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees111.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees112.pdf"
+      ],
+      "book2": [
+        "https://ncert.nic.in/textbook/pdf/gees201.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees202.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees203.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees204.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees205.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees206.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees207.pdf",
+        "https://ncert.nic.in/textbook/pdf/gees208.pdf"
+      ]
+    },
+    "science": [
+      "https://ncert.nic.in/textbook/pdf/gecu101.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu102.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu103.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu104.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu105.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu106.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu107.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu108.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu109.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu110.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu111.pdf",
+      "https://ncert.nic.in/textbook/pdf/gecu112.pdf"
+    ]
+  },
+  "class8": {
+    "english": [
+      "https://ncert.nic.in/textbook/pdf/hepr101.pdf",
+      "https://ncert.nic.in/textbook/pdf/hepr102.pdf",
+      "https://ncert.nic.in/textbook/pdf/hepr103.pdf",
+      "https://ncert.nic.in/textbook/pdf/hepr104.pdf",
+      "https://ncert.nic.in/textbook/pdf/hepr105.pdf"
+    ],
+    "maths": {
+      "book1": [
+        "https://ncert.nic.in/textbook/pdf/hegp101.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp102.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp103.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp104.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp105.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp106.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp107.pdf"
+      ],
+      "book2": [
+        "https://ncert.nic.in/textbook/pdf/hegp201.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp202.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp203.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp204.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp205.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp206.pdf",
+        "https://ncert.nic.in/textbook/pdf/hegp207.pdf"
+      ]
+    },
+    "socialScience": {
+      "book1": [
+        "https://ncert.nic.in/textbook/pdf/hees101.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees102.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees103.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees104.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees105.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees106.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees107.pdf"
+      ],
+      "book2": [
+        "https://ncert.nic.in/textbook/pdf/hees201.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees202.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees203.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees204.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees205.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees206.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees207.pdf",
+        "https://ncert.nic.in/textbook/pdf/hees208.pdf"
+      ]
+    },
+    "science": [
+      "https://ncert.nic.in/textbook/pdf/hecu101.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu102.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu103.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu104.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu105.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu106.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu107.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu108.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu109.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu110.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu111.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu112.pdf",
+      "https://ncert.nic.in/textbook/pdf/hecu113.pdf"
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Gyan Quest",
+  "description": "An interactive gamified learning platform combining traditional Indian learning methods, modern gamification, and AI-assisted learning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with academic streak data and identity information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "streak": { "type": "number" },
+        "lastActiveDate": { "type": "string" },
+        "longestStreak": { "type": "number" },
+        "activeDays": { "type": "array" }
+      },
+      "required": ["name", "streak", "lastActiveDate"]
+    },
+    "Chapter": {
+      "title": "Chapter",
+      "description": "Uploaded PDF chapter with extracted study notes and diagrams explanation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "fileSize": { "type": "number" }
+      },
+      "required": ["id", "fileName", "title", "summary", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document storing streaks and learner details"
+    },
+    "/users/{userId}/chapters/{chapterId}": {
+      "schema": "Chapter",
+      "description": "Extracted chapters and generated study guides belonging to the user"
+    }
+  }
+}
