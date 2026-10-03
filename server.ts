@@ -19,6 +19,11 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    },
+  },
 });
 
 function callWithTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -53,7 +58,7 @@ app.post('/api/extract-pdf', async (req, res) => {
       });
     }
 
-    // Step 1: Main OCR & diagram explanation using Gemini 3.1 Flash-Lite, with 3.5 flash-lite fallback
+    // Step 1: Main OCR & diagram explanation using Gemini 3.1 Flash-Lite, with Gemini 3.8 Flash fallback
     let extractionText = '';
     const extractionPrompt = `You are an educational study assistant. Analyze this PDF textbook or chapter notes thoroughly:
 1. Read and transcribe all written content, definitions, formulas, and study sections accurately.
@@ -79,12 +84,12 @@ app.post('/api/extract-pdf', async (req, res) => {
       extractionText = ocrResponse.text || '';
     } catch (primaryErr: any) {
       console.warn('[Extraction] Gemini 3.1 Flash-Lite issue:', primaryErr?.message || primaryErr);
-      console.log('[Extraction] Falling back to Gemini 3.5 Flash-Lite...');
+      console.log('[Extraction] Falling back to Gemini 3.8 Flash...');
       
-      // Attempt 2: Gemini 3.5 Flash-Lite fallback (with 25s timeout)
+      // Attempt 2: Gemini 3.8 Flash fallback (with 25s timeout)
       try {
         const fallbackPromise = ai.models.generateContent({
-          model: 'gemini-3.5-flash-lite',
+          model: 'gemini-3.8-flash',
           contents: [
             {
               inlineData: {
@@ -95,15 +100,15 @@ app.post('/api/extract-pdf', async (req, res) => {
             extractionPrompt,
           ],
         });
-        const fallbackResponse = await callWithTimeout(fallbackPromise, 25000, 'Gemini 3.5 Flash-Lite OCR');
+        const fallbackResponse = await callWithTimeout(fallbackPromise, 25000, 'Gemini 3.8 Flash OCR');
         extractionText = fallbackResponse.text || '';
       } catch (secondaryErr: any) {
-        console.warn('[Extraction] Gemini 3.5 Flash-Lite issue:', secondaryErr?.message || secondaryErr);
-        console.log('[Extraction] Falling back to Gemini Flash Lite Latest as safety net...');
+        console.warn('[Extraction] Gemini 3.8 Flash issue:', secondaryErr?.message || secondaryErr);
+        console.log('[Extraction] Falling back to Gemini Flash Latest as safety net...');
         
-        // Attempt 3: gemini-flash-lite-latest as safety net (with 25s timeout)
+        // Attempt 3: gemini-flash-latest as safety net (with 25s timeout)
         const tertiaryPromise = ai.models.generateContent({
-          model: 'gemini-flash-lite-latest',
+          model: 'gemini-flash-latest',
           contents: [
             {
               inlineData: {
@@ -114,7 +119,7 @@ app.post('/api/extract-pdf', async (req, res) => {
             extractionPrompt,
           ],
         });
-        const tertiaryResponse = await callWithTimeout(tertiaryPromise, 25000, 'Gemini Flash Lite Latest OCR');
+        const tertiaryResponse = await callWithTimeout(tertiaryPromise, 25000, 'Gemini Flash Latest OCR');
         extractionText = tertiaryResponse.text || '';
       }
     }
@@ -123,7 +128,7 @@ app.post('/api/extract-pdf', async (req, res) => {
       return res.status(500).json({ error: 'Unable to extract text or diagrams from the uploaded file.' });
     }
 
-    // Step 2: Summarization using Gemma 4 26B
+    // Step 2: Summarization using Gemini 3.8 Flash
     const summarizationPrompt = `You are a friendly, encouraging study mentor for students.
 Create a neat, beautifully structured, and clear study summary from the following extracted textbook material:
 
@@ -139,22 +144,22 @@ Formatting Instructions:
 
     let summary = '';
     try {
-      console.log(`[Summarization] Summarizing with Gemma 4 26B...`);
+      console.log(`[Summarization] Summarizing with Gemini 3.8 Flash...`);
       const summaryPromise = ai.models.generateContent({
-        model: 'gemma-4-26b-a4b-it',
+        model: 'gemini-3.8-flash',
         contents: summarizationPrompt,
       });
-      const summaryResponse = await callWithTimeout(summaryPromise, 25000, 'Gemma 4 26B Summarization');
+      const summaryResponse = await callWithTimeout(summaryPromise, 25000, 'Gemini 3.8 Flash Summarization');
       summary = summaryResponse.text || '';
-    } catch (gemmaErr: any) {
-      console.warn('[Summarization] Gemma 4 26B encountered an issue:', gemmaErr?.message || gemmaErr);
-      console.log('[Summarization] Falling back to Gemini 3.5 Flash-Lite for summarization...');
+    } catch (primarySummErr: any) {
+      console.warn('[Summarization] Gemini 3.8 Flash issue:', primarySummErr?.message || primarySummErr);
+      console.log('[Summarization] Falling back to Gemini 3.1 Flash-Lite for summarization...');
       try {
         const fallbackSummaryPromise = ai.models.generateContent({
-          model: 'gemini-3.5-flash-lite',
+          model: 'gemini-3.1-flash-lite',
           contents: summarizationPrompt,
         });
-        const fallbackSummary = await callWithTimeout(fallbackSummaryPromise, 20000, 'Gemini 3.5 Flash-Lite Summarization');
+        const fallbackSummary = await callWithTimeout(fallbackSummaryPromise, 20000, 'Gemini 3.1 Flash-Lite Summarization');
         summary = fallbackSummary.text || '';
       } catch (geminiSummaryErr) {
         console.warn('[Summarization] Fallback summarization issue, using direct extraction:', geminiSummaryErr);

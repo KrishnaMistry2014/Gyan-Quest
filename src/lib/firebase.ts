@@ -21,13 +21,13 @@ import {
 } from 'firebase/firestore';
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyDkCU1DHUqnRjuWvCiMi3m4Q8G2uJ6ECZU",
-  authDomain: "gyanquest-edu.firebaseapp.com",
-  projectId: "gyanquest-edu",
-  storageBucket: "gyanquest-edu.firebasestorage.app",
-  messagingSenderId: "1056592118463",
-  appId: "1:1056592118463:web:0f60a0638d3df51edcfc0a",
-  measurementId: "G-YTJLM3QSNW"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDkCU1DHUqnRjuWvCiMi3m4Q8G2uJ6ECZU",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "gyanquest-edu.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "gyanquest-edu",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "gyanquest-edu.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1056592118463",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1056592118463:web:0f60a0638d3df51edcfc0a",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-YTJLM3QSNW"
 };
 
 // Singleton initialization
