@@ -26,6 +26,37 @@ interface ShravanPageProps {
   onNavigateDashboard?: () => void;
 }
 
+// Helper to convert an MP3/Audio Blob to base64 string
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        const base64Index = reader.result.indexOf(';base64,');
+        if (base64Index !== -1) {
+          resolve(reader.result.substring(base64Index + 8));
+        } else {
+          resolve(reader.result);
+        }
+      } else {
+        reject(new Error('Failed to read audio blob as base64 string'));
+      }
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Helper to resolve an audio source string (data URI, blob URL, or base64)
+function resolveAudioSrc(src: string): string {
+  if (src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('http')) {
+    return src;
+  }
+  // Check if legacy RIFF (WAV) base64 or Edge TTS MP3 base64
+  const mime = src.startsWith('UklGR') ? 'audio/wav' : 'audio/mpeg';
+  return `data:${mime};base64,${src}`;
+}
+
 export const ShravanPage: React.FC<ShravanPageProps> = ({
   chapter,
   onBackToVidya,
@@ -33,6 +64,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 }) => {
   const { user, refreshUser } = useAuth();
   const [audioBase64, setAudioBase64] = useState<string | null>(chapter.audioBase64 || null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(chapter.audioBase64 ? 'ready' : 'loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
   
@@ -45,6 +77,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [xpToast, setXpToast] = useState<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   const generateAudio = async () => {
     // If audio already cached on chapter, use it immediately
@@ -55,43 +88,88 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       return;
     }
 
-    // Strictly generate via Gemini 3.1 Flash TTS ONLY
+    if (!chapter.summary || typeof chapter.summary !== 'string' || chapter.summary.trim().length === 0) {
+      setStatus('error');
+      setErrorMessage('No chapter summary available to narrate. Please open or generate a chapter summary first.');
+      return;
+    }
+
+    // Set status to loading and clear existing error message
     setStatus('loading');
     setErrorMessage('');
 
     try {
-      console.log('[Shravan] Requesting audio generation from Gemini 3.1 Flash TTS (Indian accent female ~30 years old)...');
-      const response = await fetch('/api/generate-audio', {
+      console.log('[Shravan] Requesting audio generation from Edge TTS (en-IN-NeerjaNeural)...');
+      const response = await fetch('https://gyanquest-edge-tts.onrender.com/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: chapter.summary }),
+        body: JSON.stringify({
+          text: chapter.summary,
+          voice: 'en-IN-NeerjaNeural',
+        }),
       });
 
-      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(`Edge TTS voice service returned status ${response.status}`);
+      }
 
-      if (data && data.success && data.audioBase64) {
-        const b64 = data.audioBase64;
+      // Edge TTS returns audio/mpeg MP3 binary stream
+      const audioBlob = await response.blob();
+      if (!audioBlob || audioBlob.size === 0) {
+        throw new Error('Received empty audio response from voice service.');
+      }
+
+      // Revoke any prior object URL to avoid memory leaks
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+
+      // Create browser object URL for immediate playback
+      const newAudioUrl = URL.createObjectURL(audioBlob);
+      objectUrlRef.current = newAudioUrl;
+      setAudioUrl(newAudioUrl);
+      setStatus('ready');
+
+      // Convert MP3 blob to base64 for persistent Firestore & localStorage caching
+      try {
+        const b64 = await blobToBase64(audioBlob);
         setAudioBase64(b64);
         chapter.audioBase64 = b64;
-        setStatus('ready');
-
-        // Save to chapter (Firestore + local storage)
         await updateChapterAudio(chapter.id, b64, true);
-        checkAndAwardXp();
-      } else {
-        const err = data?.error || `Gemini 3.1 Flash TTS failed (HTTP ${response.status})`;
-        setStatus('error');
-        setErrorMessage(err);
+      } catch (cacheErr) {
+        console.warn('[Shravan] Could not persist audio to chapter cache:', cacheErr);
       }
+
+      checkAndAwardXp();
     } catch (err: any) {
+      console.error('[Shravan] Edge TTS error:', err);
       setStatus('error');
-      setErrorMessage(err?.message || 'Network error while generating audio with Gemini 3.1 Flash TTS. Please check your connection.');
+      setErrorMessage(
+        'Unable to generate audio narration at this moment. The voice service may be waking up or temporarily unavailable. Please retry in a few moments.'
+      );
     }
   };
 
-  // Generate audio or retrieve cached version on mount
+  // Generate audio or retrieve cached version on mount / chapter change
   useEffect(() => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    setAudioUrl(null);
+    setAudioBase64(chapter.audioBase64 || null);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
     generateAudio();
+
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
   }, [chapter.id]);
 
   const checkAndAwardXp = async () => {
@@ -252,7 +330,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             {chapter.title}
           </p>
           <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Powered by Gemini 3.1 Flash TTS • Indian Accent Female (~30 Yrs) • (+10 XP)
+            Powered by Edge TTS • Indian Accent Female (Neerja) • (+10 XP)
           </p>
         </div>
 
@@ -267,7 +345,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               Generating Shravan Audio...
             </h3>
             <p className="text-xs sm:text-sm max-w-md" style={{ color: 'var(--text-secondary)' }}>
-              Gemini 3.1 Flash TTS is synthesizing your chapter summary into an Indian accent female (~30 years old) voice narration in sections of 3,000–4,000 words (65s processing per chunk). Please hold on a moment.
+              Edge TTS is synthesizing your chapter summary into an Indian accent female voice narration (en-IN-NeerjaNeural). The service may take a moment to wake if sleeping. Please hold on.
             </p>
           </div>
         )}
@@ -282,7 +360,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               Audio Generation Notice
             </h3>
             <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              {errorMessage || 'Failed to generate audio with Gemini 3.1 Flash TTS.'}
+              {errorMessage || 'Failed to generate audio narration with voice service.'}
             </p>
             <button
               type="button"
@@ -299,11 +377,11 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
         )}
 
         {/* READY / AUDIO PLAYER STATE */}
-        {status === 'ready' && audioBase64 && (
+        {status === 'ready' && (audioUrl || audioBase64) && (
           <div className="space-y-8 max-w-2xl mx-auto">
             <audio
               ref={audioRef}
-              src={`data:audio/wav;base64,${audioBase64}`}
+              src={audioUrl || (audioBase64 ? resolveAudioSrc(audioBase64) : undefined)}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onEnded={() => setIsPlaying(false)}
