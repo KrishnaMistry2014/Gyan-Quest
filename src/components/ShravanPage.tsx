@@ -57,6 +57,39 @@ function resolveAudioSrc(src: string): string {
   return `data:${mime};base64,${src}`;
 }
 
+// Helper to strip Markdown formatting so TTS narrates clean, natural spoken plain text
+function stripMarkdownForSpeech(md: string): string {
+  if (!md) return '';
+  return md
+    // Strip image markers ![alt](url)
+    .replace(/!\[(.*?)\]\(.*?\)/g, '$1')
+    // Strip links [text](url) -> text
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+    // Strip code blocks ``` ... ```
+    .replace(/```[a-zA-Z]*\n?([\s\S]*?)```/g, '$1')
+    // Strip inline backticks `code` -> code
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/`/g, '')
+    // Strip heading markers (#, ##, etc. at start of line)
+    .replace(/^[ \t]*#+[ \t]*/gm, '')
+    // Strip bold/italic formatting (***text***, **text**, *text*, ___text___, __text__, _text_)
+    .replace(/(\*{1,3}|_{1,3})([^*_\n]+)\1/g, '$2')
+    // Remove any remaining stray asterisks or underscores used for styling
+    .replace(/[*_]/g, '')
+    // Strip blockquote markers (> at start of line)
+    .replace(/^[ \t]*>[ \t]*/gm, '')
+    // Strip bullet markers (-, *, +) at start of line
+    .replace(/^[ \t]*[-*+][ \t]+/gm, '')
+    // Strip numbered list prefixes (1., 2.) at start of line
+    .replace(/^[ \t]*\d+\.[ \t]+/gm, '')
+    // Strip horizontal rules (---, ***, ___)
+    .replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, '')
+    // Normalize spaces and multiple blank lines
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export const ShravanPage: React.FC<ShravanPageProps> = ({
   chapter,
   onBackToVidya,
@@ -104,7 +137,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: chapter.summary,
+          text: stripMarkdownForSpeech(chapter.summary),
           voice: 'en-IN-NeerjaNeural',
         }),
       });
