@@ -154,7 +154,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
           </h1>
 
           <p className="text-sm sm:text-base mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Access all your uploaded PDF chapters, extracted notes, and study guides in one place.
+            Access all your uploaded PDF chapters and Vidya study notes in one place.
           </p>
         </div>
 
@@ -192,7 +192,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
       {/* Search Bar (if chapters exist) */}
       {chapters.length > 0 && (
         <div className="relative max-w-md">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400" />
           <input
             type="text"
             value={searchQuery}
@@ -301,14 +301,14 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
                     }}
                   >
                     <FileText className="w-3.5 h-3.5" />
-                    <span>PDF Chapter</span>
+                    <span>Vidya Chapter</span>
                   </div>
 
                   <button
                     type="button"
                     onClick={(e) => handleDelete(chapter.id, e)}
-                    className="p-1.5 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                    title="Delete chapter notes"
+                    className="p-1.5 rounded-lg text-stone-500 dark:text-stone-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                    title="Delete Vidya notes"
                     aria-label={`Delete ${chapter.title}`}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -355,7 +355,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
                   className="inline-flex items-center gap-1 font-bold group-hover:translate-x-1 transition-transform"
                   style={{ color: 'var(--accent-saffron-text)' }}
                 >
-                  <span>Open Notes</span>
+                  <span>Open Vidya</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </div>
               </div>

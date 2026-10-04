@@ -4,10 +4,11 @@ import { useAuth } from '../context/AuthContext';
 
 interface DashboardProps {
   onResumeLearning?: () => void;
+  onStartLearning?: () => void;
   onPdfUpload?: (file: File) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onPdfUpload }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartLearning, onPdfUpload }) => {
   const { streak, isStreakActiveToday, openStreakModal } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
@@ -142,7 +143,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onPdfUpl
             <button
               type="button"
               id="btn-card-start-learning"
-              onClick={onResumeLearning}
+              onClick={onStartLearning}
               className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold shadow-sm transition-all hover:opacity-90 hover:scale-[1.02] hover:shadow-md active:scale-[0.99] cursor-pointer"
               style={{
                 backgroundColor: 'var(--accent-saffron)',

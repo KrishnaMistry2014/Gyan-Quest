@@ -13,18 +13,79 @@ import {
   Compass,
   AlertTriangle,
   XCircle,
-  Layers
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 import { SavedChapter, saveChapter } from '../lib/chapters';
 
 const EXTRACTION_STAGES = [
-  'Reading document text and diagrams...',
-  'Extracting core definitions and formulas...',
-  'Organizing main topics and chapter structure...',
-  'Creating clear takeaways and visual explanations...',
-  'Structuring key review questions...',
-  'Finalizing student study notes...',
+  'Extracting textbook text and diagrams with Gemini Flash-Lite...',
+  'Analyzing diagrams, scientific schematics, and visual components...',
+  'Gemma 4 26B is analyzing chapter content and naming the title...',
+  'Gemma 4 26B is synthesizing deep academic concept breakdowns...',
+  'Detailing scientific laws, principles, and diagram explanations...',
+  'Compiling exhaustive glossary and key definitions without omissions...',
+  'Finalizing detailed Vidya chapter summary...',
 ];
+
+const sanitizeClientVidya = (raw: string, defaultTitle: string): string => {
+  let cleaned = raw.trim();
+
+  // 1. Remove introductory conversational greetings (e.g. "Hello, little scholar...", "Welcome, ...")
+  cleaned = cleaned.replace(/^(hello|welcome|hey there|greetings|dear)[^\n]*(\n+|$)/gi, '');
+
+  // 2. Remove questions and answers / check your understanding section if present
+  cleaned = cleaned.replace(/\n##+\s*(Check Your Understanding|Questions & Answers|Q&A|Practice Questions|Quiz|Self-Check|Review Questions|Exercises|Questions)[\s\S]*$/i, '');
+
+  // 3. Remove LaTeX math dollar signs ($...$ or $$...$$) unless followed by pure currency digits like $25
+  cleaned = cleaned.replace(/\$\$([^$]+)\$\$/g, '$1');
+  cleaned = cleaned.replace(/\$([A-Za-z0-9_+\-*\/=^()\\ ]+)\$/g, '$1');
+
+  // 4. Remove emojis to ensure clean reading and TTS compatibility
+  cleaned = cleaned.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+
+  // 5. Ensure title starts with "# Vidya: [x]"
+  const firstLineMatch = cleaned.match(/^#\s*(?:Vidya:\s*)?(.*)/m);
+  if (firstLineMatch) {
+    const titleText = firstLineMatch[1].trim();
+    cleaned = cleaned.replace(/^#\s*.*$/m, `# Vidya: ${titleText}`);
+  } else {
+    const fallbackTitle = defaultTitle.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+    cleaned = `# Vidya: ${fallbackTitle}\n\n` + cleaned;
+  }
+
+  return cleaned.trim();
+};
+
+const extractVidyaTitle = (text: string, fallback: string): string => {
+  const match = text.match(/^#\s*Vidya:\s*(.*)/m) || text.match(/^#\s*(.*)/m);
+  if (match && match[1].trim()) {
+    const raw = match[1].trim().replace(/^Vidya:\s*/i, '');
+    return `Vidya: ${raw}`;
+  }
+  const cleanFallback = fallback.replace(/^Vidya:\s*/i, '').replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+  return `Vidya: ${cleanFallback}`;
+};
+
+const extractTextFromBuffer = (buffer: ArrayBuffer): string => {
+  try {
+    const bytes = new Uint8Array(buffer);
+    const len = Math.min(bytes.length, 2 * 1024 * 1024);
+    const decoder = new TextDecoder('latin1');
+    const str = decoder.decode(bytes.subarray(0, len));
+    const matches = str.match(/\(([^()]{3,})\)\s*(?:Tj|TJ|\'|\")/g) || [];
+    const parts: string[] = [];
+    for (const m of matches) {
+      const cleaned = m.replace(/^\(/, '').replace(/\)\s*(?:Tj|TJ|\'|\")$/, '').trim();
+      if (cleaned.length > 2 && !/[^\x20-\x7E\s]/.test(cleaned)) {
+        parts.push(cleaned);
+      }
+    }
+    return parts.join(' ').replace(/\s+/g, ' ').slice(0, 60000).trim();
+  } catch {
+    return '';
+  }
+};
 
 interface BlankPageProps {
   uploadedFile?: File | null;
@@ -78,8 +139,10 @@ export const BlankPage: React.FC<BlankPageProps> = ({
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
-      setDocTitle(selectedChapter.title);
-      setSummary(selectedChapter.summary);
+      const cleanSummary = sanitizeClientVidya(selectedChapter.summary, selectedChapter.title);
+      const computedTitle = extractVidyaTitle(cleanSummary, selectedChapter.title);
+      setDocTitle(computedTitle);
+      setSummary(cleanSummary);
       setStatus('done');
     }
   }, [selectedChapter]);
@@ -130,26 +193,33 @@ export const BlankPage: React.FC<BlankPageProps> = ({
       setStageMessage(EXTRACTION_STAGES[stageIdx]);
     }, 4000);
 
-    // 60-second safety net timeout to prevent permanent hang
+    // 120-second safety net timeout to allow deep Gemma 4 26B chapter analysis
     timeoutIdRef.current = setTimeout(() => {
       clearTimers();
       controller.abort();
       setStatus('error');
-      setErrorMessage('Processing is taking longer than expected. Please select another chapter PDF or try again.');
-    }, 60000);
+      setErrorMessage('Processing timed out after 120 seconds. Please check that the PDF contains readable text and try again.');
+    }, 120000);
 
     try {
-      // Convert PDF to base64
-      const base64Data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const res = reader.result as string;
-          const commaIdx = res.indexOf(',');
-          resolve(commaIdx !== -1 ? res.substring(commaIdx + 1) : res);
-        };
-        reader.onerror = () => reject(new Error('Failed to read the selected file.'));
-        reader.readAsDataURL(file);
-      });
+      // 1. Fast ArrayBuffer text extraction from the PDF directly in the browser
+      const arrayBuffer = await file.arrayBuffer();
+      const extractedText = extractTextFromBuffer(arrayBuffer);
+
+      // 2. Prepare payload (if file is under 35MB, convert to base64 for multimodal analysis)
+      let base64Data = '';
+      if (file.size <= 35 * 1024 * 1024) {
+        base64Data = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const res = reader.result as string;
+            const commaIdx = res.indexOf(',');
+            resolve(commaIdx !== -1 ? res.substring(commaIdx + 1) : res);
+          };
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(file);
+        });
+      }
 
       const response = await fetch('/api/extract-pdf', {
         method: 'POST',
@@ -160,47 +230,50 @@ export const BlankPage: React.FC<BlankPageProps> = ({
         body: JSON.stringify({
           pdfBase64: base64Data,
           fileName: file.name,
+          extractedText,
         }),
       });
 
       clearTimers();
 
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || 'Unable to process the document.');
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = null;
+      if (contentType.includes('application/json')) {
+        data = await response.json().catch(() => null);
       }
 
-      const data = await response.json();
-      if (!data.success || !data.summary) {
-        throw new Error(data.error || 'No summary could be generated.');
-      }
+      if (data && data.success && data.summary) {
+        const cleanSummary = sanitizeClientVidya(data.summary, file.name);
+        const computedTitle = extractVidyaTitle(cleanSummary, file.name);
+        setStageMessage('Vidya ready!');
+        setDocTitle(computedTitle);
+        setSummary(cleanSummary);
+        setStatus('done');
 
-      setStageMessage('Study notes ready!');
-      setSummary(data.summary);
-      setStatus('done');
-
-      // Persist to Cloud Firestore database
-      try {
-        await saveChapter({
-          fileName: file.name,
-          title: cleanTitle,
-          summary: data.summary,
-          fileSize: file.size,
-        });
-      } catch (saveErr) {
-        console.warn('Background chapter cloud save notice:', saveErr);
+        // Persist to Cloud Firestore database
+        try {
+          await saveChapter({
+            fileName: file.name,
+            title: computedTitle,
+            summary: cleanSummary,
+            fileSize: file.size,
+          });
+        } catch (saveErr) {
+          console.warn('Background chapter cloud save notice:', saveErr);
+        }
+      } else {
+        const errMsg = data?.error || (response.status !== 200 ? `Extraction failed (HTTP ${response.status})` : 'Could not generate chapter summary from this PDF.');
+        setStatus('error');
+        setErrorMessage(errMsg);
       }
     } catch (err: any) {
       clearTimers();
-      if (err.name === 'AbortError') {
-        console.log('Extraction aborted by user.');
+      if (err.name === 'AbortError' && !lastProcessedKeyRef.current) {
+        console.log('Extraction manually cancelled by user.');
         return;
       }
-      console.error('Extraction error:', err);
-      setErrorMessage(
-        err.message || 'We could not read this document. Please ensure it is a valid PDF and try again.'
-      );
       setStatus('error');
+      setErrorMessage(err?.message || 'We were unable to process this file. Please make sure it is a valid PDF and try again.');
     }
   };
 
@@ -257,15 +330,21 @@ export const BlankPage: React.FC<BlankPageProps> = ({
         return <div key={idx} className="h-3" />;
       }
 
-      // Title (# )
+      // Filter out any lingering Q&A or self-check lines
+      if (/^(##+\s*(Check Your Understanding|Questions & Answers|Q&A|Practice Questions|Quiz|Self-Check)|Q\d+:|Question\s*\d*:|Ans\d*:|Answer\s*\d*:)/i.test(trimmed)) {
+        return null;
+      }
+
+      // Title (# ) - always format as "Vidya: [AI-generated title]"
       if (trimmed.startsWith('# ')) {
+        const rawTitle = trimmed.replace(/^#\s+/, '').replace(/^Vidya:\s*/i, '');
         return (
           <h1
             key={idx}
-            className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-6 mb-3 pb-2 border-b"
+            className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-6 mb-3 pb-3 border-b"
             style={{ color: 'var(--text-primary)', borderColor: 'var(--border-warm)' }}
           >
-            {trimmed.replace(/^#\s+/, '')}
+            Vidya: {rawTitle}
           </h1>
         );
       }
@@ -278,7 +357,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
             className="text-xl sm:text-2xl font-bold tracking-tight mt-6 mb-3 flex items-center gap-2"
             style={{ color: 'var(--accent-saffron-text)' }}
           >
-            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+            <span className="w-2 h-2 rounded-full bg-orange-600 dark:bg-orange-500 shrink-0" />
             <span>{trimmed.replace(/^##\s+/, '')}</span>
           </h2>
         );
@@ -329,10 +408,10 @@ export const BlankPage: React.FC<BlankPageProps> = ({
       if (/^[\*\-]\s+/.test(trimmed)) {
         const itemText = trimmed.replace(/^[\*\-]\s+/, '');
         return (
-          <div key={idx} className="flex items-start gap-3 my-1.5 pl-1 sm:pl-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 mt-2 shrink-0" />
+          <div key={idx} className="flex items-start gap-3 my-2 pl-1 sm:pl-2">
+            <span className="w-2 h-2 rounded-full bg-orange-600 dark:bg-orange-500 mt-2 shrink-0" />
             <span
-              className="text-sm sm:text-base leading-relaxed"
+              className="text-[15px] sm:text-[16px] leading-relaxed"
               style={{ color: 'var(--text-primary)' }}
               dangerouslySetInnerHTML={{
                 __html: formatInlineMarkdown(itemText),
@@ -347,15 +426,15 @@ export const BlankPage: React.FC<BlankPageProps> = ({
         const match = trimmed.match(/^(\d+\.)\s+(.*)$/);
         if (match) {
           return (
-            <div key={idx} className="flex items-start gap-2.5 my-1.5 pl-1 sm:pl-2">
+            <div key={idx} className="flex items-start gap-2.5 my-2 pl-1 sm:pl-2">
               <span
-                className="text-xs sm:text-sm font-bold mt-0.5 min-w-[1.5rem]"
-                style={{ color: 'var(--accent-saffron)' }}
+                className="text-sm sm:text-base font-bold mt-0.5 min-w-[1.5rem]"
+                style={{ color: 'var(--accent-saffron-text)' }}
               >
                 {match[1]}
               </span>
               <span
-                className="text-sm sm:text-base leading-relaxed"
+                className="text-[15px] sm:text-[16px] leading-relaxed"
                 style={{ color: 'var(--text-primary)' }}
                 dangerouslySetInnerHTML={{
                   __html: formatInlineMarkdown(match[2]),
@@ -370,7 +449,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
       return (
         <p
           key={idx}
-          className="text-sm sm:text-base leading-relaxed my-2"
+          className="text-[15px] sm:text-[16px] leading-relaxed my-2.5"
           style={{ color: 'var(--text-secondary)' }}
           dangerouslySetInnerHTML={{
             __html: formatInlineMarkdown(trimmed),
@@ -380,12 +459,15 @@ export const BlankPage: React.FC<BlankPageProps> = ({
     });
   };
 
-  // Safe inline markdown formatter for **bold** and *italic*
+  // Safe inline markdown formatter for **bold**, *italic*, and cleaning raw math dollar signs
   const formatInlineMarkdown = (str: string) => {
     return str
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-stone-900 dark:text-stone-100">$1</strong>')
+      // Remove LaTeX math dollar signs ($...$ or $$...$$) unless followed by pure currency digits like $25
+      .replace(/\$\$([^$]+)\$\$/g, '$1')
+      .replace(/\$([A-Za-z0-9_+\-*\/=^()\\ ]+)\$/g, '$1')
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-stone-950 dark:text-stone-100">$1</strong>')
       .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>')
-      .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded text-xs font-mono bg-stone-200/60 dark:bg-stone-800 text-orange-600 dark:text-orange-400">$1</code>');
+      .replace(/`([^`]+)`/g, '<code class="px-1.5 py-0.5 rounded text-xs font-mono font-semibold bg-amber-100/90 dark:bg-stone-800 text-amber-950 dark:text-amber-300 border border-amber-200/80 dark:border-stone-700">$1</code>');
   };
 
   return (
@@ -609,15 +691,17 @@ export const BlankPage: React.FC<BlankPageProps> = ({
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: 'var(--accent-saffron-text)' }}>
-                  <span>Study Guide</span>
+                  <span>Vidya</span>
+                  <span>•</span>
+                  <span>Stage 01</span>
                   <span>•</span>
                   <span className="flex items-center gap-1">
                     <Clock className="w-3 h-3" />
-                    <span>Quick Read</span>
+                    <span>Structured Reading</span>
                   </span>
                 </div>
                 <h2 className="text-base sm:text-lg font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-                  {docTitle || 'Extracted Chapter'}
+                  {docTitle || 'Vidya Notes'}
                 </h2>
               </div>
             </div>
@@ -651,7 +735,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                   borderColor: 'var(--border-warm)',
                   color: 'var(--text-primary)',
                 }}
-                title="Copy all notes to clipboard"
+                title="Copy Vidya to clipboard"
               >
                 {copied ? (
                   <>
@@ -661,7 +745,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Copy Notes</span>
+                    <span>Copy Vidya</span>
                   </>
                 )}
               </button>
@@ -707,7 +791,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
             {renderFormattedContent(summary)}
           </article>
 
-          {/* Bottom Navigation & Practice Link */}
+          {/* Bottom Navigation & Progression Link */}
           <div
             className="p-6 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4"
             style={{
@@ -717,10 +801,10 @@ export const BlankPage: React.FC<BlankPageProps> = ({
           >
             <div className="text-center sm:text-left">
               <h4 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-                Ready to test what you learned?
+                Completed Vidya Reading?
               </h4>
               <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Reinforce your understanding with interactive chapter questions.
+                Advance to Shravan for concise audio explanation and conceptual synthesis.
               </p>
             </div>
 
@@ -742,64 +826,20 @@ export const BlankPage: React.FC<BlankPageProps> = ({
               {onNavigateHome && (
                 <button
                   type="button"
+                  id="btn-continue-to-shravan"
                   onClick={onNavigateHome}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition-all hover:opacity-90 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
                   style={{
                     backgroundColor: 'var(--accent-saffron)',
                     color: '#FFFFFF',
                   }}
                 >
-                  <Compass className="w-4 h-4" />
-                  <span>Start Practice (+80 XP)</span>
+                  <span>Continue to Shravan</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
               )}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ==============================================================
-          STATE 4: IDLE (if user lands directly without a file)
-          ============================================================== */}
-      {status === 'idle' && (
-        <div
-          className="flex-1 flex flex-col items-center justify-center text-center p-8 sm:p-14 my-auto rounded-3xl border shadow-sm max-w-lg mx-auto w-full"
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            borderColor: 'var(--border-warm)',
-          }}
-        >
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 border shadow-xs"
-            style={{
-              backgroundColor: 'var(--accent-saffron-light)',
-              borderColor: 'var(--border-warm)',
-              color: 'var(--accent-saffron)',
-            }}
-          >
-            <UploadCloud className="w-8 h-8" />
-          </div>
-
-          <h3 className="text-2xl font-bold tracking-tight mb-2" style={{ color: 'var(--text-primary)' }}>
-            Upload a Chapter PDF
-          </h3>
-
-          <p className="text-sm max-w-sm mb-6 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            Select any textbook chapter or study notes PDF to generate a clear, student-friendly summary.
-          </p>
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold shadow-xs transition-transform hover:scale-105 active:scale-95 cursor-pointer"
-            style={{
-              backgroundColor: 'var(--accent-saffron)',
-              color: '#FFFFFF',
-            }}
-          >
-            <UploadCloud className="w-4 h-4" />
-            <span>Select PDF Document</span>
-          </button>
         </div>
       )}
     </div>

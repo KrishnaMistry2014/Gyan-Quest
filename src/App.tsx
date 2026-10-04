@@ -27,13 +27,10 @@ const MainAppContent: React.FC = () => {
   const [selectedChapter, setSelectedChapter] = useState<SavedChapter | null>(null);
   const [activeSection, setActiveSection] = useState<string>('home');
 
-  // When user logs in and is verified, automatically navigate to dashboard
+  // When user logs in and is verified, automatically navigate to dashboard if on landing
   useEffect(() => {
     if (user && !isEmailUnverified) {
-      setCurrentView((prev) => (prev === 'blank' || prev === 'my-chapters' ? prev : 'dashboard'));
-    } else {
-      // If user signs out, ensure 'my-chapters' view is closed and reverted to 'landing'
-      setCurrentView((prev) => (prev === 'my-chapters' ? 'landing' : (prev === 'blank' ? 'blank' : 'landing')));
+      setCurrentView((prev) => (prev === 'landing' ? 'dashboard' : prev));
     }
   }, [user, isEmailUnverified]);
 
@@ -80,8 +77,17 @@ const MainAppContent: React.FC = () => {
   };
 
   const handleResumeLearning = () => {
-    setCurrentView('landing');
-    setTimeout(() => scrollToSection('journey'), 50);
+    // Resume learning leads to My Chapters (for now)
+    setCurrentView('my-chapters');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleStartLearning = () => {
+    // Start learning must not redirect to anywhere - stays on current dashboard
+    const uploadEl = document.getElementById('card-upload-textbooks');
+    if (uploadEl) {
+      uploadEl.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   const handlePdfUploaded = (file: File) => {
@@ -134,24 +140,18 @@ const MainAppContent: React.FC = () => {
             onClearUploadedPdf={() => setUploadedPdf(null)}
           />
         ) : currentView === 'my-chapters' ? (
-          /* My Chapters Library View - only for signed-in users */
-          user ? (
-            <MyChapters
-              onOpenChapter={handleOpenChapter}
-              onUploadPdf={handlePdfUploaded}
-              onNavigateDashboard={() => setCurrentView('dashboard')}
-              onNavigateHome={() => setCurrentView('landing')}
-            />
-          ) : (
-            (() => {
-              setCurrentView('landing');
-              return null;
-            })()
-          )
+          /* My Chapters Library View */
+          <MyChapters
+            onOpenChapter={handleOpenChapter}
+            onUploadPdf={handlePdfUploaded}
+            onNavigateDashboard={() => setCurrentView('dashboard')}
+            onNavigateHome={() => setCurrentView('landing')}
+          />
         ) : currentView === 'dashboard' ? (
           /* Dashboard View */
           <Dashboard
             onResumeLearning={handleResumeLearning}
+            onStartLearning={handleStartLearning}
             onPdfUpload={handlePdfUploaded}
           />
         ) : (
@@ -197,8 +197,10 @@ const MainAppContent: React.FC = () => {
       {/* Interactive Streak Modal */}
       <StreakModal
         onStartLearning={() => {
-          setCurrentView('landing');
-          setTimeout(() => scrollToSection('journey'), 50);
+          if (user) {
+            setCurrentView('my-chapters');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
         }}
       />
     </div>

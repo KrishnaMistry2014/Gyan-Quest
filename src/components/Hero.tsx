@@ -87,7 +87,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
               style={{ color: 'var(--text-primary)' }}
             >
               Transform Any Chapter Into a{' '}
-              <span style={{ color: 'var(--accent-saffron-text)' }}>
+              <span className="text-yellow-500 dark:text-yellow-400">
                 5-Stage Quest
               </span>
             </h1>
@@ -284,7 +284,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
                 <button
                   type="button"
                   onClick={user ? onStartQuest : openAuthModal}
-                  className="inline-flex items-center gap-1 font-bold text-[11px] hover:opacity-80 transition-opacity cursor-pointer"
+                  className="inline-flex items-center gap-1 font-bold text-[11px] hover:underline cursor-pointer"
                   style={{ color: 'var(--accent-saffron-text)' }}
                 >
                   <span>Start Chapter Quest</span>
