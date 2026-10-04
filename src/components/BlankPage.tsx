@@ -21,8 +21,8 @@ import { SavedChapter, saveChapter } from '../lib/chapters';
 const EXTRACTION_STAGES = [
   'Extracting textbook text and diagrams with Gemini Flash-Lite...',
   'Analyzing diagrams, scientific schematics, and visual components...',
-  'Gemma 4 26B is analyzing chapter content and naming the title...',
-  'Gemma 4 26B is synthesizing deep academic concept breakdowns...',
+  'Gemini 3.5 Flash-Lite is analyzing chapter content and naming the title...',
+  'Gemini 3.5 Flash-Lite is synthesizing deep academic concept breakdowns...',
   'Detailing scientific laws, principles, and diagram explanations...',
   'Compiling exhaustive glossary and key definitions without omissions...',
   'Finalizing detailed Vidya chapter summary...',
@@ -93,6 +93,7 @@ interface BlankPageProps {
   onNavigateHome?: () => void;
   onNavigateDashboard?: () => void;
   onNavigateMyChapters?: () => void;
+  onNavigateShravan?: (chapter: SavedChapter) => void;
   onPdfUpload?: (file: File) => void;
   onClearUploadedPdf?: () => void;
 }
@@ -103,6 +104,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
   onNavigateHome,
   onNavigateDashboard,
   onNavigateMyChapters,
+  onNavigateShravan,
   onPdfUpload,
   onClearUploadedPdf,
 }) => {
@@ -193,7 +195,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
       setStageMessage(EXTRACTION_STAGES[stageIdx]);
     }, 4000);
 
-    // 120-second safety net timeout to allow deep Gemma 4 26B chapter analysis
+    // 120-second safety net timeout to allow deep Gemini 3.5 Flash-Lite chapter analysis
     timeoutIdRef.current = setTimeout(() => {
       clearTimers();
       controller.abort();
@@ -823,11 +825,20 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                 </button>
               )}
 
-              {onNavigateHome && (
+              {onNavigateShravan && (
                 <button
                   type="button"
                   id="btn-continue-to-shravan"
-                  onClick={onNavigateHome}
+                  onClick={() => {
+                    const ch: SavedChapter = selectedChapter || {
+                      id: activeFile ? `${activeFile.name}-${activeFile.size}` : `ch_${Date.now()}`,
+                      fileName: activeFile?.name || 'Chapter.pdf',
+                      title: docTitle || 'Chapter Summary',
+                      summary: summary,
+                      createdAt: new Date().toISOString(),
+                    };
+                    onNavigateShravan(ch);
+                  }}
                   className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
                   style={{
                     backgroundColor: 'var(--accent-saffron)',

@@ -18,13 +18,15 @@ import { Dashboard } from './components/Dashboard';
 import { VerificationScreen } from './components/VerificationScreen';
 import { BlankPage } from './components/BlankPage';
 import { MyChapters } from './components/MyChapters';
+import { ShravanPage } from './components/ShravanPage';
 import { SavedChapter } from './lib/chapters';
 
 const MainAppContent: React.FC = () => {
   const { openAuthModal, user, isEmailUnverified } = useAuth();
-  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'blank' | 'my-chapters'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'blank' | 'my-chapters' | 'shravan'>('landing');
   const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<SavedChapter | null>(null);
+  const [activeShravanChapter, setActiveShravanChapter] = useState<SavedChapter | null>(null);
   const [activeSection, setActiveSection] = useState<string>('home');
 
   // When user logs in and is verified, automatically navigate to dashboard if on landing
@@ -136,8 +138,27 @@ const MainAppContent: React.FC = () => {
                 setCurrentView('my-chapters');
               }
             }}
+            onNavigateShravan={(ch) => {
+              setSelectedChapter(ch);
+              setActiveShravanChapter(ch);
+              setCurrentView('shravan');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onPdfUpload={handlePdfUploaded}
             onClearUploadedPdf={() => setUploadedPdf(null)}
+          />
+        ) : currentView === 'shravan' && activeShravanChapter ? (
+          /* Shravan Audio Narration View */
+          <ShravanPage
+            chapter={activeShravanChapter}
+            onBackToVidya={() => {
+              setCurrentView('blank');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateDashboard={() => {
+              setCurrentView('dashboard');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         ) : currentView === 'my-chapters' ? (
           /* My Chapters Library View */

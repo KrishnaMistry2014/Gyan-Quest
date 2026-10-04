@@ -117,12 +117,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     GYAN QUEST
                   </span>
-                  <span
-                    className="text-[9px] font-bold tracking-widest block uppercase opacity-85"
-                    style={{ color: 'var(--accent-saffron-text)' }}
-                  >
-                    Vedic Pedagogy • CBSE Academy
-                  </span>
                 </div>
               </button>
 
@@ -325,12 +319,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   style={{ color: 'var(--text-primary)' }}
                 >
                   GYAN QUEST
-                </span>
-                <span
-                  className="text-[9px] font-bold tracking-widest block uppercase opacity-85"
-                  style={{ color: 'var(--accent-saffron-text)' }}
-                >
-                  Vedic Pedagogy • CBSE Academy
                 </span>
               </div>
             </button>

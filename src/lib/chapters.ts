@@ -18,6 +18,8 @@ export interface SavedChapter {
   fileName: string;
   title: string;
   summary: string;
+  audioBase64?: string;
+  shravanCompleted?: boolean;
   createdAt: string; // ISO string
   fileSize?: number;
 }
@@ -85,6 +87,8 @@ export async function fetchUserChaptersFromFirestore(userId: string): Promise<Sa
         fileName: data.fileName || 'document.pdf',
         title: data.title || 'Chapter Notes',
         summary: data.summary || '',
+        audioBase64: data.audioBase64,
+        shravanCompleted: Boolean(data.shravanCompleted),
         createdAt: data.createdAt || new Date().toISOString(),
         fileSize: data.fileSize,
       });
@@ -126,6 +130,8 @@ export function subscribeUserChapters(
             fileName: data.fileName || 'document.pdf',
             title: data.title || 'Chapter Notes',
             summary: data.summary || '',
+            audioBase64: data.audioBase64,
+            shravanCompleted: Boolean(data.shravanCompleted),
             createdAt: data.createdAt || new Date().toISOString(),
             fileSize: data.fileSize,
           });
@@ -205,6 +211,32 @@ export async function saveChapter(chapterData: {
   }
 
   return newChapter;
+}
+
+/**
+ * Update chapter audio and Shravan completion status in Firestore and local cache.
+ */
+export async function updateChapterAudio(chapterId: string, audioBase64: string, shravanCompleted: boolean = true) {
+  const currentUser = auth.currentUser;
+  const userId = currentUser?.uid || 'guest_session';
+
+  const localList = getLocalChapters(userId);
+  const updated = localList.map((c) => {
+    if (c.id === chapterId) {
+      return { ...c, audioBase64, shravanCompleted };
+    }
+    return c;
+  });
+  setLocalChapters(updated, userId);
+
+  if (currentUser) {
+    try {
+      const chapterDocRef = doc(db, 'users', userId, 'chapters', chapterId);
+      await setDoc(chapterDocRef, { audioBase64, shravanCompleted }, { merge: true });
+    } catch (err) {
+      console.warn('Failed to update chapter audio in Firestore:', err);
+    }
+  }
 }
 
 /**

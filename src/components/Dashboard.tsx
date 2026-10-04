@@ -9,7 +9,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartLearning, onPdfUpload }) => {
-  const { streak, isStreakActiveToday, openStreakModal } = useAuth();
+  const { streak, isStreakActiveToday, openStreakModal, profile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -207,7 +207,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartL
               XP
             </span>
             <div className="text-3xl sm:text-4xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              0 XP
+              {profile?.xp || 0} XP
             </div>
             <p className="text-xs sm:text-sm mt-2" style={{ color: 'var(--text-secondary)' }}>
               Vidya (10), Shravan (5), Manan (15), Pariksha (50)

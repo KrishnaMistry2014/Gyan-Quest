@@ -55,6 +55,7 @@ export interface UserProfileData {
   lastActiveDate: string;
   longestStreak?: number;
   activeDays?: string[];
+  xp?: number;
 }
 
 const GUEST_STORAGE_KEY = 'gq_guest_profile';
@@ -72,6 +73,7 @@ export const getGuestProfile = (): UserProfileData => {
         lastActiveDate: parsed.lastActiveDate || today,
         longestStreak: typeof parsed.longestStreak === 'number' ? parsed.longestStreak : 1,
         activeDays: Array.isArray(parsed.activeDays) ? parsed.activeDays : [today],
+        xp: typeof parsed.xp === 'number' ? parsed.xp : 0,
       };
     }
   } catch {
@@ -84,6 +86,7 @@ export const getGuestProfile = (): UserProfileData => {
     lastActiveDate: today,
     longestStreak: 1,
     activeDays: [today],
+    xp: 0,
   };
   saveGuestProfile(defaultGuest);
   return defaultGuest;
@@ -341,6 +344,35 @@ export async function registerWithEmail(email: string, pass: string): Promise<Us
   }
   await syncUserAndStreak(cred.user);
   return cred.user;
+}
+
+export async function addUserXp(user: User | null, amount: number): Promise<UserProfileData> {
+  if (!user) {
+    const guest = getGuestProfile();
+    const currentXp = typeof guest.xp === 'number' ? guest.xp : 0;
+    const updated = { ...guest, xp: currentXp + amount };
+    saveGuestProfile(updated);
+    return updated;
+  }
+  const local = getLocalProfile(user.uid) || {
+    name: user.displayName || 'Learner',
+    email: user.isAnonymous ? null : (user.email || null),
+    streak: 1,
+    lastActiveDate: getLocalDateString(),
+    longestStreak: 1,
+    activeDays: [getLocalDateString()],
+    xp: 0,
+  };
+  const currentXp = typeof local.xp === 'number' ? local.xp : 0;
+  const updated = { ...local, xp: currentXp + amount };
+  saveLocalProfile(user.uid, updated);
+  try {
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, { xp: updated.xp }, { merge: true });
+  } catch (err) {
+    console.debug('Failed to sync XP to Firestore:', err);
+  }
+  return updated;
 }
 
 export async function logOut(): Promise<void> {

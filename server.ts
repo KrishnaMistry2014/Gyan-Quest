@@ -196,7 +196,7 @@ Perform two essential tasks across all pages:
     }
 
     // =========================================================================
-    // STEP 2: Chapter Summariser & Title Creator (Gemma 4 26B)
+    // STEP 2: Chapter Summariser & Title Creator (Gemini 3.5 Flash-Lite)
     // =========================================================================
     const summarizerPrompt = `You are a distinguished academic educator writing an exhaustive, highly detailed chapter summary titled "Vidya" for students.
 Students will use this as their complete, definitive chapter revision text.
@@ -260,24 +260,24 @@ CRITICAL REQUIREMENTS:
 
     let summary = '';
 
-    // Primary: Gemma 4 26B as the Summariser
+    // Primary: Gemini 3.5 Flash-Lite as the Summariser
     try {
-      console.log(`[Vidya Step 2] Generating chapter summary with Gemma 4 26B...`);
-      const gemmaPromise = ai.models.generateContent({
-        model: 'gemma-4-26b-a4b-it',
+      console.log(`[Vidya Step 2] Generating chapter summary with Gemini 3.5 Flash-Lite...`);
+      const lite35Promise = ai.models.generateContent({
+        model: 'gemini-3.5-flash-lite',
         contents: [summarizerPrompt],
         config: {
           maxOutputTokens: 8192,
         },
       });
-      const gemmaResponse = await callWithTimeout(gemmaPromise, 65000, 'Gemma 4 26B Summariser');
-      if (gemmaResponse.text && gemmaResponse.text.trim().length > 80) {
-        summary = sanitizeVidya(gemmaResponse.text, fileName || 'Chapter Summary');
-        console.log(`[Vidya Step 2] Gemma 4 26B summarization successful (${summary.length} characters)!`);
+      const lite35Response = await callWithTimeout(lite35Promise, 55000, 'Gemini 3.5 Flash-Lite Summariser');
+      if (lite35Response.text && lite35Response.text.trim().length > 80) {
+        summary = sanitizeVidya(lite35Response.text, fileName || 'Chapter Summary');
+        console.log(`[Vidya Step 2] Gemini 3.5 Flash-Lite summarization successful (${summary.length} characters)!`);
       }
-    } catch (gemmaErr: any) {
-      console.warn('[Vidya Step 2] Gemma 4 26B notice:', gemmaErr?.message || gemmaErr);
-      // Fallback: Gemini 3.1 Flash-Lite (or 3.5 Flash-Lite) to summarize the extracted chapter content
+    } catch (lite35Err: any) {
+      console.warn('[Vidya Step 2] Gemini 3.5 Flash-Lite notice:', lite35Err?.message || lite35Err);
+      // Fallback: Gemini 3.1 Flash-Lite
       try {
         console.log(`[Vidya Step 2 Fallback] Summarizing with Gemini 3.1 Flash-Lite...`);
         const litePromise = ai.models.generateContent({
@@ -293,24 +293,7 @@ CRITICAL REQUIREMENTS:
           console.log(`[Vidya Step 2 Fallback] Gemini 3.1 Flash-Lite summarization successful (${summary.length} characters)!`);
         }
       } catch (liteErr: any) {
-        console.warn('[Vidya Step 2 Fallback] Gemini 3.1 Flash-Lite notice:', liteErr?.message || liteErr);
-        try {
-          console.log(`[Vidya Step 2 Fallback] Summarizing with Gemini 3.5 Flash-Lite...`);
-          const lite35Promise = ai.models.generateContent({
-            model: 'gemini-3.5-flash-lite',
-            contents: [summarizerPrompt],
-            config: {
-              maxOutputTokens: 8192,
-            },
-          });
-          const lite35Response = await callWithTimeout(lite35Promise, 45000, 'Gemini 3.5 Flash-Lite Summariser');
-          if (lite35Response.text && lite35Response.text.trim().length > 80) {
-            summary = sanitizeVidya(lite35Response.text, fileName || 'Chapter Summary');
-            console.log(`[Vidya Step 2 Fallback] Gemini 3.5 Flash-Lite summarization successful (${summary.length} characters)!`);
-          }
-        } catch (lite35Err: any) {
-          console.error('[Vidya Step 2 Fallback] Gemini 3.5 Flash-Lite notice:', lite35Err?.message || lite35Err);
-        }
+        console.error('[Vidya Step 2 Fallback] Gemini 3.1 Flash-Lite notice:', liteErr?.message || liteErr);
       }
     }
 
@@ -333,6 +316,189 @@ CRITICAL REQUIREMENTS:
     return res.status(500).json({
       success: false,
       error: error?.message || 'An error occurred during PDF processing.',
+    });
+  }
+});
+
+// Helper to chunk text into sections of roughly 3,000 to 4,000 words for TTS
+function chunkTextByWords(text: string, targetChunkWords = 3200): string[] {
+  const totalWords = text.split(/\s+/).filter(Boolean).length;
+  // If the total text is within a single chunk size (<= 3,800 words), keep as 1 chunk
+  if (totalWords <= 3800) {
+    return [text.trim()];
+  }
+
+  // Split by markdown headings or double-newline paragraph breaks
+  const sections = text.split(/\n(?=##+ )|\n\s*\n/);
+  const chunks: string[] = [];
+  let currentChunk: string[] = [];
+  let currentWords = 0;
+
+  for (const sec of sections) {
+    const trimmed = sec.trim();
+    if (!trimmed) continue;
+    const wordsInSec = trimmed.split(/\s+/).filter(Boolean).length;
+
+    if (currentWords + wordsInSec > 3800 && currentChunk.length > 0) {
+      chunks.push(currentChunk.join('\n\n'));
+      currentChunk = [trimmed];
+      currentWords = wordsInSec;
+    } else {
+      currentChunk.push(trimmed);
+      currentWords += wordsInSec;
+    }
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.join('\n\n'));
+  }
+
+  // Fallback safety: If any single chunk exceeds 4,000 words, split at sentence boundaries
+  const finalChunks: string[] = [];
+  for (const c of chunks) {
+    const wCount = c.split(/\s+/).filter(Boolean).length;
+    if (wCount > 4000) {
+      const sentences = c.match(/[^.!?]+[.!?]+(\s+|$)|[^.!?]+$/g) || [c];
+      let subChunk: string[] = [];
+      let subWords = 0;
+      for (const sent of sentences) {
+        const sw = sent.split(/\s+/).filter(Boolean).length;
+        if (subWords + sw > 3500 && subChunk.length > 0) {
+          finalChunks.push(subChunk.join(''));
+          subChunk = [sent];
+          subWords = sw;
+        } else {
+          subChunk.push(sent);
+          subWords += sw;
+        }
+      }
+      if (subChunk.length > 0) {
+        finalChunks.push(subChunk.join(''));
+      }
+    } else {
+      finalChunks.push(c);
+    }
+  }
+
+  return finalChunks.filter(c => c.trim().length > 0);
+}
+
+// Helper to wrap raw L16 PCM into standard WAV format if needed
+function pcmToWav(pcmBuffer: Buffer, sampleRate = 24000, numChannels = 1, bitsPerSample = 16): Buffer {
+  if (pcmBuffer.length >= 12 && pcmBuffer.toString('ascii', 0, 4) === 'RIFF') {
+    return pcmBuffer;
+  }
+  const header = Buffer.alloc(44);
+  const dataSize = pcmBuffer.length;
+  const fileSize = 36 + dataSize;
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+
+  header.write('RIFF', 0);
+  header.writeUInt32LE(fileSize, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM format
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(dataSize, 40);
+
+  return Buffer.concat([header, pcmBuffer]);
+}
+
+// Shravan Audio Generation Endpoint strictly using Gemini 3.1 Flash TTS ONLY
+// Chunks text into 3,000-4,000 word sections, applies 65s timeout per chunk, and stitches resulting WAVs
+app.post('/api/generate-audio', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'No text provided for audio generation.' });
+    }
+
+    const totalWordCount = text.split(/\s+/).filter(Boolean).length;
+    const chunks = chunkTextByWords(text);
+    console.log(`[Shravan TTS] Starting audio generation strictly with Gemini 3.1 Flash TTS (gemini-3.1-flash-tts-preview)... total words: ${totalWordCount}, chunks: ${chunks.length}`);
+
+    const pcmBuffers: Buffer[] = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunkText = chunks[i];
+      const chunkWordCount = chunkText.split(/\s+/).filter(Boolean).length;
+      console.log(`[Shravan TTS] Synthesizing chunk ${i + 1}/${chunks.length} (~${chunkWordCount} words) with Gemini 3.1 Flash TTS (65s timeout)...`);
+
+      // Strictly Gemini 3.1 Flash TTS ONLY with an Indian accent Female ~30 Years old voice
+      const ttsPromise = ai.models.generateContent({
+        model: 'gemini-3.1-flash-tts-preview',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: `You are an Indian female educator, approximately 30 years old, speaking with a warm, natural, and clear Indian accent at an educational pace. Please narrate the following chapter summary clearly and engagingly for students:\n\n${chunkText}`,
+                speechMetadata: {
+                  style: 'Indian accent female ~30 years old, warm, clear, educational pace',
+                },
+              },
+            ],
+          } as any,
+        ],
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
+            },
+          },
+        },
+      });
+
+      // Strict 65s timeout per chunk
+      const ttsResponse = await callWithTimeout(ttsPromise, 65000, `Gemini 3.1 Flash TTS (chunk ${i + 1} of ${chunks.length})`);
+      const rawBase64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+      if (!rawBase64Audio) {
+        throw new Error(`Gemini 3.1 Flash TTS did not return audio data for chunk ${i + 1} of ${chunks.length}.`);
+      }
+
+      const rawChunkBuffer = Buffer.from(rawBase64Audio, 'base64');
+      // If the model chunk already has a 44-byte WAV header, strip it to extract pure PCM before stitching
+      const pcmChunk = (rawChunkBuffer.length >= 44 && rawChunkBuffer.toString('ascii', 0, 4) === 'RIFF')
+        ? rawChunkBuffer.subarray(44)
+        : rawChunkBuffer;
+
+      pcmBuffers.push(pcmChunk);
+      console.log(`[Shravan TTS] Chunk ${i + 1}/${chunks.length} completed successfully (${pcmChunk.length} bytes PCM).`);
+    }
+
+    // Stitch all PCM chunks together seamlessly
+    const completePcm = Buffer.concat(pcmBuffers);
+    // Wrap the stitched audio track into a standard, universally playable WAV file
+    const stitchedWavBuffer = pcmToWav(completePcm, 24000, 1, 16);
+    const finalBase64Audio = stitchedWavBuffer.toString('base64');
+
+    console.log(`[Shravan TTS] All ${chunks.length} chunks synthesized and stitched successfully into complete WAV (${stitchedWavBuffer.length} bytes, base64 length: ${finalBase64Audio.length})!`);
+
+    return res.json({
+      success: true,
+      model: 'Gemini 3.1 Flash TTS',
+      voice: 'Indian accent female (~30 years old)',
+      chunksCount: chunks.length,
+      audioBase64: finalBase64Audio,
+    });
+  } catch (error: any) {
+    console.error('[Shravan TTS Error]:', error);
+    let userMsg = error?.message || 'Failed to generate audio with Gemini 3.1 Flash TTS.';
+    if (userMsg.includes('429') || userMsg.includes('RESOURCE_EXHAUSTED') || userMsg.includes('quota') || userMsg.includes('Quota exceeded')) {
+      userMsg = 'Gemini 3.1 Flash TTS rate limit / quota exceeded (Free tier daily limit: 10 requests). Please try again later or configure billing for your Gemini API key.';
+    }
+    return res.status(500).json({
+      success: false,
+      error: userMsg,
     });
   }
 });
