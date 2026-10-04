@@ -309,7 +309,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
                     onClick={(e) => handleDelete(chapter.id, e)}
                     className="p-1.5 rounded-lg text-stone-500 dark:text-stone-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                     title="Delete Vidya notes"
-                    aria-label={`Delete ${chapter.title}`}
+                    aria-label={`Delete ${chapter.title.replace(/^Vidya:\s*/i, '')}`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -320,7 +320,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
                   className="text-lg font-bold tracking-tight mb-2 line-clamp-2 group-hover:text-orange-600 transition-colors"
                   style={{ color: 'var(--text-primary)' }}
                 >
-                  {chapter.title}
+                  {chapter.title.replace(/^Vidya:\s*/i, '')}
                 </h3>
 
                 {/* File name subtitle */}

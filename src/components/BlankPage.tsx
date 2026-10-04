@@ -44,27 +44,25 @@ const sanitizeClientVidya = (raw: string, defaultTitle: string): string => {
   // 4. Remove emojis to ensure clean reading and TTS compatibility
   cleaned = cleaned.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
 
-  // 5. Ensure title starts with "# Vidya: [x]"
+  // 5. Ensure title starts with "# [x]"
   const firstLineMatch = cleaned.match(/^#\s*(?:Vidya:\s*)?(.*)/m);
   if (firstLineMatch) {
-    const titleText = firstLineMatch[1].trim();
-    cleaned = cleaned.replace(/^#\s*.*$/m, `# Vidya: ${titleText}`);
+    const titleText = firstLineMatch[1].trim().replace(/^Vidya:\s*/i, '');
+    cleaned = cleaned.replace(/^#\s*.*$/m, `# ${titleText}`);
   } else {
-    const fallbackTitle = defaultTitle.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-    cleaned = `# Vidya: ${fallbackTitle}\n\n` + cleaned;
+    const fallbackTitle = defaultTitle.replace(/^Vidya:\s*/i, '').replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+    cleaned = `# ${fallbackTitle}\n\n` + cleaned;
   }
 
   return cleaned.trim();
 };
 
 const extractVidyaTitle = (text: string, fallback: string): string => {
-  const match = text.match(/^#\s*Vidya:\s*(.*)/m) || text.match(/^#\s*(.*)/m);
+  const match = text.match(/^#\s*(?:Vidya:\s*)?(.*)/m);
   if (match && match[1].trim()) {
-    const raw = match[1].trim().replace(/^Vidya:\s*/i, '');
-    return `Vidya: ${raw}`;
+    return match[1].trim().replace(/^Vidya:\s*/i, '');
   }
-  const cleanFallback = fallback.replace(/^Vidya:\s*/i, '').replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-  return `Vidya: ${cleanFallback}`;
+  return fallback.replace(/^Vidya:\s*/i, '').replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
 };
 
 const extractTextFromBuffer = (buffer: ArrayBuffer): string => {
@@ -337,7 +335,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
         return null;
       }
 
-      // Title (# ) - always format as "Vidya: [AI-generated title]"
+      // Title (# ) - formatted as the AI-generated title
       if (trimmed.startsWith('# ')) {
         const rawTitle = trimmed.replace(/^#\s+/, '').replace(/^Vidya:\s*/i, '');
         return (
@@ -346,7 +344,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
             className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-6 mb-3 pb-3 border-b"
             style={{ color: 'var(--text-primary)', borderColor: 'var(--border-warm)' }}
           >
-            Vidya: {rawTitle}
+            {rawTitle}
           </h1>
         );
       }

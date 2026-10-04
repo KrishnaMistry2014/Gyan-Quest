@@ -107,8 +107,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
 
-  const [xpToast, setXpToast] = useState<string | null>(null);
-
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
 
@@ -213,9 +211,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
         chapter.shravanCompleted = true;
         await updateChapterAudio(chapter.id, chapter.audioBase64 || audioBase64 || '', true);
         await refreshUser?.();
-        
-        setXpToast('+10 XP Earned for Shravan (Audio Milestone)!');
-        setTimeout(() => setXpToast(null), 4000);
       } catch (err) {
         console.warn('Failed to claim Shravan XP:', err);
       }
@@ -303,22 +298,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
-      {/* XP Toast Notification Banner */}
-      {xpToast && (
-        <div
-          id="shravan-xp-toast"
-          className="fixed top-20 right-4 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl border shadow-lg animate-bounce"
-          style={{
-            backgroundColor: 'var(--accent-saffron-light)',
-            borderColor: 'var(--accent-saffron)',
-            color: 'var(--accent-saffron-text)',
-          }}
-        >
-          <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
-          <span className="text-sm font-bold">{xpToast}</span>
-        </div>
-      )}
-
       {/* Top Navigation & Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <button
@@ -360,10 +339,10 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             Shravan Audio Narration
           </h1>
           <p className="text-sm sm:text-base font-medium truncate" style={{ color: 'var(--accent-saffron-text)' }}>
-            {chapter.title}
+            {chapter.title.replace(/^Vidya:\s*/i, '')}
           </p>
           <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Powered by Edge TTS • Indian Accent Female (Neerja) • (+10 XP)
+            Powered by Edge TTS
           </p>
         </div>
 
@@ -378,7 +357,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               Generating Shravan Audio...
             </h3>
             <p className="text-xs sm:text-sm max-w-md" style={{ color: 'var(--text-secondary)' }}>
-              Edge TTS is synthesizing your chapter summary into an Indian accent female voice narration (en-IN-NeerjaNeural). The service may take a moment to wake if sleeping. Please hold on.
+              Please wait for a few moments as the service may take a minute to load after sleeping...
             </p>
           </div>
         )}

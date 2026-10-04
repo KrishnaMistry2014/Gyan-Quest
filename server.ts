@@ -83,18 +83,18 @@ app.post('/api/extract-pdf', async (req, res) => {
       // 4. Remove emojis to ensure clean reading and TTS compatibility
       cleaned = cleaned.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
 
-      // 5. Ensure title starts with "# Vidya: [x]"
+      // 5. Ensure title starts with "# [x]" (without "Vidya: " prefix)
       const firstLineMatch = cleaned.match(/^#\s*(?:Vidya:\s*)?(.*)/m);
       if (firstLineMatch) {
-        const titleText = firstLineMatch[1].trim();
-        cleaned = cleaned.replace(/^#\s*.*$/m, `# Vidya: ${titleText}`);
+        const titleText = firstLineMatch[1].trim().replace(/^Vidya:\s*/i, '');
+        cleaned = cleaned.replace(/^#\s*.*$/m, `# ${titleText}`);
       } else {
         const fallbackTitle = (defaultTitle || 'Chapter Study')
           .replace(/^Vidya:\s*/i, '')
           .replace(/\.[^/.]+$/, '')
           .replace(/[-_]/g, ' ')
           .trim();
-        cleaned = `# Vidya: ${fallbackTitle}\n\n` + cleaned;
+        cleaned = `# ${fallbackTitle}\n\n` + cleaned;
       }
 
       return cleaned.trim();
@@ -210,8 +210,8 @@ CRITICAL REQUIREMENTS:
 
 1. TITLE FORMAT:
    - The very first line of your response MUST be in this exact format:
-     # Vidya: [x]
-   - Replace [x] with the definitive, specific chapter title you decide to give it based on the actual material (e.g., "# Vidya: Acids, Bases and Salts", "# Vidya: Chemical Reactions and Equations", "# Vidya: Motion and Measurement of Distances").
+     # [x]
+   - Replace [x] with the definitive, specific chapter title you decide to give it based on the actual material (e.g., "# Acids, Bases and Salts", "# Chemical Reactions and Equations", "# Motion and Measurement of Distances").
    - Absolutely NO text, greetings, pleasantries, or preamble before this line.
 
 2. DETAILED AND EXTENSIVE CHAPTER SUMMARY (NO STUDY TIPS):
