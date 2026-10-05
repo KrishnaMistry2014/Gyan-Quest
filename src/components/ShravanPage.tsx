@@ -26,27 +26,6 @@ interface ShravanPageProps {
   onNavigateDashboard?: () => void;
 }
 
-// Helper to convert an MP3/Audio Blob to base64 string
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        const base64Index = reader.result.indexOf(';base64,');
-        if (base64Index !== -1) {
-          resolve(reader.result.substring(base64Index + 8));
-        } else {
-          resolve(reader.result);
-        }
-      } else {
-        reject(new Error('Failed to read audio blob as base64 string'));
-      }
-    };
-    reader.onerror = () => reject(reader.error || new Error('FileReader error'));
-    reader.readAsDataURL(blob);
-  });
-}
-
 // Helper to resolve an audio source string (data URI, blob URL, or base64)
 function resolveAudioSrc(src: string): string {
   if (src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('http')) {
@@ -109,6 +88,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const generateAudio = async () => {
     // If audio already cached on chapter, use it immediately
@@ -125,6 +105,14 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       return;
     }
 
+    // Abort previous in-flight request if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     // Set status to loading and clear existing error message
     setStatus('loading');
     setErrorMessage('');
@@ -138,6 +126,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
           text: stripMarkdownForSpeech(chapter.summary),
           voice: 'en-IN-NeerjaNeural',
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -156,24 +145,19 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
         objectUrlRef.current = null;
       }
 
-      // Create browser object URL for immediate playback
+      // Create browser object URL for immediate playback (no base64 conversion or localStorage/Firestore persistence)
       const newAudioUrl = URL.createObjectURL(audioBlob);
       objectUrlRef.current = newAudioUrl;
       setAudioUrl(newAudioUrl);
       setStatus('ready');
 
-      // Convert MP3 blob to base64 for persistent Firestore & localStorage caching
-      try {
-        const b64 = await blobToBase64(audioBlob);
-        setAudioBase64(b64);
-        chapter.audioBase64 = b64;
-        await updateChapterAudio(chapter.id, b64, true);
-      } catch (cacheErr) {
-        console.warn('[Shravan] Could not persist audio to chapter cache:', cacheErr);
-      }
-
       checkAndAwardXp();
     } catch (err: any) {
+      // Treat AbortError as intentional user cancellation rather than a voice-service error
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        console.log('[Shravan] Edge TTS request was intentionally cancelled.');
+        return;
+      }
       console.error('[Shravan] Edge TTS error:', err);
       setStatus('error');
       setErrorMessage(
@@ -184,6 +168,11 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 
   // Generate audio or retrieve cached version on mount / chapter change
   useEffect(() => {
+    // Abort any in-flight request before initiating a new one
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
@@ -196,6 +185,11 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     generateAudio();
 
     return () => {
+      // Abort in-flight request when component unmounts
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
@@ -209,7 +203,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       try {
         await addUserXp(user, 10);
         chapter.shravanCompleted = true;
-        await updateChapterAudio(chapter.id, chapter.audioBase64 || audioBase64 || '', true);
+        // Mark Shravan completed in Firestore without storing heavy Edge TTS audio
+        await updateChapterAudio(chapter.id, chapter.audioBase64 || '', true);
         await refreshUser?.();
       } catch (err) {
         console.warn('Failed to claim Shravan XP:', err);
