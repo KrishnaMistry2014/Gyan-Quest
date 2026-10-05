@@ -85,10 +85,22 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [duration, setDuration] = useState<number>(0);
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [playbackRate, setPlaybackRate] = useState<number>(2.0); // Doubled narration speed (2x) by default
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const SPEED_PRESETS = [1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0];
+
+  const handleCycleSpeed = () => {
+    const nextIndex = (SPEED_PRESETS.indexOf(playbackRate) + 1) % SPEED_PRESETS.length;
+    const nextSpeed = SPEED_PRESETS[nextIndex] || 2.0;
+    setPlaybackRate(nextSpeed);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = nextSpeed;
+    }
+  };
 
   const generateAudio = async () => {
     // If audio already cached on chapter, use it immediately
@@ -118,13 +130,14 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     setErrorMessage('');
 
     try {
-      console.log('[Shravan] Requesting audio generation from Edge TTS (en-IN-NeerjaNeural)...');
+      console.log('[Shravan] Requesting audio generation from Edge TTS (en-IN-NeerjaNeural, 2x speed)...');
       const response = await fetch('https://gyanquest-edge-tts.onrender.com/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: stripMarkdownForSpeech(chapter.summary),
           voice: 'en-IN-NeerjaNeural',
+          rate: '+100%',
         }),
         signal: controller.signal,
       });
@@ -218,6 +231,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
+      audioRef.current.playbackRate = playbackRate;
       audioRef.current.play().then(() => {
         setIsPlaying(true);
       }).catch((err) => {
@@ -235,6 +249,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
       setDuration(audioRef.current.duration);
+      audioRef.current.playbackRate = playbackRate;
+      audioRef.current.defaultPlaybackRate = playbackRate;
     }
   };
 
@@ -271,6 +287,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       setCurrentTime(0);
+      audioRef.current.playbackRate = playbackRate;
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
@@ -337,7 +354,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             {chapter.title.replace(/^Vidya:\s*/i, '')}
           </p>
           <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Powered by Edge TTS
+            Powered by Edge TTS • 2x Speed
           </p>
         </div>
 
@@ -432,22 +449,40 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               </div>
             </div>
 
-            {/* Player Controls (Repeat, -10s, Play/Pause, +10s, Volume) */}
+            {/* Player Controls (Repeat, Speed, -10s, Play/Pause, +10s, Volume) */}
             <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-              {/* Repeat Button */}
-              <button
-                type="button"
-                onClick={handleRepeat}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs"
-                style={{
-                  borderColor: 'var(--border-warm)',
-                  color: 'var(--text-primary)',
-                }}
-                title="Repeat from beginning"
-              >
-                <RotateCcw className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                <span>Repeat</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Repeat Button */}
+                <button
+                  type="button"
+                  onClick={handleRepeat}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs"
+                  style={{
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
+                  title="Repeat from beginning"
+                >
+                  <RotateCcw className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                  <span>Repeat</span>
+                </button>
+
+                {/* Speed Toggle Button (Options up to 3x) */}
+                <button
+                  type="button"
+                  id="btn-toggle-speed"
+                  onClick={handleCycleSpeed}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs active:scale-95"
+                  style={{
+                    borderColor: playbackRate > 1.0 ? 'var(--accent-saffron)' : 'var(--border-warm)',
+                    backgroundColor: playbackRate > 1.0 ? 'var(--accent-saffron-light)' : 'transparent',
+                    color: playbackRate > 1.0 ? 'var(--accent-saffron-text)' : 'var(--text-primary)',
+                  }}
+                  title={`Narration Speed: ${playbackRate}x (Click to cycle up to 3x)`}
+                >
+                  <span>{playbackRate}x</span>
+                </button>
+              </div>
 
               {/* Playback & Seek Controls Cluster */}
               <div className="flex items-center gap-3">
