@@ -69,6 +69,50 @@ function stripMarkdownForSpeech(md: string): string {
     .trim();
 }
 
+// Helper to divide long chapter summaries into optimal sections of ~350-450 words
+// to guarantee fast synthesis and prevent 502/timeouts on Render & Cloudflare.
+function chunkTextForTTS(text: string, maxWordsPerChunk = 400): string[] {
+  if (!text) return [];
+  const paragraphs = text.split(/\n+/).map((p) => p.trim()).filter(Boolean);
+  const chunks: string[] = [];
+  let currentChunk = '';
+
+  for (const para of paragraphs) {
+    const paraWords = para.split(/\s+/).length;
+    const currentWords = currentChunk ? currentChunk.split(/\s+/).length : 0;
+
+    if (currentWords + paraWords <= maxWordsPerChunk) {
+      currentChunk = currentChunk ? `${currentChunk}\n\n${para}` : para;
+    } else {
+      if (currentChunk) {
+        chunks.push(currentChunk);
+        currentChunk = '';
+      }
+      if (paraWords > maxWordsPerChunk) {
+        const sentences = para.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [para];
+        for (const sentence of sentences) {
+          const sentWords = sentence.split(/\s+/).length;
+          const curWords = currentChunk ? currentChunk.split(/\s+/).length : 0;
+          if (curWords + sentWords <= maxWordsPerChunk) {
+            currentChunk = currentChunk ? `${currentChunk} ${sentence}` : sentence;
+          } else {
+            if (currentChunk) chunks.push(currentChunk);
+            currentChunk = sentence;
+          }
+        }
+      } else {
+        currentChunk = para;
+      }
+    }
+  }
+
+  if (currentChunk) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks.length > 0 ? chunks : [text];
+}
+
 export const ShravanPage: React.FC<ShravanPageProps> = ({
   chapter,
   onBackToVidya,
@@ -78,6 +122,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [audioBase64, setAudioBase64] = useState<string | null>(chapter.audioBase64 || null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(chapter.audioBase64 ? 'ready' : 'loading');
+  const [chunkProgress, setChunkProgress] = useState<{ current: number; total: number } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -85,22 +130,11 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [duration, setDuration] = useState<number>(0);
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [playbackRate, setPlaybackRate] = useState<number>(2.0); // Doubled narration speed (2x) by default
+  const [playbackRate] = useState<number>(1.0); // 1x default narration speed
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  const SPEED_PRESETS = [1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0];
-
-  const handleCycleSpeed = () => {
-    const nextIndex = (SPEED_PRESETS.indexOf(playbackRate) + 1) % SPEED_PRESETS.length;
-    const nextSpeed = SPEED_PRESETS[nextIndex] || 2.0;
-    setPlaybackRate(nextSpeed);
-    if (audioRef.current) {
-      audioRef.current.playbackRate = nextSpeed;
-    }
-  };
 
   const generateAudio = async () => {
     // If audio already cached on chapter, use it immediately
@@ -130,27 +164,76 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     setErrorMessage('');
 
     try {
-      console.log('[Shravan] Requesting audio generation from Edge TTS (en-IN-NeerjaNeural, 2x speed)...');
-      const response = await fetch('https://gyanquest-edge-tts.onrender.com/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: stripMarkdownForSpeech(chapter.summary),
-          voice: 'en-IN-NeerjaNeural',
-          rate: '+100%',
-        }),
-        signal: controller.signal,
-      });
+      const plainText = stripMarkdownForSpeech(chapter.summary);
+      const chunks = chunkTextForTTS(plainText, 400);
+      setChunkProgress({ current: 0, total: chunks.length });
 
-      if (!response.ok) {
-        throw new Error(`Edge TTS voice service returned status ${response.status}`);
+      console.log(`[Shravan] Starting TTS synthesis for ${chunks.length} sections (${plainText.split(/\s+/).length} total words)...`);
+      const audioBlobs: Blob[] = [];
+
+      for (let i = 0; i < chunks.length; i++) {
+        if (controller.signal.aborted) return;
+        setChunkProgress({ current: i + 1, total: chunks.length });
+
+        let attempts = 0;
+        let success = false;
+        let lastErr: any = null;
+
+        while (attempts < 2 && !success) {
+          attempts++;
+          try {
+            const chunkController = new AbortController();
+            const onParentAbort = () => chunkController.abort();
+            controller.signal.addEventListener('abort', onParentAbort, { once: true });
+            const timeoutId = setTimeout(() => chunkController.abort(), 40000);
+
+            try {
+              console.log(`[Shravan] Fetching section ${i + 1}/${chunks.length} (${chunks[i].split(/\s+/).length} words)...`);
+              const response = await fetch('https://gyanquest-edge-tts.onrender.com/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  text: chunks[i],
+                  voice: 'en-IN-NeerjaNeural',
+                  rate: '+25%',
+                }),
+                signal: chunkController.signal,
+              });
+
+              if (!response.ok) {
+                throw new Error(`Edge TTS returned HTTP ${response.status}`);
+              }
+
+              const blob = await response.blob();
+              if (!blob || blob.size === 0) {
+                throw new Error('Received empty audio section response.');
+              }
+
+              audioBlobs.push(blob);
+              success = true;
+            } finally {
+              clearTimeout(timeoutId);
+              controller.signal.removeEventListener('abort', onParentAbort);
+            }
+          } catch (chunkErr: any) {
+            if (controller.signal.aborted) return;
+            lastErr = chunkErr;
+            console.warn(`[Shravan] Section ${i + 1} attempt ${attempts} warning:`, chunkErr);
+            if (attempts < 2) {
+              await new Promise((r) => setTimeout(r, 1000));
+            }
+          }
+        }
+
+        if (!success) {
+          throw lastErr || new Error(`Failed to generate audio for section ${i + 1}`);
+        }
       }
 
-      // Edge TTS returns audio/mpeg MP3 binary stream
-      const audioBlob = await response.blob();
-      if (!audioBlob || audioBlob.size === 0) {
-        throw new Error('Received empty audio response from voice service.');
-      }
+      if (controller.signal.aborted) return;
+
+      // Combine all MP3 chunks into one unified seamless MP3 blob
+      const combinedBlob = new Blob(audioBlobs, { type: 'audio/mpeg' });
 
       // Revoke any prior object URL to avoid memory leaks
       if (objectUrlRef.current) {
@@ -159,13 +242,16 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       }
 
       // Create browser object URL for immediate playback (no base64 conversion or localStorage/Firestore persistence)
-      const newAudioUrl = URL.createObjectURL(audioBlob);
+      const newAudioUrl = URL.createObjectURL(combinedBlob);
       objectUrlRef.current = newAudioUrl;
       setAudioUrl(newAudioUrl);
       setStatus('ready');
+      setChunkProgress(null);
 
       checkAndAwardXp();
     } catch (err: any) {
+      if (controller.signal.aborted) return;
+      setChunkProgress(null);
       // Treat AbortError as intentional user cancellation rather than a voice-service error
       if (err?.name === 'AbortError' || controller.signal.aborted) {
         console.log('[Shravan] Edge TTS request was intentionally cancelled.');
@@ -354,7 +440,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             {chapter.title.replace(/^Vidya:\s*/i, '')}
           </p>
           <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Powered by Edge TTS • 2x Speed
+            Powered by Edge TTS • 1.25x Speed
           </p>
         </div>
 
@@ -366,11 +452,26 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               style={{ borderTopColor: 'var(--accent-saffron)' }}
             />
             <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-              Generating Shravan Audio...
+              {chunkProgress && chunkProgress.total > 1
+                ? `Generating Audio Section ${chunkProgress.current} of ${chunkProgress.total}...`
+                : 'Generating Shravan Audio...'}
             </h3>
             <p className="text-xs sm:text-sm max-w-md" style={{ color: 'var(--text-secondary)' }}>
-              Please wait for a few moments as the service may take a minute to load after sleeping...
+              {chunkProgress && chunkProgress.total > 1
+                ? `Synthesizing educational chapter summary in fast, smooth sections (${chunkProgress.current}/${chunkProgress.total}). Please hold on.`
+                : 'Connecting to Edge TTS voice service. Please wait a few moments...'}
             </p>
+            {chunkProgress && chunkProgress.total > 1 && (
+              <div className="w-56 h-2 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden mt-2">
+                <div
+                  className="h-full transition-all duration-300 rounded-full"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron)',
+                    width: `${Math.round((chunkProgress.current / chunkProgress.total) * 100)}%`,
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -467,21 +568,19 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
                   <span>Repeat</span>
                 </button>
 
-                {/* Speed Toggle Button (Options up to 3x) */}
-                <button
-                  type="button"
-                  id="btn-toggle-speed"
-                  onClick={handleCycleSpeed}
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs active:scale-95"
+                {/* Fixed Speed Badge (1.25x only) */}
+                <span
+                  id="shravan-speed-badge"
+                  className="inline-flex items-center px-2.5 py-2 rounded-xl text-xs font-bold border shadow-2xs"
                   style={{
-                    borderColor: playbackRate > 1.0 ? 'var(--accent-saffron)' : 'var(--border-warm)',
-                    backgroundColor: playbackRate > 1.0 ? 'var(--accent-saffron-light)' : 'transparent',
-                    color: playbackRate > 1.0 ? 'var(--accent-saffron-text)' : 'var(--text-primary)',
+                    borderColor: 'var(--accent-saffron)',
+                    backgroundColor: 'var(--accent-saffron-light)',
+                    color: 'var(--accent-saffron-text)',
                   }}
-                  title={`Narration Speed: ${playbackRate}x (Click to cycle up to 3x)`}
+                  title="Narration Speed: 1.25x"
                 >
-                  <span>{playbackRate}x</span>
-                </button>
+                  1.25x
+                </span>
               </div>
 
               {/* Playback & Seek Controls Cluster */}

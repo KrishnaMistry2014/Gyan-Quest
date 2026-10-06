@@ -198,8 +198,8 @@ Perform two essential tasks across all pages:
     // =========================================================================
     // STEP 2: Chapter Summariser & Title Creator (Gemini 3.5 Flash-Lite)
     // =========================================================================
-    const summarizerPrompt = `You are a distinguished academic educator writing an exhaustive, highly detailed chapter summary titled "Vidya" for students.
-Students will use this as their complete, definitive chapter revision text.
+    const summarizerPrompt = `You are a distinguished academic educator writing a high-yield, 5-minute chapter revision summary titled "Vidya" for students.
+Students will use this as their core chapter revision and audio narration text.
 
 Below is the complete textbook chapter text and diagram explanations extracted from the PDF:
 ---
@@ -211,45 +211,39 @@ CRITICAL REQUIREMENTS:
 1. TITLE FORMAT:
    - The very first line of your response MUST be in this exact format:
      # [x]
-   - Replace [x] with the definitive, specific chapter title you decide to give it based on the actual material (e.g., "# Acids, Bases and Salts", "# Chemical Reactions and Equations", "# Motion and Measurement of Distances").
+   - Replace [x] with the definitive, specific chapter title based on the material (e.g., "# Acids, Bases and Salts", "# Chemical Reactions and Equations", "# Motion and Measurement of Distances").
    - Absolutely NO text, greetings, pleasantries, or preamble before this line.
 
-2. DETAILED AND EXTENSIVE CHAPTER SUMMARY (NO STUDY TIPS):
-   - This must be a DEEP, THOROUGH, LONG-FORM, and EXHAUSTIVE chapter summary.
-   - Do NOT write a short or surface-level summary. The student specifically needs a comprehensive and long summary so that NO important points, definitions, or mechanisms are cut out.
-   - Strictly NO generic study tips, revision tricks, or study advice (do NOT say "make flashcards", "review before exams", "take good notes", "test yourself"). Focus 100% on the academic subject matter of the chapter.
-   - Explain all concepts thoroughly with multi-paragraph depth, intermediate steps, underlying theories, and real-world scientific examples.
+2. 5-MINUTE TARGET LENGTH (650 - 750 WORDS):
+   - The total summary MUST be calibrated to be completely read or listened to in approximately 5 minutes (strictly ~650 to 750 words total; do NOT exceed 800 words).
+   - PRESERVE ALL KEY CONCEPTS: Cover every essential curriculum point, key mechanism, scientific law, formula, and definition. Do NOT drop important academic facts.
+   - Achieve this 5-minute length through high-yield density and crisp synthesis: avoid long-winded narrative padding, repetitive phrasing, and conversational fluff. Every sentence must deliver clear, actionable knowledge.
+   - Strictly NO generic study tips, revision tricks, or study advice (no "make flashcards", "review notes", "test yourself"). Focus 100% on the academic subject matter.
 
 3. REQUIRED STRUCTURED SECTIONS:
-   Structure your comprehensive summary with these exact headings:
+   Structure your 5-minute summary with these exact headings:
 
-   ## Chapter Overview & Significance
-   Provide a detailed, multi-paragraph introduction explaining the core theme of this chapter, its importance in science and the curriculum, foundational principles, and the scope of what is covered.
+   ## Chapter Overview
+   A concise, 1-paragraph synthesis (approx. 60-80 words) explaining the core theme of this chapter, its foundational principles, and why it matters in science.
 
-   ## Comprehensive Concept Breakdown
-   Go through EVERY topic and sub-topic present in the chapter. For each topic:
-   - Explain the concept in depth with clear, paragraph-by-paragraph explanations.
-   - Explain the underlying scientific mechanism or principle step-by-step.
-   - Include experimental observations, causes and effects, and practical real-world applications.
-   - Do not cut out intermediate details or skip any subtopics from the text.
+   ## Core Concept Breakdown
+   Go through every key topic and sub-topic concisely (approx. 300-350 words):
+   - State each core concept with its essential scientific mechanism or principle.
+   - Include key observations, cause-and-effect relationships, and practical real-world examples.
+   - Use direct, packed sentences so no essential topic is missed while remaining tight and fast to read.
 
-   ## Detailed Diagram, Schematic & Visual Explanations
-   Provide an exhaustive breakdown of every diagram, schematic, figure, chart, experimental setup, or flowchart in the chapter:
-   - State the diagram topic or title.
-   - Visual Details: Thoroughly describe the components, labeled parts, arrows, directions, and physical arrangement depicted.
-   - Conceptual Meaning: Deeply explain the scientific mechanism, reaction, physical law, or principle illustrated by the visual.
+   ## Key Diagrams & Visual Insights
+   For each key diagram, apparatus setup, chart, or figure in the chapter (approx. 80-100 words):
+   - State the diagram topic.
+   - State what the visual illustrates and the scientific principle it proves in 1-2 sharp sentences.
 
-   ## Scientific Laws, Principles, and Equations
-   Detail every scientific law, principle, chemical equation, and formula introduced in the chapter:
-   - State each formula or law clearly in plain keyboard text (e.g., Force = Mass * Acceleration, Density = Mass / Volume, NO LaTeX dollar signs).
-   - Define every single variable, symbol, and unit.
-   - Explain the physical meaning of the formula and the conditions under which it holds true.
+   ## Laws, Equations & Core Definitions
+   Provide a bulleted list of essential formulas, scientific laws, and key definitions (approx. 120-150 words):
+   - State each law or formula in plain keyboard text (e.g., Force = Mass * Acceleration; NO LaTeX dollar signs).
+   - Provide clear, 1-line definitions of key technical vocabulary.
 
-   ## Exhaustive Glossary & Key Definitions
-   Provide an extensive, comprehensive bulleted list defining all scientific terms, keywords, and technical definitions introduced across the entire chapter so that no vocabulary or concept is left out.
-
-   ## Core Takeaways & Summary Conclusions
-   Provide a detailed, synthesized summary of the most essential concepts, laws, and conclusions students must master from this chapter.
+   ## Summary Takeaways
+   A bulleted list of 3-5 high-impact takeaway conclusions that summarize the chapter's most critical facts for exam mastery (approx. 50-70 words).
 
 4. FORMATTING RULES:
    - Clean, well-structured markdown.
@@ -262,15 +256,15 @@ CRITICAL REQUIREMENTS:
 
     // Primary: Gemini 3.5 Flash-Lite as the Summariser
     try {
-      console.log(`[Vidya Step 2] Generating chapter summary with Gemini 3.5 Flash-Lite...`);
+      console.log(`[Vidya Step 2] Generating 5-minute chapter summary with Gemini 3.5 Flash-Lite...`);
       const lite35Promise = ai.models.generateContent({
         model: 'gemini-3.5-flash-lite',
         contents: [summarizerPrompt],
         config: {
-          maxOutputTokens: 8192,
+          maxOutputTokens: 2048,
         },
       });
-      const lite35Response = await callWithTimeout(lite35Promise, 55000, 'Gemini 3.5 Flash-Lite Summariser');
+      const lite35Response = await callWithTimeout(lite35Promise, 45000, 'Gemini 3.5 Flash-Lite Summariser');
       if (lite35Response.text && lite35Response.text.trim().length > 80) {
         summary = sanitizeVidya(lite35Response.text, fileName || 'Chapter Summary');
         console.log(`[Vidya Step 2] Gemini 3.5 Flash-Lite summarization successful (${summary.length} characters)!`);
@@ -284,10 +278,10 @@ CRITICAL REQUIREMENTS:
           model: 'gemini-3.1-flash-lite',
           contents: [summarizerPrompt],
           config: {
-            maxOutputTokens: 8192,
+            maxOutputTokens: 2048,
           },
         });
-        const liteResponse = await callWithTimeout(litePromise, 45000, 'Gemini 3.1 Flash-Lite Summariser');
+        const liteResponse = await callWithTimeout(litePromise, 40000, 'Gemini 3.1 Flash-Lite Summariser');
         if (liteResponse.text && liteResponse.text.trim().length > 80) {
           summary = sanitizeVidya(liteResponse.text, fileName || 'Chapter Summary');
           console.log(`[Vidya Step 2 Fallback] Gemini 3.1 Flash-Lite summarization successful (${summary.length} characters)!`);
