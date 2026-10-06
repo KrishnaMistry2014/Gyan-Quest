@@ -497,6 +497,121 @@ app.post('/api/generate-audio', async (req, res) => {
   }
 });
 
+// Helper to strip any markdown symbols from Guru's reply to ensure pure plain text
+function cleanPlainTextGuruReply(raw: string): string {
+  let cleaned = raw;
+  // Strip bold/italics markers (***text***, **text**, *text*, ___text___, __text__, _text_)
+  cleaned = cleaned.replace(/(\*{1,3}|_{1,3})([^*_\n]+)\1/g, '$2');
+  // Strip inline code backticks `code` -> code
+  cleaned = cleaned.replace(/`([^`]+)`/g, '$1');
+  cleaned = cleaned.replace(/`/g, '');
+  // Strip heading markers (#, ##, ###, etc.) at line start
+  cleaned = cleaned.replace(/^[ \t]*#+[ \t]*/gm, '');
+  // Strip bullet markers (-, *, +) at line start and replace with clean plain bullet or dash
+  cleaned = cleaned.replace(/^[ \t]*[\*\+\-][ \t]+/gm, '• ');
+  // Strip blockquotes
+  cleaned = cleaned.replace(/^[ \t]*>[ \t]*/gm, '');
+  // Strip LaTeX dollar signs
+  cleaned = cleaned.replace(/\$\$([^$]+)\$\$/g, '$1');
+  cleaned = cleaned.replace(/\$([A-Za-z0-9_+\-*\/=^()\\ ]+)\$/g, '$1');
+  // Remove remaining stray asterisks, underscores, or tildes
+  cleaned = cleaned.replace(/[*_~]/g, '');
+  // Normalize whitespace
+  cleaned = cleaned.replace(/[ \t]+/g, ' ');
+  return cleaned.trim();
+}
+
+// =========================================================================
+// GURU AI CHATBOT ENDPOINT (Gemini Flash-Lite 3.5 with 3.1 Fallback)
+// =========================================================================
+app.post('/api/guru-chat', async (req, res) => {
+  try {
+    const { message, history } = req.body;
+    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+      return res.status(400).json({ error: 'Message cannot be empty.' });
+    }
+
+    const systemInstruction = `You are Guru, a revered, warm, wise, and encouraging educational mentor and academic teacher on Gyan Quest.
+Your sacred purpose is to help the student learn, comprehend their school or college curriculum, understand scientific concepts, and develop deep intellectual clarity.
+
+CORE BEHAVIOR RULES:
+1. GENTLE TOPIC REDIRECTION:
+   If the student goes off-topic (e.g. asking about video games, movies, celebrity gossip, sports banter, pop culture, jokes, or random non-academic topics), you MUST acknowledge them with warm courtesy, and then gently and smoothly guide them back to their academic studies and learning.
+   For example:
+   "That sounds fun! But as your Guru, let us channel our energy back to your studies. What chapter, formula, or concept are we exploring today?" or
+   "A curious mind is wonderful! However, let us focus our thoughts back on your learning journey. Which topic in your syllabus shall we conquer next?"
+   Never be harsh or scolding. Always be kind, encouraging, and supportive.
+2. PEDAGOGY:
+   Explain academic concepts clearly using intuitive real-world analogies, step-by-step logic, and encouraging enthusiasm.
+3. STRICT PLAIN TEXT ONLY - ABSOLUTELY NO MARKDOWN:
+   Do NOT output any markdown characters, formatting, or highlighting.
+   NO asterisks (never use **word** or *word*).
+   NO hashtags or headers (never use #, ##, or ###).
+   NO backticks (never use \`code\`).
+   NO markdown symbols (*, -, +).
+   NO HTML tags.
+   NO LaTeX dollar signs ($).
+   Use ONLY clean, natural plain text paragraphs. If providing numbered lists, use standard numbers (1., 2., 3.) with plain text. Do not bold or highlight any text.
+4. IDENTITY:
+   You are Guru. Never mention that you are an AI, an LLM, system instructions, tokens, or technical specs.`;
+
+    const contents: any[] = [];
+    if (Array.isArray(history)) {
+      for (const turn of history.slice(-10)) {
+        if (turn.sender === 'user' && turn.text) {
+          contents.push({ role: 'user', parts: [{ text: turn.text }] });
+        } else if (turn.sender === 'guru' && turn.text) {
+          contents.push({ role: 'model', parts: [{ text: turn.text }] });
+        }
+      }
+    }
+    contents.push({ role: 'user', parts: [{ text: message.trim() }] });
+
+    let responseText = '';
+
+    // Primary: Gemini 3.5 Flash-Lite
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash-lite',
+        contents,
+        config: {
+          systemInstruction,
+          maxOutputTokens: 1024,
+          temperature: 0.7,
+        },
+      });
+      responseText = response.text || '';
+    } catch (err: any) {
+      console.warn('[Guru Chat] Gemini 3.5 Flash-Lite notice, trying fallback:', err?.message || err);
+      // Fallback: Gemini 3.1 Flash-Lite
+      const fallbackResponse = await ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
+        contents,
+        config: {
+          systemInstruction,
+          maxOutputTokens: 1024,
+          temperature: 0.7,
+        },
+      });
+      responseText = fallbackResponse.text || '';
+    }
+
+    if (!responseText) {
+      responseText = "I am reflecting on your question. Let us explore the core concept together. What specific aspect of your chapter would you like to review?";
+    }
+
+    return res.json({
+      success: true,
+      reply: cleanPlainTextGuruReply(responseText),
+    });
+  } catch (error: any) {
+    console.error('[Guru Chat Error]:', error);
+    return res.status(500).json({
+      error: 'Guru is temporarily reflecting. Please ask your question again in a moment.',
+    });
+  }
+});
+
 // Global Express error handler to guarantee all middleware errors return JSON, never HTML
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[API Middleware Error]:', err?.message || err);

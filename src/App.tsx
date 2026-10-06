@@ -14,6 +14,7 @@ import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
 import { ProfileModal } from './components/ProfileModal';
 import { StreakModal } from './components/StreakModal';
+import { GuruModal } from './components/GuruModal';
 import { Dashboard } from './components/Dashboard';
 import { VerificationScreen } from './components/VerificationScreen';
 import { BlankPage } from './components/BlankPage';
@@ -28,11 +29,14 @@ const MainAppContent: React.FC = () => {
   const [selectedChapter, setSelectedChapter] = useState<SavedChapter | null>(null);
   const [activeShravanChapter, setActiveShravanChapter] = useState<SavedChapter | null>(null);
   const [activeSection, setActiveSection] = useState<string>('home');
+  const [isGuruModalOpen, setIsGuruModalOpen] = useState<boolean>(false);
 
   // When user logs in and is verified, automatically navigate to dashboard if on landing
   useEffect(() => {
     if (user && !isEmailUnverified) {
       setCurrentView((prev) => (prev === 'landing' ? 'dashboard' : prev));
+    } else if (!user) {
+      setIsGuruModalOpen(false);
     }
   }, [user, isEmailUnverified]);
 
@@ -114,6 +118,7 @@ const MainAppContent: React.FC = () => {
         onNavigateView={(view) => setCurrentView(view)}
         activeSection={activeSection}
         onNavigateSection={scrollToSection}
+        onOpenGuruModal={user ? () => setIsGuruModalOpen(true) : undefined}
       />
 
       {/* Main App Content */}
@@ -214,6 +219,12 @@ const MainAppContent: React.FC = () => {
 
       {/* Profile Modal (Contains name textbox and Submit button, saving to Firestore) */}
       <ProfileModal />
+
+      {/* Guru AI Chatbot Modal */}
+      <GuruModal
+        isOpen={isGuruModalOpen}
+        onClose={() => setIsGuruModalOpen(false)}
+      />
 
       {/* Interactive Streak Modal */}
       <StreakModal

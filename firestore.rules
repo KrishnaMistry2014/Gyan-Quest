@@ -2,13 +2,18 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User profile and sub-collections rule
+    // User profile and all sub-collections rule (chapters, guruChat, settings)
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
 
-      match /chapters/{chapterId} {
+      match /{allSubcollections=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+    }
+
+    // Guest chats fallback collection
+    match /guestChats/{docId} {
+      allow read, write: if true;
     }
 
     // Fallback connectivity test path

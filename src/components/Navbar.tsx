@@ -26,6 +26,7 @@ interface NavbarProps {
   onNavigateView: (view: 'landing' | 'dashboard' | 'blank' | 'my-chapters') => void;
   activeSection?: string;
   onNavigateSection?: (sectionId: string) => void;
+  onOpenGuruModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -33,6 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigateView,
   activeSection = 'home',
   onNavigateSection = (_id?: string) => {},
+  onOpenGuruModal,
 }) => {
   const { isDark, toggleTheme } = useTheme();
   const {
@@ -158,8 +160,28 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Empty space */}
             <div className="flex-1" />
 
-            {/* Right Controls: Theme Toggle, Streak Counter, Profile Dropdown */}
+            {/* Right Controls: Guru AI, Streak Counter, Theme Toggle, Profile Dropdown */}
             <div className="flex items-center gap-2 sm:gap-2.5">
+              {/* Guru AI Chatbot Button */}
+              {onOpenGuruModal && (
+                <button
+                  type="button"
+                  id="nav-guru-ai-btn"
+                  onClick={onOpenGuruModal}
+                  aria-label="Open Guru AI chat"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold border shadow-2xs transition-all hover:scale-102 active:scale-98 cursor-pointer group"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron)',
+                    borderColor: 'var(--accent-saffron)',
+                    color: '#FFFFFF',
+                  }}
+                  title="Ask Guru AI"
+                >
+                  <Sparkles className="w-4 h-4 transition-transform group-hover:rotate-12" />
+                  <span>Guru AI</span>
+                </button>
+              )}
+
               {/* Streak Counter */}
               <button
                 type="button"
