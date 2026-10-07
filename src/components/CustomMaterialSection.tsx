@@ -43,7 +43,7 @@ export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ on
           }}
         >
           <BookMarked className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-          <span>CBSE CURRICULUM & CUSTOM LEARNING</span>
+          <span>CUSTOM PDF LEARNING</span>
         </div>
 
         <h2
@@ -51,11 +51,11 @@ export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ on
           className="text-3xl sm:text-4xl lg:text-[40px] font-bold tracking-tight font-serif-heading"
           style={{ color: 'var(--text-primary)' }}
         >
-          CBSE Textbooks by Default — Or Upload Any PDF
+          Master Any Chapter — Upload Your PDF
         </h2>
 
         <p className="text-sm sm:text-base leading-relaxed max-w-2xl mx-auto" style={{ color: 'var(--text-secondary)' }}>
-          Gyan Quest comes pre-configured with official CBSE (NCERT) textbooks. Have a specific chapter handout, coaching module, or school PDF you want to master? Upload it to generate a full 5-stage quest with 80 XP.
+          Have a specific chapter handout, coaching module, textbook chapter, or school PDF you want to master? Upload it to generate a full 5-stage quest with 80 XP.
         </p>
       </div>
 
@@ -100,11 +100,11 @@ export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ on
             </div>
 
             <h3 className="text-base font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-              CBSE Books or Custom PDF
+              Upload Any PDF
             </h3>
 
             <p className="text-xs leading-relaxed max-w-xs" style={{ color: 'var(--text-secondary)' }}>
-              Official NCERT chapters or your school PDF handouts.
+              Your school handouts, chapter notes, or coaching PDFs.
             </p>
           </div>
 

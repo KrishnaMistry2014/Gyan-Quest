@@ -23,7 +23,7 @@ import { ShravanPage } from './components/ShravanPage';
 import { SavedChapter } from './lib/chapters';
 
 const MainAppContent: React.FC = () => {
-  const { openAuthModal, user, isEmailUnverified } = useAuth();
+  const { openAuthModal, user, isEmailUnverified, loading } = useAuth();
   const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'blank' | 'my-chapters' | 'shravan'>('landing');
   const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<SavedChapter | null>(null);
@@ -32,13 +32,20 @@ const MainAppContent: React.FC = () => {
   const [isGuruModalOpen, setIsGuruModalOpen] = useState<boolean>(false);
 
   // When user logs in and is verified, automatically navigate to dashboard if on landing
+  // When user signs out, immediately redirect back to landing page and clear active session states
   useEffect(() => {
+    if (loading) return;
     if (user && !isEmailUnverified) {
       setCurrentView((prev) => (prev === 'landing' ? 'dashboard' : prev));
     } else if (!user) {
       setIsGuruModalOpen(false);
+      setCurrentView('landing');
+      setSelectedChapter(null);
+      setActiveShravanChapter(null);
+      setUploadedPdf(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }, [user, isEmailUnverified]);
+  }, [user, isEmailUnverified, loading]);
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
@@ -135,7 +142,13 @@ const MainAppContent: React.FC = () => {
               setCurrentView('landing');
               setTimeout(() => scrollToSection('journey'), 50);
             }}
-            onNavigateDashboard={() => setCurrentView('dashboard')}
+            onNavigateDashboard={() => {
+              if (!user) {
+                setCurrentView('landing');
+              } else {
+                setCurrentView('dashboard');
+              }
+            }}
             onNavigateMyChapters={() => {
               if (!user) {
                 openAuthModal();
@@ -161,11 +174,15 @@ const MainAppContent: React.FC = () => {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             onNavigateDashboard={() => {
-              setCurrentView('dashboard');
+              if (!user) {
+                setCurrentView('landing');
+              } else {
+                setCurrentView('dashboard');
+              }
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           />
-        ) : currentView === 'my-chapters' ? (
+        ) : currentView === 'my-chapters' && user ? (
           /* My Chapters Library View */
           <MyChapters
             onOpenChapter={handleOpenChapter}
@@ -173,8 +190,8 @@ const MainAppContent: React.FC = () => {
             onNavigateDashboard={() => setCurrentView('dashboard')}
             onNavigateHome={() => setCurrentView('landing')}
           />
-        ) : currentView === 'dashboard' ? (
-          /* Dashboard View */
+        ) : currentView === 'dashboard' && user ? (
+          /* Dashboard View - Only accessible when authenticated */
           <Dashboard
             onResumeLearning={handleResumeLearning}
             onStartLearning={handleStartLearning}

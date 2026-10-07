@@ -182,8 +182,11 @@ export const VerificationScreen: React.FC = () => {
             <button
               type="button"
               id="btn-verification-signout"
-              onClick={signOutUser}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold py-1.5 px-3 rounded-xl transition-colors hover:text-red-500"
+              onClick={async () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                await signOutUser();
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold py-1.5 px-3 rounded-xl transition-colors hover:text-red-500 cursor-pointer"
               style={{ color: 'var(--text-secondary)' }}
             >
               <LogOut className="w-3.5 h-3.5" />

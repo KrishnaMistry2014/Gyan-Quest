@@ -33,7 +33,7 @@ export const GuruSection: React.FC = () => {
         </h2>
 
         <p className="text-sm sm:text-base leading-relaxed max-w-2xl mx-auto" style={{ color: 'var(--text-secondary)' }}>
-          Guru is Gyan Quest's intelligent study assistant. It helps students understand concepts and clear doubts while keeping the conversation focused on the topic being studied.
+          Guru is Gyan Quest's intelligent study assistant and cultural wisdom mentor. It helps students master concepts, explore Indian traditions, mythology, and Sanskrit, and clear doubts with depth and clarity.
         </p>
       </div>
 
@@ -75,11 +75,11 @@ export const GuruSection: React.FC = () => {
             </div>
 
             <h3 className="text-base font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-              Strict Syllabus Guardrails
+              Dedicated Learning & Cultural Guardrails
             </h3>
 
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              Unlike open-ended chatbots that drift into distractions and hallucinations, Guru remains strictly anchored to the specific chapter and curriculum concepts currently open in the student's quest.
+              Unlike open-ended chatbots that drift into pop culture gossip and distractions, Guru remains devoted to deep academic mastery, curriculum concepts, and authentic explorations of Indian culture, Hindu mythology, and Sanskrit wisdom.
             </p>
           </div>
 
@@ -88,7 +88,7 @@ export const GuruSection: React.FC = () => {
             style={{ borderColor: 'var(--border-warm)', color: 'var(--accent-saffron-text)' }}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Topic-locked guarantee</span>
+            <span>Wisdom-centered guidance</span>
           </div>
         </div>
 

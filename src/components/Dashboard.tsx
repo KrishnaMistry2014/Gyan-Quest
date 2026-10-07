@@ -339,7 +339,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartL
         </h3>
 
         <p className="text-sm sm:text-base max-w-lg mb-6 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-          Upload your CBSE chapter or notes PDF to transform it into a personalized 5-stage quest with 80 XP.
+          Upload your chapter or notes PDF to transform it into a personalized 5-stage quest with 80 XP.
         </p>
 
         {uploadedFileName ? (

@@ -687,20 +687,18 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             <span>Go back to Vidya</span>
           </button>
 
-          {onNavigateDashboard && (
-            <button
-              type="button"
-              onClick={onNavigateDashboard}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all hover:opacity-90 cursor-pointer"
-              style={{
-                backgroundColor: 'var(--accent-saffron)',
-                color: '#FFFFFF',
-              }}
-            >
-              <span>Back to Dashboard</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {}}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all hover:opacity-90 cursor-pointer"
+            style={{
+              backgroundColor: 'var(--accent-saffron)',
+              color: '#FFFFFF',
+            }}
+          >
+            <span>Go to Manan</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>

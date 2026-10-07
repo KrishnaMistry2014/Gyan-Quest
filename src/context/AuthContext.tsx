@@ -14,6 +14,7 @@ import {
   claimUserStreak
 } from '../lib/firebase';
 import { getLocalDateString } from '../lib/streak';
+import { clearLocalChapters } from '../lib/chapters';
 
 interface AuthContextType {
   user: User | null;
@@ -186,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOutUser = async () => {
     try {
       await logOut();
+      clearLocalChapters();
       setUser(null);
       setProfile(getGuestProfile());
     } catch (e) {

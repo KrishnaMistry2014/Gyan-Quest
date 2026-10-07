@@ -150,7 +150,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
             >
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                <span>CBSE Syllabus & NCERT Bound</span>
+                <span>Custom PDF & Syllabus Aligned</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Compass className="w-4 h-4 text-amber-700 dark:text-amber-400" />
@@ -243,10 +243,10 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
                   <BookOpen className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
                   <div>
                     <div className="font-bold text-[12px]" style={{ color: 'var(--text-primary)' }}>
-                      NCERT & Custom Material Transformation
+                      Custom PDF & Material Transformation
                     </div>
                     <div className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                      Any textbook chapter or uploaded PDF is automatically structured into bite-sized study notes and audio summaries.
+                      Any uploaded textbook chapter or PDF is automatically structured into bite-sized study notes and audio summaries.
                     </div>
                   </div>
                 </div>

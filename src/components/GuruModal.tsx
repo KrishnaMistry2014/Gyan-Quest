@@ -25,15 +25,16 @@ interface GuruModalProps {
 const INITIAL_GURU_MESSAGE: ChatMessage = {
   id: 'init-guru-msg',
   sender: 'guru',
-  text: 'Namaste! I am Guru, your academic mentor. What topic or concept from your chapters would you like to explore today?',
+  text: 'Namaste! I am Guru, your guide in academic learning and Indian wisdom. What chapter concept, Hindu mythology, or Sanskrit explanation would you like to explore today?',
   timestamp: Date.now(),
 };
 
 const SUGGESTED_QUESTIONS = [
   'Explain Chemical Reactions simply',
-  'How does Photosynthesis work?',
+  'Meaning and Sanskrit roots of Gayatri Mantra',
+  'Story of Arjuna & Krishna in the Bhagavad Gita',
   'What are Newton’s Laws of Motion?',
-  'Help me revise Acids, Bases and Salts',
+  'Explain the concepts of Dharma and Karma',
 ];
 
 export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
@@ -257,7 +258,7 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
                 Guru
               </h2>
               <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                Your Academic Guide & Learning Companion
+                Your Academic & Cultural Heritage Companion
               </p>
             </div>
           </div>
@@ -434,7 +435,7 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
               id="guru-chat-input"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Ask Guru about your chapter or concept..."
+              placeholder="Ask Guru about chapters, Indian culture, mythology, or Sanskrit..."
               disabled={isLoading}
               className="flex-1 px-4 py-2.5 rounded-2xl border text-sm transition-all focus:outline-none focus:ring-2 disabled:opacity-60"
               style={{

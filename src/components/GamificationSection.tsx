@@ -180,7 +180,7 @@ export const GamificationSection: React.FC = () => {
               Chapter Quests
             </h3>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              Large, intimidating NCERT textbooks are broken down into achievable 5-stage mini-quests that fit easily into 20–30 minute focused study windows.
+              Large, intimidating textbooks and chapters are broken down into achievable 5-stage mini-quests that fit easily into 20–30 minute focused study windows.
             </p>
           </div>
           <div className="pt-2 border-t flex items-center gap-1.5 text-[11px] font-medium" style={{ borderColor: 'var(--border-warm)', color: 'var(--accent-saffron-text)' }}>

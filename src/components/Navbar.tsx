@@ -303,6 +303,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                       id="dropdown-signout-btn"
                       onClick={async () => {
                         setDropdownOpen(false);
+                        onNavigateView('landing');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
                         await signOutUser();
                       }}
                       className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors hover:bg-red-500/10 text-red-600 dark:text-red-400 text-left"

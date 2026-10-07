@@ -513,7 +513,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
           </h3>
 
           <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--text-secondary)' }}>
-            Select any CBSE or school textbook PDF to extract structured study notes and visual explanations.
+            Select any chapter or textbook PDF to extract structured study notes and visual explanations.
           </p>
 
           <button
