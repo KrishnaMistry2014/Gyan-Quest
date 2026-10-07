@@ -122,6 +122,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [audioBase64, setAudioBase64] = useState<string | null>(chapter.audioBase64 || null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(chapter.audioBase64 ? 'ready' : 'loading');
+  const [isWakingUp, setIsWakingUp] = useState<boolean>(false);
   const [chunkProgress, setChunkProgress] = useState<{ current: number; total: number } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   
@@ -130,7 +131,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [duration, setDuration] = useState<number>(0);
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [playbackRate] = useState<number>(1.0); // 1x default narration speed
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -141,12 +141,14 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     if (chapter.audioBase64) {
       setAudioBase64(chapter.audioBase64);
       setStatus('ready');
+      setIsWakingUp(false);
       checkAndAwardXp();
       return;
     }
 
     if (!chapter.summary || typeof chapter.summary !== 'string' || chapter.summary.trim().length === 0) {
       setStatus('error');
+      setIsWakingUp(false);
       setErrorMessage('No chapter summary available to narrate. Please open or generate a chapter summary first.');
       return;
     }
@@ -162,11 +164,70 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     // Set status to loading and clear existing error message
     setStatus('loading');
     setErrorMessage('');
+    setIsWakingUp(false);
 
     try {
       const plainText = stripMarkdownForSpeech(chapter.summary);
       const chunks = chunkTextForTTS(plainText, 400);
       setChunkProgress({ current: 0, total: chunks.length });
+
+      // Step 1: Check if Render TTS service is booting / waking up or already active
+      // Using a quick 2.5s probe to /health. Render cold boot takes ~45-60s, returning no fast response.
+      let serviceAwake = false;
+      try {
+        const probeController = new AbortController();
+        const probeTimeout = setTimeout(() => probeController.abort(), 2500);
+        const probeRes = await fetch('https://gyanquest-edge-tts.onrender.com/health', {
+          method: 'GET',
+          signal: probeController.signal,
+        });
+        clearTimeout(probeTimeout);
+        if (probeRes.ok) {
+          serviceAwake = true;
+        }
+      } catch {
+        serviceAwake = false;
+      }
+
+      if (controller.signal.aborted) return;
+
+      if (!serviceAwake) {
+        setIsWakingUp(true);
+        // Wait up to 75 seconds for Render TTS service to finish waking up
+        const wakeStartTime = Date.now();
+        const WAKE_TIMEOUT_MS = 75000; // Strictly 75s timeout for waking up the service ONLY
+
+        while (!serviceAwake && Date.now() - wakeStartTime < WAKE_TIMEOUT_MS) {
+          if (controller.signal.aborted) return;
+          await new Promise((r) => setTimeout(r, 2000));
+          if (controller.signal.aborted) return;
+
+          try {
+            const checkController = new AbortController();
+            const checkTimeout = setTimeout(() => checkController.abort(), 4000);
+            const res = await fetch('https://gyanquest-edge-tts.onrender.com/health', {
+              method: 'GET',
+              signal: checkController.signal,
+            });
+            clearTimeout(checkTimeout);
+            if (res.ok) {
+              serviceAwake = true;
+              break;
+            }
+          } catch {
+            // Service still waking up, continue polling until 75s timeout
+          }
+        }
+
+        if (!serviceAwake && !controller.signal.aborted) {
+          setIsWakingUp(false);
+          throw new Error('TTS service wake-up timed out after 75 seconds. The voice server is taking longer than expected to start up. Please try again.');
+        }
+
+        setIsWakingUp(false);
+      }
+
+      if (controller.signal.aborted) return;
 
       console.log(`[Shravan] Starting TTS synthesis for ${chunks.length} sections (${plainText.split(/\s+/).length} total words)...`);
       const audioBlobs: Blob[] = [];
@@ -246,12 +307,14 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       objectUrlRef.current = newAudioUrl;
       setAudioUrl(newAudioUrl);
       setStatus('ready');
+      setIsWakingUp(false);
       setChunkProgress(null);
 
       checkAndAwardXp();
     } catch (err: any) {
       if (controller.signal.aborted) return;
       setChunkProgress(null);
+      setIsWakingUp(false);
       // Treat AbortError as intentional user cancellation rather than a voice-service error
       if (err?.name === 'AbortError' || controller.signal.aborted) {
         console.log('[Shravan] Edge TTS request was intentionally cancelled.');
@@ -260,7 +323,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       console.error('[Shravan] Edge TTS error:', err);
       setStatus('error');
       setErrorMessage(
-        'Unable to generate audio narration at this moment. The voice service may be waking up or temporarily unavailable. Please retry in a few moments.'
+        err?.message || 'Unable to generate audio narration at this moment. The voice service may be waking up or temporarily unavailable. Please retry in a few moments.'
       );
     }
   };
@@ -317,7 +380,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.playbackRate = playbackRate;
+      audioRef.current.playbackRate = 1.0;
       audioRef.current.play().then(() => {
         setIsPlaying(true);
       }).catch((err) => {
@@ -335,8 +398,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
       setDuration(audioRef.current.duration);
-      audioRef.current.playbackRate = playbackRate;
-      audioRef.current.defaultPlaybackRate = playbackRate;
+      audioRef.current.playbackRate = 1.0;
+      audioRef.current.defaultPlaybackRate = 1.0;
     }
   };
 
@@ -345,6 +408,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     setCurrentTime(val);
     if (audioRef.current) {
       audioRef.current.currentTime = val;
+      // Ensure playbackRate remains exactly 1.0
+      audioRef.current.playbackRate = 1.0;
     }
   };
 
@@ -373,7 +438,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       setCurrentTime(0);
-      audioRef.current.playbackRate = playbackRate;
+      audioRef.current.playbackRate = 1.0;
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
@@ -384,6 +449,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       const targetTime = Math.max(0, Math.min(maxDuration, audioRef.current.currentTime + seconds));
       audioRef.current.currentTime = targetTime;
       setCurrentTime(targetTime);
+      // Ensure playback rate remains unchanged and never increases
+      audioRef.current.playbackRate = 1.0;
     }
   };
 
@@ -440,7 +507,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             {chapter.title.replace(/^Vidya:\s*/i, '')}
           </p>
           <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Powered by Edge TTS • 1.25x Speed
+            Powered by Edge TTS
           </p>
         </div>
 
@@ -452,16 +519,20 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               style={{ borderTopColor: 'var(--accent-saffron)' }}
             />
             <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-              {chunkProgress && chunkProgress.total > 1
+              {isWakingUp
+                ? 'Service is Waking up'
+                : chunkProgress && chunkProgress.total > 1
                 ? `Generating Audio Section ${chunkProgress.current} of ${chunkProgress.total}...`
                 : 'Generating Shravan Audio...'}
             </h3>
             <p className="text-xs sm:text-sm max-w-md" style={{ color: 'var(--text-secondary)' }}>
-              {chunkProgress && chunkProgress.total > 1
+              {isWakingUp
+                ? 'The TTS narration service is starting up after inactivity. Please allow a short moment...'
+                : chunkProgress && chunkProgress.total > 1
                 ? `Synthesizing educational chapter summary in fast, smooth sections (${chunkProgress.current}/${chunkProgress.total}). Please hold on.`
                 : 'Connecting to Edge TTS voice service. Please wait a few moments...'}
             </p>
-            {chunkProgress && chunkProgress.total > 1 && (
+            {chunkProgress && chunkProgress.total > 1 && !isWakingUp && (
               <div className="w-56 h-2 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden mt-2">
                 <div
                   className="h-full transition-all duration-300 rounded-full"
@@ -550,7 +621,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               </div>
             </div>
 
-            {/* Player Controls (Repeat, Speed, -10s, Play/Pause, +10s, Volume) */}
+            {/* Player Controls (Repeat, -10s, Play/Pause, +10s, Volume) */}
             <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
               <div className="flex items-center gap-2">
                 {/* Repeat Button */}
@@ -567,20 +638,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
                   <RotateCcw className="w-4 h-4 text-amber-700 dark:text-amber-400" />
                   <span>Repeat</span>
                 </button>
-
-                {/* Fixed Speed Badge (1.25x only) */}
-                <span
-                  id="shravan-speed-badge"
-                  className="inline-flex items-center px-2.5 py-2 rounded-xl text-xs font-bold border shadow-2xs"
-                  style={{
-                    borderColor: 'var(--accent-saffron)',
-                    backgroundColor: 'var(--accent-saffron-light)',
-                    color: 'var(--accent-saffron-text)',
-                  }}
-                  title="Narration Speed: 1.25x"
-                >
-                  1.25x
-                </span>
               </div>
 
               {/* Playback & Seek Controls Cluster */}
