@@ -21,8 +21,16 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 
+const isValidFirebaseApiKey = (key: unknown): boolean =>
+  typeof key === 'string' && key.startsWith('AIza') && key.trim().length >= 30;
+
+const rawApiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+const effectiveApiKey = isValidFirebaseApiKey(rawApiKey)
+  ? (rawApiKey as string).trim()
+  : "AIzaSyDkCU1DHUqnRjuWvCiMi3m4Q8G2uJ6ECZU";
+
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDkCU1DHUqnRjuWvCiMi3m4Q8G2uJ6ECZU",
+  apiKey: effectiveApiKey,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "gyanquest-edu.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "gyanquest-edu",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "gyanquest-edu.firebasestorage.app",

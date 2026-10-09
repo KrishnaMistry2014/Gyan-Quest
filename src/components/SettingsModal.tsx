@@ -5,7 +5,7 @@ import {
   Sun,
   Moon,
   Volume2,
-  BookOpen,
+  Clock,
   User,
   Bell,
   Trash2,
@@ -13,11 +13,14 @@ import {
   RotateCcw,
   Sparkles,
   Flame,
-  Zap
+  Zap,
+  Sliders,
+  ChevronRight,
+  EyeOff,
+  Footprints
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { useToast } from '../context/ToastContext';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -29,7 +32,6 @@ export const SettingsModal: React.FC = () => {
     streak
   } = useAuth();
   const { isDark, toggleTheme } = useTheme();
-  const { showToast } = useToast();
 
   // Settings State with LocalStorage Persistence
   const [audioSpeed, setAudioSpeed] = useState<string>(() => {
@@ -38,22 +40,29 @@ export const SettingsModal: React.FC = () => {
   const [autoplayAudio, setAutoplayAudio] = useState<boolean>(() => {
     return localStorage.getItem('gyanquest_autoplay_audio') === 'true';
   });
-  const [ambientChant, setAmbientChant] = useState<boolean>(() => {
-    const val = localStorage.getItem('gyanquest_ambient_chant');
-    return val === null ? true : val === 'true';
+
+  // Focus Mode configuration: '15' | '30' | '45' | '60' | 'custom' | 'none'
+  const [focusModeOption, setFocusModeOption] = useState<string>(() => {
+    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || '30';
+    if (['15', '30', '45', '60', 'none'].includes(raw)) return raw;
+    return 'custom';
   });
-  const [scriptPreference, setScriptPreference] = useState<string>(() => {
-    return localStorage.getItem('gyanquest_sanskrit_script') || 'bilingual';
+
+  const [customMinutes, setCustomMinutes] = useState<number>(() => {
+    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || '30';
+    if (!['15', '30', '45', '60', 'none'].includes(raw)) {
+      const parsed = parseInt(raw, 10);
+      return !isNaN(parsed) && parsed > 0 ? parsed : 25;
+    }
+    return 25;
   });
-  const [studyGoal, setStudyGoal] = useState<string>(() => {
-    return localStorage.getItem('gyanquest_study_goal') || '30';
-  });
+
   const [streakAlerts, setStreakAlerts] = useState<boolean>(() => {
     const val = localStorage.getItem('gyanquest_streak_alerts');
     return val === null ? true : val === 'true';
   });
 
-  const [activeTab, setActiveTab] = useState<'preferences' | 'audio' | 'account'>('preferences');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'focus' | 'account'>('appearance');
 
   // Close on Escape key
   useEffect(() => {
@@ -66,78 +75,74 @@ export const SettingsModal: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSettingsModalOpen, closeSettingsModal]);
 
-  if (!isSettingsModalOpen) return null;
+  // Settings are strictly available to signed-in users
+  if (!isSettingsModalOpen || !user) return null;
 
   const handleSaveAudioSpeed = (speed: string) => {
     setAudioSpeed(speed);
     localStorage.setItem('gyanquest_audio_speed', speed);
-    showToast(`Default narration speed set to ${speed}x`, 'success');
   };
 
   const handleToggleAutoplay = () => {
     const nextVal = !autoplayAudio;
     setAutoplayAudio(nextVal);
     localStorage.setItem('gyanquest_autoplay_audio', String(nextVal));
-    showToast(nextVal ? 'Auto-play narration enabled' : 'Auto-play narration disabled', 'info');
   };
 
-  const handleToggleAmbient = () => {
-    const nextVal = !ambientChant;
-    setAmbientChant(nextVal);
-    localStorage.setItem('gyanquest_ambient_chant', String(nextVal));
-    showToast(nextVal ? 'Ambient Vedic Chants turned on' : 'Ambient Vedic Chants muted', 'info');
+  const notifyFocusModeChanged = () => {
+    window.dispatchEvent(new Event('gyanquest_focus_mode_changed'));
   };
 
-  const handleScriptChange = (script: string) => {
-    setScriptPreference(script);
-    localStorage.setItem('gyanquest_sanskrit_script', script);
-    showToast('Vedic script display preference saved', 'success');
+  const handleFocusOptionChange = (option: string) => {
+    setFocusModeOption(option);
+    if (option === 'custom') {
+      localStorage.setItem('gyanquest_focus_mode_minutes', String(customMinutes));
+    } else {
+      localStorage.setItem('gyanquest_focus_mode_minutes', option);
+    }
+    notifyFocusModeChanged();
   };
 
-  const handleStudyGoalChange = (minutes: string) => {
-    setStudyGoal(minutes);
-    localStorage.setItem('gyanquest_study_goal', minutes);
-    showToast(`Daily study goal updated to ${minutes} mins`, 'success');
+  const handleCustomMinutesChange = (valStr: string) => {
+    const num = parseInt(valStr, 10);
+    const safeNum = isNaN(num) || num < 1 ? 1 : Math.min(num, 480);
+    setCustomMinutes(safeNum);
+    if (focusModeOption === 'custom') {
+      localStorage.setItem('gyanquest_focus_mode_minutes', String(safeNum));
+      notifyFocusModeChanged();
+    }
   };
 
   const handleToggleStreakAlerts = () => {
     const nextVal = !streakAlerts;
     setStreakAlerts(nextVal);
     localStorage.setItem('gyanquest_streak_alerts', String(nextVal));
-    showToast(nextVal ? 'Streak reminders enabled' : 'Streak reminders muted', 'info');
   };
 
   const handleClearCache = () => {
     try {
       localStorage.removeItem('gyanquest_cached_chapters');
-      showToast('Offline learning cache cleared successfully', 'success');
-    } catch {
-      showToast('Cache cleared', 'info');
-    }
+    } catch (_) {}
   };
 
   const handleResetDefaults = () => {
     setAudioSpeed('1.0');
     setAutoplayAudio(false);
-    setAmbientChant(true);
-    setScriptPreference('bilingual');
-    setStudyGoal('30');
+    setFocusModeOption('30');
+    setCustomMinutes(25);
     setStreakAlerts(true);
 
     localStorage.setItem('gyanquest_audio_speed', '1.0');
     localStorage.setItem('gyanquest_autoplay_audio', 'false');
-    localStorage.setItem('gyanquest_ambient_chant', 'true');
-    localStorage.setItem('gyanquest_sanskrit_script', 'bilingual');
-    localStorage.setItem('gyanquest_study_goal', '30');
+    localStorage.setItem('gyanquest_focus_mode_minutes', '30');
     localStorage.setItem('gyanquest_streak_alerts', 'true');
-
-    showToast('All settings restored to defaults', 'info');
+    notifyFocusModeChanged();
   };
 
   return (
     <div
       id="settings-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) closeSettingsModal();
       }}
@@ -156,7 +161,7 @@ export const SettingsModal: React.FC = () => {
           className="p-5 sm:p-6 border-b flex items-center justify-between"
           style={{ borderColor: 'var(--border-warm)' }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3.5">
             <div
               className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-xs"
               style={{
@@ -164,14 +169,14 @@ export const SettingsModal: React.FC = () => {
                 color: 'var(--accent-saffron-text)',
               }}
             >
-              <SettingsIcon className="w-5 h-5 animate-[spin_10s_linear_infinite]" />
+              <SettingsIcon className="w-5 h-5 text-amber-700 dark:text-amber-400" />
             </div>
             <div>
               <h3 className="text-xl sm:text-2xl font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
                 Settings
               </h3>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Customize your Vedic study environment & preferences
+                Manage Focus Mode, narration audio, themes, and goals
               </p>
             </div>
           </div>
@@ -190,49 +195,49 @@ export const SettingsModal: React.FC = () => {
 
         {/* Tab Navigation */}
         <div
-          className="flex border-b px-5 sm:px-6 gap-2 sm:gap-4 overflow-x-auto text-xs sm:text-sm font-semibold"
+          className="flex border-b px-4 sm:px-6 gap-2 overflow-x-auto text-xs sm:text-sm font-semibold"
           style={{ borderColor: 'var(--border-warm)' }}
         >
           <button
             type="button"
-            onClick={() => setActiveTab('preferences')}
-            className={`py-3 px-1 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'preferences'
-                ? 'border-amber-600 font-bold'
+            onClick={() => setActiveTab('appearance')}
+            className={`py-3 px-3 border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'appearance'
+                ? 'font-bold'
                 : 'border-transparent opacity-70 hover:opacity-100'
             }`}
             style={{
-              color: activeTab === 'preferences' ? 'var(--accent-saffron-text)' : 'var(--text-secondary)',
-              borderColor: activeTab === 'preferences' ? 'var(--accent-saffron)' : 'transparent',
+              color: activeTab === 'appearance' ? 'var(--accent-saffron-text)' : 'var(--text-secondary)',
+              borderColor: activeTab === 'appearance' ? 'var(--accent-saffron)' : 'transparent',
             }}
           >
             <Sun className="w-4 h-4" />
-            <span>Appearance & Study</span>
+            <span>Theme & Narration</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab('audio')}
-            className={`py-3 px-1 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'audio'
-                ? 'border-amber-600 font-bold'
+            onClick={() => setActiveTab('focus')}
+            className={`py-3 px-3 border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'focus'
+                ? 'font-bold'
                 : 'border-transparent opacity-70 hover:opacity-100'
             }`}
             style={{
-              color: activeTab === 'audio' ? 'var(--accent-saffron-text)' : 'var(--text-secondary)',
-              borderColor: activeTab === 'audio' ? 'var(--accent-saffron)' : 'transparent',
+              color: activeTab === 'focus' ? 'var(--accent-saffron-text)' : 'var(--text-secondary)',
+              borderColor: activeTab === 'focus' ? 'var(--accent-saffron)' : 'transparent',
             }}
           >
-            <Volume2 className="w-4 h-4" />
-            <span>Shravan (Audio)</span>
+            <Clock className="w-4 h-4" />
+            <span>Focus Mode</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('account')}
-            className={`py-3 px-1 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+            className={`py-3 px-3 border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'account'
-                ? 'border-amber-600 font-bold'
+                ? 'font-bold'
                 : 'border-transparent opacity-70 hover:opacity-100'
             }`}
             style={{
@@ -241,38 +246,50 @@ export const SettingsModal: React.FC = () => {
             }}
           >
             <User className="w-4 h-4" />
-            <span>Student Profile</span>
+            <span>Profile & Account</span>
           </button>
         </div>
 
         {/* Modal Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
-          {/* TAB 1: Preferences & Appearance */}
-          {activeTab === 'preferences' && (
+          {/* TAB 1: Theme & Narration */}
+          {activeTab === 'appearance' && (
             <div className="space-y-6">
               {/* Theme Preference */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-muted)' }}>
-                  Theme Mode
+                  Visual Theme
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3.5">
                   <button
                     type="button"
                     onClick={() => {
                       if (isDark) toggleTheme();
                     }}
-                    className={`flex items-center justify-center gap-2.5 p-3.5 rounded-2xl border text-sm font-bold transition-all cursor-pointer ${
-                      !isDark ? 'ring-2 ring-amber-500 shadow-sm' : 'opacity-70 hover:opacity-100'
+                    className={`flex flex-col gap-2 p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                      !isDark
+                        ? 'ring-2 ring-amber-500 shadow-sm border-amber-500'
+                        : 'opacity-70 hover:opacity-100'
                     }`}
                     style={{
                       backgroundColor: !isDark ? 'var(--bg-main)' : 'var(--bg-card-subtle)',
-                      borderColor: 'var(--border-warm)',
-                      color: 'var(--text-primary)',
+                      borderColor: !isDark ? 'var(--accent-saffron)' : 'var(--border-warm)',
                     }}
                   >
-                    <Sun className="w-4 h-4 text-amber-500" />
-                    <span>Surya (Light)</span>
-                    {!isDark && <Check className="w-4 h-4 text-amber-600 ml-auto" />}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-sm">
+                        <Sun className="w-4 h-4 text-amber-500" />
+                        <span>Surya (Light)</span>
+                      </div>
+                      {!isDark && (
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs">
+                          <Check className="w-3.5 h-3.5" />
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-tight" style={{ color: 'var(--text-muted)' }}>
+                      Warm parchment palette with saffron accents
+                    </p>
                   </button>
 
                   <button
@@ -280,101 +297,248 @@ export const SettingsModal: React.FC = () => {
                     onClick={() => {
                       if (!isDark) toggleTheme();
                     }}
-                    className={`flex items-center justify-center gap-2.5 p-3.5 rounded-2xl border text-sm font-bold transition-all cursor-pointer ${
-                      isDark ? 'ring-2 ring-amber-500 shadow-sm' : 'opacity-70 hover:opacity-100'
+                    className={`flex flex-col gap-2 p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                      isDark
+                        ? 'ring-2 ring-amber-500 shadow-sm border-amber-500'
+                        : 'opacity-70 hover:opacity-100'
                     }`}
                     style={{
                       backgroundColor: isDark ? 'var(--bg-main)' : 'var(--bg-card-subtle)',
-                      borderColor: 'var(--border-warm)',
-                      color: 'var(--text-primary)',
+                      borderColor: isDark ? 'var(--accent-saffron)' : 'var(--border-warm)',
                     }}
                   >
-                    <Moon className="w-4 h-4 text-amber-400" />
-                    <span>Chandra (Dark)</span>
-                    {isDark && <Check className="w-4 h-4 text-amber-400 ml-auto" />}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-sm">
+                        <Moon className="w-4 h-4 text-amber-400" />
+                        <span>Chandra (Dark)</span>
+                      </div>
+                      {isDark && (
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs">
+                          <Check className="w-3.5 h-3.5" />
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-tight" style={{ color: 'var(--text-muted)' }}>
+                      Restful bronze and charcoal tones for night study
+                    </p>
                   </button>
                 </div>
               </div>
 
-              {/* Sanskrit / Shloka Script Preference */}
+              {/* Narration Playback Speed */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-muted)' }}>
-                  Sanskrit Shloka Display
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Shravan Recitation Speed
+                  </label>
+                  <span className="text-xs font-bold" style={{ color: 'var(--accent-saffron-text)' }}>
+                    {audioSpeed}x ({audioSpeed === '1.0' ? 'Normal' : audioSpeed === '0.75' ? 'Relaxed' : audioSpeed === '1.25' ? 'Focused' : 'Brisk'})
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2.5">
                   {[
-                    { id: 'bilingual', label: 'Bilingual (देवनागरी + Eng)' },
-                    { id: 'devanagari', label: 'देवनागरी (Devanagari Only)' },
-                    { id: 'iast', label: 'IAST Roman Transliteration' },
+                    { spd: '0.75', label: '0.75x', desc: 'Relaxed' },
+                    { spd: '1.0', label: '1.0x', desc: 'Normal' },
+                    { spd: '1.25', label: '1.25x', desc: 'Focused' },
+                    { spd: '1.5', label: '1.5x', desc: 'Brisk' },
                   ].map((item) => (
                     <button
-                      key={item.id}
+                      key={item.spd}
                       type="button"
-                      onClick={() => handleScriptChange(item.id)}
-                      className={`px-3 py-2.5 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer ${
-                        scriptPreference === item.id ? 'ring-2 ring-amber-500 font-bold' : 'opacity-80 hover:opacity-100'
+                      onClick={() => handleSaveAudioSpeed(item.spd)}
+                      className={`py-2.5 px-2 rounded-2xl border text-center transition-all cursor-pointer ${
+                        audioSpeed === item.spd
+                          ? 'ring-2 ring-amber-500 font-bold border-amber-500 shadow-xs'
+                          : 'opacity-80 hover:opacity-100'
                       }`}
                       style={{
-                        backgroundColor: scriptPreference === item.id ? 'var(--accent-saffron-light)' : 'var(--bg-card-subtle)',
+                        backgroundColor: audioSpeed === item.spd ? 'var(--accent-saffron)' : 'var(--bg-card-subtle)',
                         borderColor: 'var(--border-warm)',
-                        color: scriptPreference === item.id ? 'var(--accent-saffron-text)' : 'var(--text-primary)',
+                        color: audioSpeed === item.spd ? '#FFFFFF' : 'var(--text-primary)',
                       }}
                     >
-                      {item.label}
+                      <span className="block text-xs sm:text-sm font-bold">{item.label}</span>
+                      <span className="block text-[10px] opacity-80">{item.desc}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Daily Study Goal */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-muted)' }}>
-                  Daily Study Goal
-                </label>
-                <div className="grid grid-cols-4 gap-2 sm:gap-3">
-                  {['15', '30', '45', '60'].map((mins) => (
-                    <button
-                      key={mins}
-                      type="button"
-                      onClick={() => handleStudyGoalChange(mins)}
-                      className={`py-2 px-3 rounded-xl border text-xs sm:text-sm font-bold text-center transition-all cursor-pointer ${
-                        studyGoal === mins ? 'ring-2 ring-amber-500' : 'opacity-80 hover:opacity-100'
-                      }`}
-                      style={{
-                        backgroundColor: studyGoal === mins ? 'var(--accent-saffron)' : 'var(--bg-card-subtle)',
-                        borderColor: 'var(--border-warm)',
-                        color: studyGoal === mins ? '#FFFFFF' : 'var(--text-primary)',
-                      }}
-                    >
-                      {mins} mins
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Streak Alerts */}
+              {/* Autoplay Narration Toggle */}
               <div
-                className="flex items-center justify-between p-3.5 rounded-2xl border"
+                className="flex items-center justify-between p-4 rounded-2xl border transition-all"
                 style={{
                   backgroundColor: 'var(--bg-card-subtle)',
                   borderColor: 'var(--border-warm)',
                 }}
               >
-                <div className="flex items-center gap-3">
-                  <Bell className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <div className="flex items-start gap-3 pr-2">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: 'var(--bg-icon)' }}>
+                    <Volume2 className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                  </div>
                   <div>
-                    <span className="text-sm font-semibold block" style={{ color: 'var(--text-primary)' }}>
-                      Daily Streak Notifications
+                    <span className="text-sm font-semibold block leading-tight" style={{ color: 'var(--text-primary)' }}>
+                      Auto-play Shravan Narration
                     </span>
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      Gentle reminders to preserve your study streak
+                    <span className="text-xs leading-relaxed block mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      Automatically begin voice playback when opening the Shravan audio stage
                     </span>
                   </div>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleToggleAutoplay}
+                  className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
+                    autoplayAudio ? 'bg-amber-600 justify-end' : 'bg-stone-300 dark:bg-stone-700 justify-start'
+                  }`}
+                  aria-label="Toggle autoplay narration"
+                >
+                  <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: Focus Mode */}
+          {activeTab === 'focus' && (
+            <div className="space-y-6">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Focus Mode Duration
+                  </label>
+                  <span className="text-xs font-bold" style={{ color: 'var(--accent-saffron-text)' }}>
+                    {focusModeOption === 'none'
+                      ? 'No time limit'
+                      : focusModeOption === 'custom'
+                      ? `${customMinutes} mins (Custom)`
+                      : `${focusModeOption} mins`}
+                  </span>
+                </div>
+
+                <p className="text-xs leading-relaxed mb-4" style={{ color: 'var(--text-muted)' }}>
+                  When your study duration elapses after signing in, an audible chime will sound, your screen will be blurred for <strong>5 minutes</strong>, and you'll be prompted to walk around and rest your eyes.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3.5">
+                  {[
+                    { id: '15', label: '15 mins', sub: 'Quick Burst' },
+                    { id: '30', label: '30 mins', sub: 'Standard Pace' },
+                    { id: '45', label: '45 mins', sub: 'Deep Study' },
+                    { id: '60', label: '60 mins', sub: 'Scholar Quest' },
+                    { id: 'custom', label: 'Custom mins', sub: 'Specify Time' },
+                    { id: 'none', label: 'No time limit', sub: 'Continuous' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleFocusOptionChange(item.id)}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                        focusModeOption === item.id
+                          ? 'ring-2 ring-amber-500 font-bold border-amber-500 shadow-xs'
+                          : 'opacity-80 hover:opacity-100'
+                      }`}
+                      style={{
+                        backgroundColor: focusModeOption === item.id ? 'var(--accent-saffron-light)' : 'var(--bg-card-subtle)',
+                        borderColor: focusModeOption === item.id ? 'var(--accent-saffron)' : 'var(--border-warm)',
+                        color: focusModeOption === item.id ? 'var(--accent-saffron-text)' : 'var(--text-primary)',
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs sm:text-sm font-bold">{item.label}</span>
+                        {focusModeOption === item.id && (
+                          <Check className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                        )}
+                      </div>
+                      <span className="text-[10px] block opacity-80 mt-0.5">{item.sub}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Minutes Input when 'custom' is selected */}
+                {focusModeOption === 'custom' && (
+                  <div
+                    className="p-4 rounded-2xl border flex items-center justify-between gap-3 animate-in fade-in"
+                    style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-warm)' }}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div>
+                        <span className="text-xs font-semibold block" style={{ color: 'var(--text-primary)' }}>
+                          Set Custom Minutes:
+                        </span>
+                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          Between 1 and 480 minutes
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="480"
+                        value={customMinutes}
+                        onChange={(e) => handleCustomMinutesChange(e.target.value)}
+                        className="w-20 px-3 py-1.5 rounded-xl border text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          borderColor: 'var(--border-warm)',
+                          color: 'var(--text-primary)',
+                        }}
+                      />
+                      <span className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>
+                        mins
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Informational banner about the 5-min walk pause */}
+              <div
+                className="p-4 rounded-2xl border space-y-2"
+                style={{
+                  backgroundColor: 'var(--bg-card-subtle)',
+                  borderColor: 'var(--border-warm)',
+                }}
+              >
+                <div className="flex items-center gap-2 font-bold text-xs" style={{ color: 'var(--accent-saffron-text)' }}>
+                  <Footprints className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <span>5-Minute Walking Pause & Screen Blur</span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  Regular physical movement and resting your eyes from digital screens prevents cognitive fatigue and improves recall by up to 25%.
+                </p>
+              </div>
+
+              {/* Streak Alerts */}
+              <div
+                className="flex items-center justify-between p-4 rounded-2xl border"
+                style={{
+                  backgroundColor: 'var(--bg-card-subtle)',
+                  borderColor: 'var(--border-warm)',
+                }}
+              >
+                <div className="flex items-start gap-3 pr-2">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: 'var(--bg-icon)' }}>
+                    <Bell className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-semibold block leading-tight" style={{ color: 'var(--text-primary)' }}>
+                      Daily Streak Reminders
+                    </span>
+                    <span className="text-xs leading-relaxed block mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      Alerts to safeguard your momentum and daily check-in
+                    </span>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleToggleStreakAlerts}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
+                  className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
                     streakAlerts ? 'bg-amber-600 justify-end' : 'bg-stone-300 dark:bg-stone-700 justify-start'
                   }`}
                   aria-label="Toggle streak alerts"
@@ -385,100 +549,7 @@ export const SettingsModal: React.FC = () => {
             </div>
           )}
 
-          {/* TAB 2: Audio & Shravan Settings */}
-          {activeTab === 'audio' && (
-            <div className="space-y-6">
-              {/* Narration Playback Speed */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-muted)' }}>
-                  Default Shravan Narration Speed
-                </label>
-                <div className="grid grid-cols-4 gap-2 sm:gap-3">
-                  {['0.75', '1.0', '1.25', '1.5'].map((spd) => (
-                    <button
-                      key={spd}
-                      type="button"
-                      onClick={() => handleSaveAudioSpeed(spd)}
-                      className={`py-2 px-3 rounded-xl border text-xs sm:text-sm font-bold text-center transition-all cursor-pointer ${
-                        audioSpeed === spd ? 'ring-2 ring-amber-500' : 'opacity-80 hover:opacity-100'
-                      }`}
-                      style={{
-                        backgroundColor: audioSpeed === spd ? 'var(--accent-saffron)' : 'var(--bg-card-subtle)',
-                        borderColor: 'var(--border-warm)',
-                        color: audioSpeed === spd ? '#FFFFFF' : 'var(--text-primary)',
-                      }}
-                    >
-                      {spd}x
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Autoplay Narration */}
-              <div
-                className="flex items-center justify-between p-3.5 rounded-2xl border"
-                style={{
-                  backgroundColor: 'var(--bg-card-subtle)',
-                  borderColor: 'var(--border-warm)',
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <Volume2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <div>
-                    <span className="text-sm font-semibold block" style={{ color: 'var(--text-primary)' }}>
-                      Auto-play Shravan Narration
-                    </span>
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      Start audio narration automatically when opening chapter
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleToggleAutoplay}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
-                    autoplayAudio ? 'bg-amber-600 justify-end' : 'bg-stone-300 dark:bg-stone-700 justify-start'
-                  }`}
-                  aria-label="Toggle autoplay narration"
-                >
-                  <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
-                </button>
-              </div>
-
-              {/* Ambient Tanpura / Chants */}
-              <div
-                className="flex items-center justify-between p-3.5 rounded-2xl border"
-                style={{
-                  backgroundColor: 'var(--bg-card-subtle)',
-                  borderColor: 'var(--border-warm)',
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <div>
-                    <span className="text-sm font-semibold block" style={{ color: 'var(--text-primary)' }}>
-                      Ambient Tanpura Drone / Chants
-                    </span>
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      Calming Vedic background harmonics during deep focus
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleToggleAmbient}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors ${
-                    ambientChant ? 'bg-amber-600 justify-end' : 'bg-stone-300 dark:bg-stone-700 justify-start'
-                  }`}
-                  aria-label="Toggle ambient chant"
-                >
-                  <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: Account & Student Profile */}
+          {/* TAB 3: Profile & Account */}
           {activeTab === 'account' && (
             <div className="space-y-6">
               {/* Profile Card */}
@@ -492,7 +563,7 @@ export const SettingsModal: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div
-                      className="w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm shadow-xs"
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-sm shadow-xs"
                       style={{
                         backgroundColor: 'var(--accent-saffron-light)',
                         color: 'var(--accent-saffron-text)',
@@ -501,11 +572,11 @@ export const SettingsModal: React.FC = () => {
                       {profile?.name?.slice(0, 2).toUpperCase() || 'GQ'}
                     </div>
                     <div>
-                      <h4 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                      <h4 className="font-bold text-base leading-tight" style={{ color: 'var(--text-primary)' }}>
                         {profile?.name || 'Vedic Learner'}
                       </h4>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {user?.email || 'Student Account'}
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {user.email || 'Student Account'}
                       </p>
                     </div>
                   </div>
@@ -516,32 +587,33 @@ export const SettingsModal: React.FC = () => {
                       closeSettingsModal();
                       openProfileModal();
                     }}
-                    className="px-3.5 py-1.5 rounded-xl border text-xs font-bold transition-all hover:scale-102 active:scale-98 cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl border text-xs font-bold transition-all hover:scale-102 active:scale-98 cursor-pointer flex items-center gap-1"
                     style={{
                       backgroundColor: 'var(--bg-card)',
                       borderColor: 'var(--border-warm)',
                       color: 'var(--accent-saffron-text)',
                     }}
                   >
-                    Edit Name
+                    <span>Edit Name</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t" style={{ borderColor: 'var(--border-warm)' }}>
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-amber-500 fill-current" />
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t" style={{ borderColor: 'var(--border-warm)' }}>
+                  <div className="flex items-center gap-2.5 p-2 rounded-xl" style={{ backgroundColor: 'var(--bg-main)' }}>
+                    <Zap className="w-4 h-4 text-amber-500 fill-current shrink-0" />
                     <div>
-                      <span className="text-xs text-muted block" style={{ color: 'var(--text-muted)' }}>Total XP</span>
+                      <span className="text-[10px] uppercase font-bold tracking-wider block" style={{ color: 'var(--text-muted)' }}>Total XP</span>
                       <span className="text-sm font-bold" style={{ color: 'var(--accent-saffron-text)' }}>
                         {profile?.xp || 0} XP
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Flame className="w-4 h-4 text-amber-500 fill-current" />
+                  <div className="flex items-center gap-2.5 p-2 rounded-xl" style={{ backgroundColor: 'var(--bg-main)' }}>
+                    <Flame className="w-4 h-4 text-amber-500 fill-current shrink-0" />
                     <div>
-                      <span className="text-xs text-muted block" style={{ color: 'var(--text-muted)' }}>Active Streak</span>
+                      <span className="text-[10px] uppercase font-bold tracking-wider block" style={{ color: 'var(--text-muted)' }}>Active Streak</span>
                       <span className="text-sm font-bold" style={{ color: 'var(--accent-saffron-text)' }}>
                         {streak} Days
                       </span>
@@ -550,12 +622,12 @@ export const SettingsModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Data & Cache management */}
-              <div className="space-y-3">
+              {/* Storage & Data management */}
+              <div className="space-y-2.5">
                 <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  Storage & Data
+                  Browser Storage & Cache
                 </label>
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col sm:flex-row gap-2.5">
                   <button
                     type="button"
                     onClick={handleClearCache}
@@ -581,9 +653,12 @@ export const SettingsModal: React.FC = () => {
                     }}
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-stone-500" />
-                    <span>Reset Defaults</span>
+                    <span>Restore Defaults</span>
                   </button>
                 </div>
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  Clearing offline cache will not remove your completed chapters, XP, or streak records.
+                </p>
               </div>
             </div>
           )}
@@ -594,18 +669,20 @@ export const SettingsModal: React.FC = () => {
           className="p-4 sm:p-5 border-t flex items-center justify-between"
           style={{ borderColor: 'var(--border-warm)', backgroundColor: 'var(--bg-card)' }}
         >
-          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Gyan Quest Vedic Study Platform v2.0
-          </span>
+          <button
+            type="button"
+            onClick={handleResetDefaults}
+            className="text-xs font-semibold underline underline-offset-4 opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Reset to defaults
+          </button>
 
           <button
             type="button"
             id="settings-done-btn"
-            onClick={() => {
-              closeSettingsModal();
-              showToast('Settings saved', 'success');
-            }}
-            className="px-5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-95 active:scale-95 cursor-pointer"
+            onClick={closeSettingsModal}
+            className="px-6 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer"
             style={{
               backgroundColor: 'var(--accent-saffron)',
               color: '#FFFFFF',

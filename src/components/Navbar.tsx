@@ -237,7 +237,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 id="theme-toggle-btn"
                 onClick={toggleTheme}
                 aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                className="w-9 h-9 rounded-xl flex items-center justify-center border transition-all hover:opacity-90 active:scale-95"
+                className="w-9 h-9 rounded-xl flex items-center justify-center border transition-all hover:opacity-90 active:scale-95 cursor-pointer"
                 style={{
                   backgroundColor: 'var(--bg-card)',
                   borderColor: 'var(--border-warm)',
@@ -257,7 +257,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   id="profile-dropdown-btn"
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   aria-expanded={dropdownOpen}
-                  className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border transition-all hover:opacity-90 shadow-2xs"
+                  className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border transition-all hover:opacity-90 shadow-2xs cursor-pointer"
                   style={{
                     backgroundColor: 'var(--bg-card)',
                     borderColor: 'var(--border-warm)',
@@ -280,7 +280,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {dropdownOpen && (
                   <div
                     id="profile-dropdown-menu"
-                    className="absolute right-0 mt-2 w-48 rounded-2xl border p-1.5 shadow-lg z-50 transition-all backdrop-blur-md"
+                    className="absolute right-0 mt-2 w-52 rounded-2xl border p-2 shadow-xl z-50 transition-all backdrop-blur-md"
                     style={{
                       backgroundColor: 'var(--bg-card)',
                       borderColor: 'var(--border-warm)',
@@ -293,11 +293,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                         setDropdownOpen(false);
                         openSettingsModal();
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 text-left cursor-pointer"
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all hover:bg-amber-500/10 text-left cursor-pointer group"
                       style={{ color: 'var(--text-primary)' }}
                     >
-                      <Settings className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
-                      <span>Settings</span>
+                      <div
+                        className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors group-hover:bg-amber-500/20"
+                        style={{ backgroundColor: 'var(--bg-icon)' }}
+                      >
+                        <Settings className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 group-hover:rotate-45 transition-transform" />
+                      </div>
+                      <div className="flex-1">
+                        <span className="block font-semibold">Settings</span>
+                        <span className="block text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          Preferences & Audio
+                        </span>
+                      </div>
                     </button>
 
                     <button
@@ -431,7 +441,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 id="theme-toggle-mobile-btn"
                 onClick={toggleTheme}
                 aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-                className="w-9 h-9 rounded-xl flex items-center justify-center border transition-all"
+                className="w-9 h-9 rounded-xl flex items-center justify-center border transition-all cursor-pointer"
                 style={{
                   backgroundColor: 'var(--bg-card)',
                   borderColor: 'var(--border-warm)',

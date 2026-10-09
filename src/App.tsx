@@ -13,6 +13,8 @@ import { AboutSection } from './components/AboutSection';
 import { FinalCTA } from './components/FinalCTA';
 import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
+import { SettingsModal } from './components/SettingsModal';
+import { FocusBreakOverlay } from './components/FocusBreakOverlay';
 import { ProfileModal } from './components/ProfileModal';
 import { StreakModal } from './components/StreakModal';
 import { GuruModal } from './components/GuruModal';
@@ -234,6 +236,12 @@ const MainAppContent: React.FC = () => {
 
       {/* Firebase Authentication Modal */}
       <AuthModal />
+
+      {/* Settings Modal */}
+      <SettingsModal />
+
+      {/* Focus Mode 5-min Walking Break Blur Overlay */}
+      <FocusBreakOverlay />
 
       {/* Profile Modal (Contains name textbox and Submit button, saving to Firestore) */}
       <ProfileModal />
