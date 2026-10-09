@@ -10,7 +10,7 @@ export const FocusBreakOverlay: React.FC = () => {
   const [isBreakActive, setIsBreakActive] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState(BREAK_DURATION_SECONDS);
   const [focusSetting, setFocusSetting] = useState<string>(() => {
-    return localStorage.getItem('gyanquest_focus_mode_minutes') || '30';
+    return localStorage.getItem('gyanquest_focus_mode_minutes') || 'none';
   });
 
   const sessionStartRef = useRef<number>(Date.now());
@@ -20,16 +20,16 @@ export const FocusBreakOverlay: React.FC = () => {
 
   // Read current focus mode configuration from localStorage
   const getFocusMinutes = (): number | null => {
-    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || '30';
+    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || 'none';
     if (raw === 'none' || raw === 'no_limit') return null;
     const parsed = parseInt(raw, 10);
-    return isNaN(parsed) || parsed <= 0 ? 30 : parsed;
+    return isNaN(parsed) || parsed <= 0 ? null : parsed;
   };
 
   // Listen to focus mode updates from SettingsModal
   useEffect(() => {
     const handleSettingChange = () => {
-      const updated = localStorage.getItem('gyanquest_focus_mode_minutes') || '30';
+      const updated = localStorage.getItem('gyanquest_focus_mode_minutes') || 'none';
       setFocusSetting(updated);
     };
 

@@ -43,13 +43,13 @@ export const SettingsModal: React.FC = () => {
 
   // Focus Mode configuration: '15' | '30' | '45' | '60' | 'custom' | 'none'
   const [focusModeOption, setFocusModeOption] = useState<string>(() => {
-    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || '30';
+    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || 'none';
     if (['15', '30', '45', '60', 'none'].includes(raw)) return raw;
     return 'custom';
   });
 
   const [customMinutes, setCustomMinutes] = useState<number>(() => {
-    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || '30';
+    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || 'none';
     if (!['15', '30', '45', '60', 'none'].includes(raw)) {
       const parsed = parseInt(raw, 10);
       return !isNaN(parsed) && parsed > 0 ? parsed : 25;
@@ -128,13 +128,13 @@ export const SettingsModal: React.FC = () => {
   const handleResetDefaults = () => {
     setAudioSpeed('1.0');
     setAutoplayAudio(false);
-    setFocusModeOption('30');
+    setFocusModeOption('none');
     setCustomMinutes(25);
     setStreakAlerts(true);
 
     localStorage.setItem('gyanquest_audio_speed', '1.0');
     localStorage.setItem('gyanquest_autoplay_audio', 'false');
-    localStorage.setItem('gyanquest_focus_mode_minutes', '30');
+    localStorage.setItem('gyanquest_focus_mode_minutes', 'none');
     localStorage.setItem('gyanquest_streak_alerts', 'true');
     notifyFocusModeChanged();
   };
