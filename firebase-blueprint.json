@@ -10,7 +10,6 @@
         "streak": { "type": "number" },
         "xp": { "type": "number" },
         "lastActiveDate": { "type": "string" },
-        "lastCheckInDate": { "type": "string" },
         "longestStreak": { "type": "number" },
         "activeDays": { "type": "array" }
       },
@@ -60,10 +59,6 @@
     "/users/{userId}/chapters/{chapterId}": {
       "schema": "Chapter",
       "description": "Extracted chapters and generated study guides belonging to the user"
-    },
-    "/users/{userId}/checkIns/{date}": {
-      "schema": "object",
-      "description": "Daily check-in records storing streak count, XP bonus, and timestamp"
     },
     "/users/{userId}/claimedRewards/{rewardKey}": {
       "schema": "object",

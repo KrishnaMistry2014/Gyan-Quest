@@ -25,6 +25,7 @@ interface AuthContextType {
   isAuthModalOpen: boolean;
   isProfileModalOpen: boolean;
   isStreakModalOpen: boolean;
+  isSettingsModalOpen: boolean;
   streak: number;
   longestStreak: number;
   isStreakActiveToday: boolean;
@@ -35,6 +36,8 @@ interface AuthContextType {
   closeProfileModal: () => void;
   openStreakModal: () => void;
   closeStreakModal: () => void;
+  openSettingsModal: () => void;
+  closeSettingsModal: () => void;
   updateName: (newName: string) => Promise<void>;
   claimDailyStreak: (activitySource?: string) => Promise<ClaimStreakResult>;
   recordStreakActivity: (reason?: string) => Promise<ClaimStreakResult | null>;
@@ -51,6 +54,7 @@ const AuthContext = createContext<AuthContextType>({
   isAuthModalOpen: false,
   isProfileModalOpen: false,
   isStreakModalOpen: false,
+  isSettingsModalOpen: false,
   streak: 1,
   longestStreak: 1,
   isStreakActiveToday: false,
@@ -61,6 +65,8 @@ const AuthContext = createContext<AuthContextType>({
   closeProfileModal: () => {},
   openStreakModal: () => {},
   closeStreakModal: () => {},
+  openSettingsModal: () => {},
+  closeSettingsModal: () => {},
   updateName: async () => {},
   claimDailyStreak: async () => ({
     profile: getGuestProfile(),
@@ -82,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isStreakModalOpen, setIsStreakModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // Determine if this user is an unverified email/password user
   const isEmailUnverified = Boolean(
@@ -162,6 +169,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openStreakModal = () => setIsStreakModalOpen(true);
   const closeStreakModal = () => setIsStreakModalOpen(false);
 
+  const openSettingsModal = () => setIsSettingsModalOpen(true);
+  const closeSettingsModal = () => setIsSettingsModalOpen(false);
+
   const updateName = async (newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed) return;
@@ -227,6 +237,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthModalOpen,
         isProfileModalOpen,
         isStreakModalOpen,
+        isSettingsModalOpen,
         streak,
         longestStreak,
         isStreakActiveToday,
@@ -237,6 +248,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         closeProfileModal,
         openStreakModal,
         closeStreakModal,
+        openSettingsModal,
+        closeSettingsModal,
         updateName,
         claimDailyStreak,
         recordStreakActivity,

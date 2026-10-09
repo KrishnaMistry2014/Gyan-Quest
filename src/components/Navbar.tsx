@@ -44,6 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     isEmailUnverified,
     openAuthModal,
     openProfileModal,
+    openSettingsModal,
     signOutUser,
     streak,
     isStreakActiveToday,
@@ -285,19 +286,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                       borderColor: 'var(--border-warm)',
                     }}
                   >
-                    <a
-                      href="#"
+                    <button
+                      type="button"
                       id="dropdown-settings-link"
-                      onClick={(e) => {
-                        e.preventDefault();
+                      onClick={() => {
                         setDropdownOpen(false);
+                        openSettingsModal();
                       }}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5 text-left cursor-pointer"
                       style={{ color: 'var(--text-primary)' }}
                     >
                       <Settings className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
                       <span>Settings</span>
-                    </a>
+                    </button>
 
                     <button
                       type="button"

@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { X, Flame, Sparkles, CheckCircle2, Trophy, Calendar, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
 import { getCurrentWeekDays } from '../lib/streak';
 
 interface StreakModalProps {
@@ -16,36 +15,11 @@ export const StreakModal: React.FC<StreakModalProps> = ({ onStartLearning }) => 
     longestStreak,
     isStreakActiveToday,
     activeDays,
-    claimDailyStreak,
   } = useAuth();
-  const { showToast } = useToast();
-
-  const [isClaiming, setIsClaiming] = useState(false);
-  const [justClaimed, setJustClaimed] = useState(false);
 
   if (!isStreakModalOpen) return null;
 
   const weekDays = getCurrentWeekDays(activeDays);
-
-  const handleClaim = async () => {
-    if (isStreakActiveToday || isClaiming) return;
-    setIsClaiming(true);
-    try {
-      const res = await claimDailyStreak('check_in');
-      if (res && !res.alreadyClaimed) {
-        setJustClaimed(true);
-        showToast({
-          title: `+${res.xpBonus} XP Daily Check-in!`,
-          message: `Day ${res.newStreak} streak secured • Consecutive day bonus`,
-          type: 'xp',
-          xpAmount: res.xpBonus,
-        });
-        setTimeout(() => setJustClaimed(false), 4000);
-      }
-    } finally {
-      setIsClaiming(false);
-    }
-  };
 
   const handleGoLearn = () => {
     closeStreakModal();
@@ -111,7 +85,7 @@ export const StreakModal: React.FC<StreakModalProps> = ({ onStartLearning }) => 
           <div className="relative inline-flex items-center justify-center mb-3">
             <div
               className={`w-20 h-20 sm:w-24 sm:h-24 rounded-3xl flex items-center justify-center border shadow-inner transition-transform ${
-                isStreakActiveToday || justClaimed ? 'scale-105' : 'animate-pulse'
+                isStreakActiveToday ? 'scale-105' : 'animate-pulse'
               }`}
               style={{
                 backgroundColor: 'var(--accent-saffron-light)',
@@ -120,13 +94,13 @@ export const StreakModal: React.FC<StreakModalProps> = ({ onStartLearning }) => 
             >
               <Flame
                 className={`w-12 h-12 sm:w-14 sm:h-14 transition-all ${
-                  isStreakActiveToday || justClaimed
+                  isStreakActiveToday
                     ? 'text-orange-500 fill-orange-500 drop-shadow-md'
                     : 'text-amber-500 fill-amber-400/60'
                 }`}
               />
             </div>
-            {(isStreakActiveToday || justClaimed) && (
+            {isStreakActiveToday && (
               <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white rounded-full p-1 shadow-xs">
                 <CheckCircle2 className="w-4 h-4" />
               </span>
@@ -138,12 +112,10 @@ export const StreakModal: React.FC<StreakModalProps> = ({ onStartLearning }) => 
           </h2>
 
           <p className="text-xs sm:text-sm mt-1 max-w-sm mx-auto" style={{ color: 'var(--text-secondary)' }}>
-            {justClaimed
-              ? '🎉 Daily streak claimed! Your learning momentum is locked in.'
-              : isStreakActiveToday
+            {isStreakActiveToday
               ? 'Flame protected for today! Complete any quest stage to expand your mastery.'
               : streak > 0
-              ? 'Check in or complete a learning quest today to extend your streak!'
+              ? 'Complete a Vidya or Shravan session today to keep your streak alive!'
               : 'Start your continuous learning journey today!'}
           </p>
         </div>
@@ -249,29 +221,14 @@ export const StreakModal: React.FC<StreakModalProps> = ({ onStartLearning }) => 
               <span>Status</span>
             </div>
             <div className="text-xs sm:text-sm font-extrabold mt-1 text-emerald-600 dark:text-emerald-400">
-              {isStreakActiveToday || justClaimed ? 'Secured' : 'Pending'}
+              {isStreakActiveToday ? 'Secured' : 'Pending'}
             </div>
           </div>
         </div>
 
         {/* Interactive Action Area */}
         <div className="space-y-2.5 pt-2">
-          {!isStreakActiveToday && !justClaimed ? (
-            <button
-              type="button"
-              id="btn-claim-daily-streak"
-              onClick={handleClaim}
-              disabled={isClaiming}
-              className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-2xl text-sm font-bold shadow-md transition-all hover:opacity-95 hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
-              style={{
-                backgroundColor: 'var(--accent-saffron)',
-                color: '#FFFFFF',
-              }}
-            >
-              <Flame className="w-4 h-4 fill-current text-white" />
-              <span>{isClaiming ? 'Securing Streak...' : 'Claim Today\'s Streak (+1 Day)'}</span>
-            </button>
-          ) : (
+          {isStreakActiveToday ? (
             <div
               className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-xs sm:text-sm font-semibold border"
               style={{
@@ -283,6 +240,18 @@ export const StreakModal: React.FC<StreakModalProps> = ({ onStartLearning }) => 
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>Streak secured for today! Come back tomorrow for Day {streak + 1}.</span>
             </div>
+          ) : (
+            <div
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-xs sm:text-sm font-semibold border"
+              style={{
+                backgroundColor: 'var(--bg-main)',
+                borderColor: 'var(--border-warm)',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <Flame className="w-4 h-4 text-orange-500 fill-current" />
+              <span>Practice a chapter to maintain today's streak</span>
+            </div>
           )}
 
           <button
@@ -291,12 +260,12 @@ export const StreakModal: React.FC<StreakModalProps> = ({ onStartLearning }) => 
             onClick={handleGoLearn}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-xs sm:text-sm font-semibold border transition-all hover:opacity-90 active:scale-[0.99] cursor-pointer"
             style={{
-              backgroundColor: 'var(--bg-main)',
-              borderColor: 'var(--border-warm)',
-              color: 'var(--text-primary)',
+              backgroundColor: isStreakActiveToday ? 'var(--bg-main)' : 'var(--accent-saffron)',
+              borderColor: isStreakActiveToday ? 'var(--border-warm)' : 'var(--accent-saffron)',
+              color: isStreakActiveToday ? 'var(--text-primary)' : '#FFFFFF',
             }}
           >
-            <span>Practice Chapter & Earn XP</span>
+            <span>{isStreakActiveToday ? 'Practice Chapter & Earn XP' : 'Start Practice to Secure Streak'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

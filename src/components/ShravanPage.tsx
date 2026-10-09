@@ -139,21 +139,12 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const objectUrlRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Automatically award daily streak for Shravan activity if not yet active today
+  // Automatically maintain daily streak for Shravan activity if not yet active today
   useEffect(() => {
     if (!isStreakActiveToday && recordStreakActivity) {
-      recordStreakActivity('shravan').then((res) => {
-        if (res && !res.alreadyClaimed && res.xpBonus > 0) {
-          showToast({
-            title: `+${res.xpBonus} XP Daily Streak Bonus!`,
-            message: `Day ${res.newStreak} streak awarded automatically for Shravan listening`,
-            type: 'xp',
-            xpAmount: res.xpBonus,
-          });
-        }
-      }).catch(() => {});
+      recordStreakActivity('shravan').catch(() => {});
     }
-  }, [isStreakActiveToday, recordStreakActivity, showToast]);
+  }, [isStreakActiveToday, recordStreakActivity]);
 
   const handleGoToManan = async () => {
     try {

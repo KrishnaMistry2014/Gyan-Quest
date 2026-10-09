@@ -126,21 +126,12 @@ export const BlankPage: React.FC<BlankPageProps> = ({
   const stageIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Automatically award daily streak for doing Vidya if not yet active today
+  // Automatically maintain daily streak for doing Vidya if not yet active today
   useEffect(() => {
     if (status === 'done' && summary && !isStreakActiveToday && recordStreakActivity) {
-      recordStreakActivity('vidya').then((res) => {
-        if (res && !res.alreadyClaimed && res.xpBonus > 0) {
-          showToast({
-            title: `+${res.xpBonus} XP Daily Streak Bonus!`,
-            message: `Day ${res.newStreak} streak awarded automatically for Vidya study`,
-            type: 'xp',
-            xpAmount: res.xpBonus,
-          });
-        }
-      }).catch(() => {});
+      recordStreakActivity('vidya').catch(() => {});
     }
-  }, [status, summary, isStreakActiveToday, recordStreakActivity, showToast]);
+  }, [status, summary, isStreakActiveToday, recordStreakActivity]);
 
   const clearTimers = () => {
     if (stageIntervalRef.current) {
@@ -883,21 +874,13 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                       console.warn('Error claiming Shravan XP:', err);
                     }
 
-                    // Also automatically award streak activity for Shravan if not active today
+                    // Automatically maintain streak for Shravan if not active today
                     try {
                       if (!isStreakActiveToday && recordStreakActivity) {
-                        const streakRes = await recordStreakActivity('shravan');
-                        if (streakRes && !streakRes.alreadyClaimed && streakRes.xpBonus > 0) {
-                          showToast({
-                            title: `+${streakRes.xpBonus} XP Daily Streak Bonus!`,
-                            message: `Day ${streakRes.newStreak} streak awarded automatically for Shravan activity`,
-                            type: 'xp',
-                            xpAmount: streakRes.xpBonus,
-                          });
-                        }
+                        recordStreakActivity('shravan').catch(() => {});
                       }
                     } catch (err) {
-                      console.warn('Error recording Shravan streak activity:', err);
+                      console.debug('Error recording Shravan streak activity:', err);
                     }
 
                     onNavigateShravan(ch);

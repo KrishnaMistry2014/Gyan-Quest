@@ -54,8 +54,6 @@ export interface UserProfileData {
   email: string | null;
   streak: number;
   lastActiveDate: string;
-  lastCheckInDate?: string;
-  lastXpBonus?: number;
   longestStreak?: number;
   activeDays?: string[];
   xp?: number;
@@ -238,12 +236,12 @@ export interface ClaimStreakResult {
 }
 
 /**
- * Claims or advances daily streak for today, awarding a small XP bonus for consecutive days visited.
- * Tracks streak and check-in state in Cloud Firestore for authenticated users.
+ * Maintains and advances daily streaks for learning activities in Cloud Firestore.
+ * Keeps streak tracking active without check-in bonus XP.
  */
 export async function claimUserStreak(
   user: User | null,
-  activitySource: string = 'check_in'
+  activitySource: string = 'activity'
 ): Promise<ClaimStreakResult> {
   const today = getLocalDateString();
 
@@ -255,7 +253,7 @@ export async function claimUserStreak(
     const activeDays = Array.from(new Set([...(guest.activeDays || []), today])).slice(-30);
 
     if (guest.lastActiveDate === today && guest.streak > 0) {
-      // Already claimed today
+      // Already active today
       return {
         profile: guest,
         newStreak: guest.streak,
@@ -272,26 +270,19 @@ export async function claimUserStreak(
       newStreak = 1;
     }
 
-    // Small XP bonus for consecutive days visited: 5 XP (Day 1), 10 XP (Day 2), 15 XP (Day 3), 20 XP (Day 4+)
-    const xpBonus = Math.min(20, 5 * Math.min(newStreak, 4));
-    const newTotalXp = (guest.xp || 0) + xpBonus;
-
     const updatedGuest: UserProfileData = {
       ...guest,
       streak: newStreak,
       lastActiveDate: today,
-      lastCheckInDate: today,
-      lastXpBonus: xpBonus,
       longestStreak: Math.max(guest.longestStreak || 0, newStreak),
       activeDays,
-      xp: newTotalXp,
     };
     saveGuestProfile(updatedGuest);
     return {
       profile: updatedGuest,
       newStreak,
-      xpBonus,
-      newTotalXp,
+      xpBonus: 0,
+      newTotalXp: updatedGuest.xp || 0,
       alreadyClaimed: false,
       activitySource,
     };
@@ -313,7 +304,7 @@ export async function claimUserStreak(
   const activeDays = Array.from(new Set([...(local.activeDays || []), today])).slice(-30);
 
   if (local.lastActiveDate === today && local.streak > 0) {
-    // Already claimed today
+    // Already active today
     return {
       profile: local,
       newStreak: local.streak,
@@ -328,57 +319,34 @@ export async function claimUserStreak(
     newStreak = 1;
   }
 
-  // Consecutive day XP bonus: Day 1 (5 XP), Day 2 (10 XP), Day 3 (15 XP), Day 4+ (20 XP)
-  const xpBonus = Math.min(20, 5 * Math.min(newStreak, 4));
-
-  // Retrieve current XP from Firestore if available
-  let currentXp = typeof local.xp === 'number' ? local.xp : 0;
-  const userRef = doc(db, 'users', user.uid);
-  try {
-    const snap = await getDoc(userRef);
-    if (snap.exists() && typeof snap.data().xp === 'number') {
-      currentXp = snap.data().xp;
-    }
-  } catch (_) {}
-
-  const newTotalXp = currentXp + xpBonus;
-
   const updatedProfile: UserProfileData = {
     ...local,
     streak: newStreak,
     lastActiveDate: today,
-    lastCheckInDate: today,
-    lastXpBonus: xpBonus,
     longestStreak: Math.max(local.longestStreak || 0, newStreak),
     activeDays,
-    xp: newTotalXp,
   };
 
   saveLocalProfile(user.uid, updatedProfile);
 
   try {
-    await setDoc(userRef, updatedProfile, { merge: true });
-
-    // Track check-in event in Firestore subcollection for audit and history
-    const checkInRef = doc(db, 'users', user.uid, 'checkIns', today);
-    await setDoc(checkInRef, {
-      date: today,
+    const userRef = doc(db, 'users', user.uid);
+    await setDoc(userRef, {
       streak: newStreak,
-      xpBonus,
-      newTotalXp,
-      timestamp: new Date().toISOString(),
-      activitySource,
+      lastActiveDate: today,
+      longestStreak: updatedProfile.longestStreak,
+      activeDays,
     }, { merge: true });
-    console.log(`[Firestore] Daily check-in secured for user ${user.uid}: Day ${newStreak} streak (+${xpBonus} XP). New Total: ${newTotalXp} XP.`);
+    console.log(`[Firestore] Daily streak secured for user ${user.uid}: Day ${newStreak} (${activitySource}).`);
   } catch (err) {
-    console.debug('Failed to sync claimed streak to Firestore (offline):', err);
+    console.debug('Failed to sync streak to Firestore (offline):', err);
   }
 
   return {
     profile: updatedProfile,
     newStreak,
-    xpBonus,
-    newTotalXp,
+    xpBonus: 0,
+    newTotalXp: updatedProfile.xp || 0,
     alreadyClaimed: false,
     activitySource,
   };
