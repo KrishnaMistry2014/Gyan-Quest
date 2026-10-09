@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Flame, Sparkles, CheckCircle2, Trophy, Calendar, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { getCurrentWeekDays } from '../lib/streak';
 
 interface StreakModalProps {
@@ -17,6 +18,7 @@ export const StreakModal: React.FC<StreakModalProps> = ({ onStartLearning }) => 
     activeDays,
     claimDailyStreak,
   } = useAuth();
+  const { showToast } = useToast();
 
   const [isClaiming, setIsClaiming] = useState(false);
   const [justClaimed, setJustClaimed] = useState(false);
@@ -29,9 +31,15 @@ export const StreakModal: React.FC<StreakModalProps> = ({ onStartLearning }) => 
     if (isStreakActiveToday || isClaiming) return;
     setIsClaiming(true);
     try {
-      const success = await claimDailyStreak();
-      if (success) {
+      const res = await claimDailyStreak('check_in');
+      if (res && !res.alreadyClaimed) {
         setJustClaimed(true);
+        showToast({
+          title: `+${res.xpBonus} XP Daily Check-in!`,
+          message: `Day ${res.newStreak} streak secured • Consecutive day bonus`,
+          type: 'xp',
+          xpAmount: res.xpBonus,
+        });
         setTimeout(() => setJustClaimed(false), 4000);
       }
     } finally {

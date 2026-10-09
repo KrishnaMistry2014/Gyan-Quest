@@ -292,16 +292,31 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
               <div>
                 {/* Header row: badge & delete */}
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <div
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border"
-                    style={{
-                      backgroundColor: 'var(--bg-main)',
-                      borderColor: 'var(--border-warm)',
-                      color: 'var(--accent-saffron-text)',
-                    }}
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>Vidya Chapter</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <div
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border"
+                      style={{
+                        backgroundColor: 'var(--bg-main)',
+                        borderColor: 'var(--border-warm)',
+                        color: 'var(--accent-saffron-text)',
+                      }}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Vidya Chapter</span>
+                    </div>
+                    {chapter.uniqueCode && (
+                      <span
+                        className="font-mono text-[10px] px-2 py-0.5 rounded-md border font-semibold"
+                        style={{
+                          backgroundColor: 'var(--bg-main)',
+                          borderColor: 'var(--border-warm)',
+                          color: 'var(--text-secondary)',
+                        }}
+                        title={`Unique Chapter Code: ${chapter.uniqueCode}`}
+                      >
+                        #{chapter.uniqueCode}
+                      </span>
+                    )}
                   </div>
 
                   <button

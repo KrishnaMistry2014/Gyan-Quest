@@ -16,7 +16,8 @@ import {
   Settings,
   ChevronDown,
   LogOut,
-  Layers
+  Layers,
+  Zap
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { isDark, toggleTheme } = useTheme();
   const {
     user,
+    profile,
     isEmailUnverified,
     openAuthModal,
     openProfileModal,
@@ -181,6 +183,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>Guru AI</span>
                 </button>
               )}
+
+              {/* XP Counter */}
+              <div
+                id="nav-xp-counter"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold border shadow-2xs"
+                style={{
+                  backgroundColor: 'var(--bg-main)',
+                  borderColor: 'var(--border-warm)',
+                  color: 'var(--accent-saffron-text)',
+                }}
+                title={`Your student XP balance: ${profile?.xp || 0} XP`}
+              >
+                <Zap className="w-4 h-4 fill-current text-amber-500" />
+                <span>{profile?.xp || 0} XP</span>
+              </div>
 
               {/* Streak Counter */}
               <button

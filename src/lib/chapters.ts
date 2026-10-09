@@ -14,14 +14,28 @@ import { db, auth } from './firebase';
 
 export interface SavedChapter {
   id: string;
+  uniqueCode: string; // 10-digit unique code: 0000000000 to 9999999999
   userId?: string;
   fileName: string;
   title: string;
   summary: string;
   audioBase64?: string;
   shravanCompleted?: boolean;
+  shravanXpClaimed?: boolean;
+  mananXpClaimed?: boolean;
   createdAt: string; // ISO string
   fileSize?: number;
+}
+
+/**
+ * Generate a cryptographically uniform 10-digit code from 0000000000 to 9999999999.
+ */
+export function generateUniqueChapterCode(): string {
+  let code = '';
+  for (let i = 0; i < 10; i++) {
+    code += Math.floor(Math.random() * 10).toString();
+  }
+  return code;
 }
 
 const STORAGE_KEY_PREFIX = 'gyan_quest_chapters_';
@@ -36,7 +50,19 @@ export function getLocalChapters(userId?: string): SavedChapter[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed;
+      // Ensure all local chapters have a valid 10-digit uniqueCode
+      let modified = false;
+      const normalized: SavedChapter[] = parsed.map((item) => {
+        if (!item.uniqueCode || typeof item.uniqueCode !== 'string' || item.uniqueCode.length !== 10) {
+          modified = true;
+          return { ...item, uniqueCode: generateUniqueChapterCode() };
+        }
+        return item;
+      });
+      if (modified) {
+        localStorage.setItem(effectiveKey, JSON.stringify(normalized));
+      }
+      return normalized;
     }
     return [];
   } catch (err) {
@@ -81,14 +107,37 @@ export async function fetchUserChaptersFromFirestore(userId: string): Promise<Sa
 
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
+      let uniqueCode = data.uniqueCode;
+      if (!uniqueCode || typeof uniqueCode !== 'string' || uniqueCode.length !== 10) {
+        uniqueCode = generateUniqueChapterCode();
+        setDoc(docSnap.ref, { uniqueCode }, { merge: true }).catch(() => {});
+        setDoc(doc(db, 'chapterCodes', uniqueCode), {
+          code: uniqueCode,
+          chapterId: docSnap.id,
+          userId: data.userId || userId,
+          fileName: data.fileName || 'document.pdf',
+          title: data.title || 'Chapter Notes',
+          createdAt: data.createdAt || new Date().toISOString(),
+          shravanClaimedBy: data.shravanXpClaimed ? [data.userId || userId] : [],
+          mananClaimedBy: data.mananXpClaimed ? [data.userId || userId] : [],
+          rewards: {
+            shravan: Boolean(data.shravanXpClaimed),
+            manan: Boolean(data.mananXpClaimed),
+          },
+        }, { merge: true }).catch(() => {});
+      }
+
       chapters.push({
         id: docSnap.id,
+        uniqueCode,
         userId: data.userId || userId,
         fileName: data.fileName || 'document.pdf',
         title: data.title || 'Chapter Notes',
         summary: data.summary || '',
         audioBase64: data.audioBase64,
         shravanCompleted: Boolean(data.shravanCompleted),
+        shravanXpClaimed: Boolean(data.shravanXpClaimed),
+        mananXpClaimed: Boolean(data.mananXpClaimed),
         createdAt: data.createdAt || new Date().toISOString(),
         fileSize: data.fileSize,
       });
@@ -126,12 +175,15 @@ export function subscribeUserChapters(
           const data = docSnap.data();
           chapters.push({
             id: docSnap.id,
+            uniqueCode: data.uniqueCode || generateUniqueChapterCode(),
             userId: data.userId || userId,
             fileName: data.fileName || 'document.pdf',
             title: data.title || 'Chapter Notes',
             summary: data.summary || '',
             audioBase64: data.audioBase64,
             shravanCompleted: Boolean(data.shravanCompleted),
+            shravanXpClaimed: Boolean(data.shravanXpClaimed),
+            mananXpClaimed: Boolean(data.mananXpClaimed),
             createdAt: data.createdAt || new Date().toISOString(),
             fileSize: data.fileSize,
           });
@@ -177,15 +229,19 @@ export async function saveChapter(chapterData: {
   const userId = currentUser?.uid || 'guest_session';
   const chapterId = `ch_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const cleanTitle = chapterData.title || chapterData.fileName.replace(/\.[^/.]+$/, '');
+  const uniqueCode = generateUniqueChapterCode();
 
   const newChapter: SavedChapter = {
     id: chapterId,
+    uniqueCode,
     userId,
     fileName: chapterData.fileName,
     title: cleanTitle,
     summary: chapterData.summary,
     createdAt: new Date().toISOString(),
     fileSize: chapterData.fileSize,
+    shravanXpClaimed: false,
+    mananXpClaimed: false,
   };
 
   // 1. Immediately cache for seamless rendering
@@ -193,19 +249,40 @@ export async function saveChapter(chapterData: {
   const updated = [newChapter, ...localList.filter((c) => c.id !== newChapter.id)];
   setLocalChapters(updated, userId);
 
-  // 2. Persist directly to Google Cloud Firestore database
+  // 2. Persist directly to Google Cloud Firestore database under user chapters and chapterCodes collection
   try {
     const chapterDocRef = doc(db, 'users', userId, 'chapters', chapterId);
     await setDoc(chapterDocRef, {
       id: chapterId,
+      uniqueCode,
       userId,
       fileName: newChapter.fileName,
       title: newChapter.title,
       summary: newChapter.summary,
       createdAt: newChapter.createdAt,
       fileSize: newChapter.fileSize || 0,
+      shravanXpClaimed: false,
+      mananXpClaimed: false,
     });
-    console.log(`[Firestore] Chapter "${cleanTitle}" successfully saved to cloud database for user ${userId}.`);
+
+    // 3. Register unique code in the dedicated /chapterCodes collection
+    const chapterCodeRef = doc(db, 'chapterCodes', uniqueCode);
+    await setDoc(chapterCodeRef, {
+      code: uniqueCode,
+      chapterId,
+      userId,
+      fileName: newChapter.fileName,
+      title: newChapter.title,
+      createdAt: newChapter.createdAt,
+      shravanClaimedBy: [],
+      mananClaimedBy: [],
+      rewards: {
+        shravan: false,
+        manan: false,
+      },
+    });
+
+    console.log(`[Firestore] Chapter "${cleanTitle}" with code ${uniqueCode} successfully saved.`);
   } catch (err) {
     console.error('Failed to write chapter to Firestore:', err);
   }

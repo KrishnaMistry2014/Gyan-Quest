@@ -16,7 +16,10 @@ import {
   Layers,
   ArrowRight
 } from 'lucide-react';
-import { SavedChapter, saveChapter } from '../lib/chapters';
+import { SavedChapter, saveChapter, generateUniqueChapterCode } from '../lib/chapters';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { claimChapterStageReward } from '../lib/firebase';
 
 const EXTRACTION_STAGES = [
   'Extracting textbook text and diagrams with Gemini Flash-Lite...',
@@ -106,6 +109,8 @@ export const BlankPage: React.FC<BlankPageProps> = ({
   onPdfUpload,
   onClearUploadedPdf,
 }) => {
+  const { user, updateProfileXp, isStreakActiveToday, recordStreakActivity } = useAuth();
+  const { showToast } = useToast();
   const [status, setStatus] = useState<'idle' | 'processing' | 'done' | 'error'>('idle');
   const [stageMessage, setStageMessage] = useState<string>('Reading document text and diagrams...');
   const [summary, setSummary] = useState<string>('');
@@ -113,12 +118,29 @@ export const BlankPage: React.FC<BlankPageProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [activeFile, setActiveFile] = useState<File | null>(uploadedFile || null);
+  const [currentChapter, setCurrentChapter] = useState<SavedChapter | null>(selectedChapter || null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastProcessedKeyRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const stageIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Automatically award daily streak for doing Vidya if not yet active today
+  useEffect(() => {
+    if (status === 'done' && summary && !isStreakActiveToday && recordStreakActivity) {
+      recordStreakActivity('vidya').then((res) => {
+        if (res && !res.alreadyClaimed && res.xpBonus > 0) {
+          showToast({
+            title: `+${res.xpBonus} XP Daily Streak Bonus!`,
+            message: `Day ${res.newStreak} streak awarded automatically for Vidya study`,
+            type: 'xp',
+            xpAmount: res.xpBonus,
+          });
+        }
+      }).catch(() => {});
+    }
+  }, [status, summary, isStreakActiveToday, recordStreakActivity, showToast]);
 
   const clearTimers = () => {
     if (stageIntervalRef.current) {
@@ -134,6 +156,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
   // If a previously saved chapter is opened from "My Chapters", display it immediately
   useEffect(() => {
     if (selectedChapter) {
+      setCurrentChapter(selectedChapter);
       clearTimers();
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -252,12 +275,13 @@ export const BlankPage: React.FC<BlankPageProps> = ({
 
         // Persist to Cloud Firestore database
         try {
-          await saveChapter({
+          const saved = await saveChapter({
             fileName: file.name,
             title: computedTitle,
             summary: cleanSummary,
             fileSize: file.size,
           });
+          setCurrentChapter(saved);
         } catch (saveErr) {
           console.warn('Background chapter cloud save notice:', saveErr);
         }
@@ -826,15 +850,56 @@ export const BlankPage: React.FC<BlankPageProps> = ({
               {onNavigateShravan && (
                 <button
                   type="button"
-                  id="btn-continue-to-shravan"
-                  onClick={() => {
-                    const ch: SavedChapter = selectedChapter || {
+                  id="btn-go-to-shravan"
+                  data-testid="btn-continue-to-shravan"
+                  onClick={async () => {
+                    let ch: SavedChapter = currentChapter || selectedChapter || {
                       id: activeFile ? `${activeFile.name}-${activeFile.size}` : `ch_${Date.now()}`,
+                      uniqueCode: generateUniqueChapterCode(),
                       fileName: activeFile?.name || 'Chapter.pdf',
                       title: docTitle || 'Chapter Summary',
                       summary: summary,
                       createdAt: new Date().toISOString(),
                     };
+
+                    if (!ch.uniqueCode || ch.uniqueCode.length !== 10) {
+                      ch = { ...ch, uniqueCode: generateUniqueChapterCode() };
+                      setCurrentChapter(ch);
+                    }
+
+                    // Claim 10 XP for Shravan for the first time only for this chapter
+                    try {
+                      const reward = await claimChapterStageReward(ch, 'shravan', user);
+                      if (reward.awarded) {
+                        showToast({
+                          title: `+${reward.xpAdded} XP Added!`,
+                          message: `Shravan audio narration unlocked • Total: ${reward.newTotal} XP`,
+                          type: 'xp',
+                          xpAmount: reward.xpAdded,
+                        });
+                        updateProfileXp(reward.newTotal);
+                      }
+                    } catch (err) {
+                      console.warn('Error claiming Shravan XP:', err);
+                    }
+
+                    // Also automatically award streak activity for Shravan if not active today
+                    try {
+                      if (!isStreakActiveToday && recordStreakActivity) {
+                        const streakRes = await recordStreakActivity('shravan');
+                        if (streakRes && !streakRes.alreadyClaimed && streakRes.xpBonus > 0) {
+                          showToast({
+                            title: `+${streakRes.xpBonus} XP Daily Streak Bonus!`,
+                            message: `Day ${streakRes.newStreak} streak awarded automatically for Shravan activity`,
+                            type: 'xp',
+                            xpAmount: streakRes.xpBonus,
+                          });
+                        }
+                      }
+                    } catch (err) {
+                      console.warn('Error recording Shravan streak activity:', err);
+                    }
+
                     onNavigateShravan(ch);
                   }}
                   className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
@@ -843,7 +908,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                     color: '#FFFFFF',
                   }}
                 >
-                  <span>Continue to Shravan</span>
+                  <span>Go to Shravan</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               )}

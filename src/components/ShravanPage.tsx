@@ -18,7 +18,8 @@ import {
 } from 'lucide-react';
 import { SavedChapter, updateChapterAudio } from '../lib/chapters';
 import { useAuth } from '../context/AuthContext';
-import { addUserXp } from '../lib/firebase';
+import { useToast } from '../context/ToastContext';
+import { claimChapterStageReward } from '../lib/firebase';
 
 interface ShravanPageProps {
   chapter: SavedChapter;
@@ -118,7 +119,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   onBackToVidya,
   onNavigateDashboard,
 }) => {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, updateProfileXp, isStreakActiveToday, recordStreakActivity } = useAuth();
+  const { showToast } = useToast();
   const [audioBase64, setAudioBase64] = useState<string | null>(chapter.audioBase64 || null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(chapter.audioBase64 ? 'ready' : 'loading');
@@ -131,10 +133,51 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [duration, setDuration] = useState<number>(0);
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [hasPlayedFullAudio, setHasPlayedFullAudio] = useState<boolean>(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Automatically award daily streak for Shravan activity if not yet active today
+  useEffect(() => {
+    if (!isStreakActiveToday && recordStreakActivity) {
+      recordStreakActivity('shravan').then((res) => {
+        if (res && !res.alreadyClaimed && res.xpBonus > 0) {
+          showToast({
+            title: `+${res.xpBonus} XP Daily Streak Bonus!`,
+            message: `Day ${res.newStreak} streak awarded automatically for Shravan listening`,
+            type: 'xp',
+            xpAmount: res.xpBonus,
+          });
+        }
+      }).catch(() => {});
+    }
+  }, [isStreakActiveToday, recordStreakActivity, showToast]);
+
+  const handleGoToManan = async () => {
+    try {
+      const reward = await claimChapterStageReward(chapter, 'manan', user);
+      if (reward.awarded) {
+        showToast({
+          title: `+${reward.xpAdded} XP Added!`,
+          message: 'Completed Shravan listening',
+          type: 'xp',
+          xpAmount: reward.xpAdded,
+        });
+        updateProfileXp(reward.newTotal);
+        await refreshUser?.();
+      } else {
+        showToast({
+          title: 'Manan Stage',
+          message: 'Completed Shravan listening',
+          type: 'info',
+        });
+      }
+    } catch (err) {
+      console.warn('Error claiming Manan XP:', err);
+    }
+  };
 
   const generateAudio = async () => {
     // If audio already cached on chapter, use it immediately
@@ -142,7 +185,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       setAudioBase64(chapter.audioBase64);
       setStatus('ready');
       setIsWakingUp(false);
-      checkAndAwardXp();
       return;
     }
 
@@ -309,8 +351,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       setStatus('ready');
       setIsWakingUp(false);
       setChunkProgress(null);
-
-      checkAndAwardXp();
     } catch (err: any) {
       if (controller.signal.aborted) return;
       setChunkProgress(null);
@@ -359,21 +399,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     };
   }, [chapter.id]);
 
-  const checkAndAwardXp = async () => {
-    // If Shravan XP not yet claimed for this chapter across sessions
-    if (!chapter.shravanCompleted) {
-      try {
-        await addUserXp(user, 10);
-        chapter.shravanCompleted = true;
-        // Mark Shravan completed in Firestore without storing heavy Edge TTS audio
-        await updateChapterAudio(chapter.id, chapter.audioBase64 || '', true);
-        await refreshUser?.();
-      } catch (err) {
-        console.warn('Failed to claim Shravan XP:', err);
-      }
-    }
-  };
-
   const handleTogglePlay = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -391,7 +416,11 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 
   const handleTimeUpdate = () => {
     if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
+      const cur = audioRef.current.currentTime;
+      setCurrentTime(cur);
+      if (audioRef.current.duration > 0 && cur >= audioRef.current.duration - 0.3) {
+        setHasPlayedFullAudio(true);
+      }
     }
   };
 
@@ -580,7 +609,10 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               src={audioUrl || (audioBase64 ? resolveAudioSrc(audioBase64) : undefined)}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
-              onEnded={() => setIsPlaying(false)}
+              onEnded={() => {
+                setIsPlaying(false);
+                setHasPlayedFullAudio(true);
+              }}
             />
 
             {/* Visual Equalizer / Waveform Graphic */}
@@ -744,18 +776,21 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             <span>Go back to Vidya</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {}}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all hover:opacity-90 cursor-pointer"
-            style={{
-              backgroundColor: 'var(--accent-saffron)',
-              color: '#FFFFFF',
-            }}
-          >
-            <span>Go to Manan</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          {hasPlayedFullAudio && (
+            <button
+              type="button"
+              id="btn-go-to-manan"
+              onClick={handleGoToManan}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-95 cursor-pointer animate-in fade-in duration-300"
+              style={{
+                backgroundColor: 'var(--accent-saffron)',
+                color: '#FFFFFF',
+              }}
+            >
+              <span>Go to Manan</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>

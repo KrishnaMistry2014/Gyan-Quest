@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { LearningJourney } from './components/LearningJourney';
@@ -260,7 +261,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <MainAppContent />
+        <ToastProvider>
+          <MainAppContent />
+        </ToastProvider>
       </AuthProvider>
     </ThemeProvider>
   );

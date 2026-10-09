@@ -45,7 +45,7 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
   const [isClearing, setIsClearing] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Auto-scroll to bottom of conversation
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
@@ -427,17 +427,26 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="flex items-center gap-2"
+            className="flex items-end gap-2"
           >
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
               id="guru-chat-input"
+              rows={1}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Ask Guru about chapters, Indian culture, mythology, or Sanskrit..."
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                  // Pressing only Enter allows the normal behavior of inserting a newline
+                }
+              }}
+              placeholder="Ask Guru anything"
               disabled={isLoading}
-              className="flex-1 px-4 py-2.5 rounded-2xl border text-sm transition-all focus:outline-none focus:ring-2 disabled:opacity-60"
+              className="flex-1 px-4 py-2.5 rounded-2xl border text-sm transition-all focus:outline-none focus:ring-2 disabled:opacity-60 resize-none min-h-[44px] max-h-32 leading-relaxed"
               style={{
                 backgroundColor: 'var(--bg-main)',
                 borderColor: 'var(--border-warm)',
@@ -450,7 +459,7 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
               id="guru-send-message-btn"
               disabled={!inputText.trim() || isLoading}
               aria-label="Send message to Guru"
-              className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs shrink-0"
+              className="w-10 h-10 rounded-2xl flex items-center justify-center transition-all hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs shrink-0 mb-0.5"
               style={{
                 backgroundColor: 'var(--accent-saffron)',
                 color: '#FFFFFF',

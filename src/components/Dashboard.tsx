@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { BookOpen, Zap, Flame, UploadCloud, CheckCircle2, ArrowRight, AlertCircle, X } from 'lucide-react';
+import { BookOpen, Zap, Flame, UploadCloud, CheckCircle2, ArrowRight, AlertCircle, X, Sparkles } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 interface DashboardProps {
   onResumeLearning?: () => void;
@@ -9,11 +10,42 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartLearning, onPdfUpload }) => {
-  const { streak, isStreakActiveToday, openStreakModal, profile } = useAuth();
+  const { streak, isStreakActiveToday, openStreakModal, profile, claimDailyStreak } = useAuth();
+  const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+
+  // Consecutive day XP bonus calculation (Day 1: 5 XP, Day 2: 10 XP, Day 3: 15 XP, Day 4+: 20 XP)
+  const currentEligibleBonus = Math.min(20, 5 * Math.min(isStreakActiveToday ? streak : streak + 1, 4));
+
+  const handleDirectCheckIn = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (isStreakActiveToday || isCheckingIn) {
+      openStreakModal();
+      return;
+    }
+    setIsCheckingIn(true);
+    try {
+      const res = await claimDailyStreak('check_in');
+      if (res && !res.alreadyClaimed) {
+        showToast({
+          title: `+${res.xpBonus} XP Daily Check-in!`,
+          message: `Day ${res.newStreak} streak secured • Consecutive day bonus added`,
+          type: 'xp',
+          xpAmount: res.xpBonus,
+        });
+      } else {
+        openStreakModal();
+      }
+    } catch (err) {
+      console.warn('Error during check-in:', err);
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
 
   // Auto-dismiss error toaster after 5 seconds
   useEffect(() => {
@@ -282,18 +314,179 @@ export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartL
 
           <div className="flex items-center justify-between pt-1">
             <div className="text-xs font-semibold" style={{ color: 'var(--accent-saffron-text)' }}>
-              {isStreakActiveToday ? 'Streak Safe' : 'Tap to Claim'}
+              {isStreakActiveToday ? 'Streak Safe' : `+${currentEligibleBonus} XP Available`}
             </div>
-            <div
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all group-hover:scale-105 shadow-xs"
+            <button
+              type="button"
+              id="btn-card-streak-action"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!isStreakActiveToday) {
+                  handleDirectCheckIn(e);
+                } else {
+                  openStreakModal();
+                }
+              }}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all group-hover:scale-105 shadow-xs cursor-pointer"
               style={{
                 backgroundColor: 'var(--accent-saffron)',
                 color: '#FFFFFF',
               }}
             >
-              <span>{isStreakActiveToday ? 'View Details' : 'Check In'}</span>
+              <span>{isStreakActiveToday ? 'View Details' : isCheckingIn ? 'Claiming...' : `Check In (+${currentEligibleBonus} XP)`}</span>
               <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================================================
+          DAILY CHECK-IN SYSTEM SECTION
+          Awards small XP bonus for consecutive days visited, tracking Firestore streak
+         ========================================================================= */}
+      <div
+        id="dashboard-daily-checkin-system"
+        className="w-full rounded-3xl border p-6 sm:p-8 shadow-sm relative overflow-hidden transition-all"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: isStreakActiveToday ? 'var(--border-warm)' : '#F59E0B',
+        }}
+      >
+        {/* Subtle warm glow background element */}
+        <div
+          className="absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-15"
+          style={{ backgroundColor: 'var(--accent-saffron)' }}
+        />
+
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
+          {/* Left: Info & Consecutive visit milestones */}
+          <div className="space-y-3 flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border shadow-2xs"
+                style={{
+                  backgroundColor: 'var(--accent-saffron-light)',
+                  borderColor: 'var(--border-warm)',
+                  color: 'var(--accent-saffron-text)',
+                }}
+              >
+                <Flame className="w-3.5 h-3.5 fill-current text-orange-500" />
+                <span>Daily Check-in System</span>
+              </div>
+
+              <span
+                className="text-xs font-semibold px-2.5 py-0.5 rounded-full border"
+                style={{
+                  backgroundColor: 'var(--bg-main)',
+                  borderColor: 'var(--border-warm)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Consecutive Visit Bonus
+              </span>
             </div>
+
+            <div>
+              <h3 className="text-xl sm:text-2xl font-bold tracking-tight font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+                {isStreakActiveToday
+                  ? `Day ${streak} Streak Locked In • XP Bonus Claimed`
+                  : `Claim Day ${streak + 1} Daily Check-in Bonus`}
+              </h3>
+              <p className="text-xs sm:text-sm mt-1 leading-relaxed max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
+                {isStreakActiveToday
+                  ? `Your streak is safely synced to Firestore for today (+${profile?.lastXpBonus || currentEligibleBonus} XP bonus awarded). Come back tomorrow to continue your learning journey!`
+                  : `Check in daily to earn escalating XP bonuses (+5 to +20 XP). Completing Vidya reading or Shravan audio listening also awards your streak automatically!`}
+              </p>
+            </div>
+
+            {/* Consecutive Day Milestones Preview */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {[
+                { day: 1, xp: 5, label: 'Day 1' },
+                { day: 2, xp: 10, label: 'Day 2' },
+                { day: 3, xp: 15, label: 'Day 3' },
+                { day: 4, xp: 20, label: 'Day 4+' },
+              ].map((m) => {
+                const isCurrentTier =
+                  (isStreakActiveToday && (m.day === 4 ? streak >= 4 : streak === m.day)) ||
+                  (!isStreakActiveToday && (m.day === 4 ? streak + 1 >= 4 : streak + 1 === m.day));
+                return (
+                  <div
+                    key={m.day}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+                      isCurrentTier
+                        ? 'ring-2 ring-amber-400 bg-amber-500/15 border-amber-500 text-amber-700 dark:text-amber-300 font-extrabold'
+                        : 'opacity-75'
+                    }`}
+                    style={{
+                      backgroundColor: isCurrentTier ? undefined : 'var(--bg-main)',
+                      borderColor: isCurrentTier ? undefined : 'var(--border-warm)',
+                      color: isCurrentTier ? undefined : 'var(--text-secondary)',
+                    }}
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
+                    <span>{m.label}:</span>
+                    <span className="font-extrabold text-amber-600 dark:text-amber-400">+{m.xp} XP</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto shrink-0">
+            {isStreakActiveToday ? (
+              <div className="flex items-center gap-3">
+                <div
+                  className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl border text-xs sm:text-sm font-semibold shadow-2xs"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron-light)',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--accent-saffron-text)',
+                  }}
+                >
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div className="text-left">
+                    <div className="font-bold">Checked in today</div>
+                    <div className="text-[11px] opacity-80">+{profile?.lastXpBonus || currentEligibleBonus} XP Secured</div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  id="btn-view-streak-calendar"
+                  onClick={openStreakModal}
+                  className="px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold border transition-all hover:opacity-85 cursor-pointer shadow-2xs"
+                  style={{
+                    backgroundColor: 'var(--bg-main)',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  View Details
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                id="btn-claim-daily-checkin"
+                onClick={handleDirectCheckIn}
+                disabled={isCheckingIn}
+                className="px-6 py-3.5 rounded-2xl text-sm font-bold shadow-md transition-all hover:opacity-95 hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center justify-center gap-2"
+                style={{
+                  backgroundColor: 'var(--accent-saffron)',
+                  color: '#FFFFFF',
+                }}
+              >
+                <Flame className="w-5 h-5 fill-current text-white animate-pulse" />
+                <span>
+                  {isCheckingIn
+                    ? 'Claiming...'
+                    : `Complete Check-in (+${currentEligibleBonus} XP)`}
+                </span>
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </button>
+            )}
           </div>
         </div>
       </div>

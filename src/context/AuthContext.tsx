@@ -11,7 +11,8 @@ import {
   onSnapshot,
   doc,
   getGuestProfile,
-  claimUserStreak
+  claimUserStreak,
+  ClaimStreakResult
 } from '../lib/firebase';
 import { getLocalDateString } from '../lib/streak';
 import { clearLocalChapters } from '../lib/chapters';
@@ -35,10 +36,11 @@ interface AuthContextType {
   openStreakModal: () => void;
   closeStreakModal: () => void;
   updateName: (newName: string) => Promise<void>;
-  claimDailyStreak: () => Promise<boolean>;
-  recordStreakActivity: (reason?: string) => Promise<boolean>;
+  claimDailyStreak: (activitySource?: string) => Promise<ClaimStreakResult>;
+  recordStreakActivity: (reason?: string) => Promise<ClaimStreakResult | null>;
   refreshUser: () => Promise<void>;
   signOutUser: () => Promise<void>;
+  updateProfileXp: (newXp: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -60,10 +62,17 @@ const AuthContext = createContext<AuthContextType>({
   openStreakModal: () => {},
   closeStreakModal: () => {},
   updateName: async () => {},
-  claimDailyStreak: async () => false,
-  recordStreakActivity: async () => false,
+  claimDailyStreak: async () => ({
+    profile: getGuestProfile(),
+    newStreak: 1,
+    xpBonus: 0,
+    newTotalXp: 0,
+    alreadyClaimed: true,
+  }),
+  recordStreakActivity: async () => null,
   refreshUser: async () => {},
   signOutUser: async () => {},
+  updateProfileXp: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -109,6 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   name: data.name ?? prev?.name ?? 'Learner',
                   email: data.email ?? (currentUser.isAnonymous ? null : currentUser.email),
                   streak: typeof data.streak === 'number' ? data.streak : (prev?.streak ?? 1),
+                  xp: typeof data.xp === 'number' ? data.xp : (prev?.xp ?? 0),
                   lastActiveDate: data.lastActiveDate ?? prev?.lastActiveDate ?? getLocalDateString(),
                   longestStreak: typeof data.longestStreak === 'number' ? data.longestStreak : (prev?.longestStreak ?? 1),
                   activeDays: Array.isArray(data.activeDays) ? data.activeDays : (prev?.activeDays ?? [getLocalDateString()]),
@@ -161,20 +171,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile((prev) => (prev ? { ...prev, name: trimmed } : null));
   };
 
-  const claimDailyStreak = useCallback(async (): Promise<boolean> => {
+  const claimDailyStreak = useCallback(async (activitySource: string = 'check_in'): Promise<ClaimStreakResult> => {
     try {
-      const updated = await claimUserStreak(user);
-      setProfile(updated);
-      return true;
+      const res = await claimUserStreak(user, activitySource);
+      setProfile(res.profile);
+      return res;
     } catch (e) {
       console.error('Error claiming streak:', e);
-      return false;
+      const fallbackProf = profile || getGuestProfile();
+      return {
+        profile: fallbackProf,
+        newStreak: fallbackProf.streak || 1,
+        xpBonus: 0,
+        newTotalXp: fallbackProf.xp || 0,
+        alreadyClaimed: true,
+        activitySource,
+      };
     }
-  }, [user]);
+  }, [user, profile]);
 
-  const recordStreakActivity = useCallback(async (_reason?: string): Promise<boolean> => {
-    if (isStreakActiveToday) return false;
-    return await claimDailyStreak();
+  const recordStreakActivity = useCallback(async (activitySource: string = 'activity'): Promise<ClaimStreakResult | null> => {
+    if (isStreakActiveToday) return null;
+    return await claimDailyStreak(activitySource);
   }, [isStreakActiveToday, claimDailyStreak]);
 
   const refreshUser = async () => {
@@ -194,6 +212,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Logout error:', e);
     }
   };
+
+  const updateProfileXp = useCallback((newXp: number) => {
+    setProfile((prev) => (prev ? { ...prev, xp: newXp } : null));
+  }, []);
 
   return (
     <AuthContext.Provider
@@ -220,6 +242,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         recordStreakActivity,
         refreshUser,
         signOutUser,
+        updateProfileXp,
       }}
     >
       {children}

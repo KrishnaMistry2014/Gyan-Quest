@@ -17,7 +17,8 @@ import {
   doc,
   setDoc,
   getDoc,
-  onSnapshot
+  onSnapshot,
+  arrayUnion
 } from 'firebase/firestore';
 
 export const firebaseConfig = {
@@ -53,6 +54,8 @@ export interface UserProfileData {
   email: string | null;
   streak: number;
   lastActiveDate: string;
+  lastCheckInDate?: string;
+  lastXpBonus?: number;
   longestStreak?: number;
   activeDays?: string[];
   xp?: number;
@@ -138,8 +141,9 @@ export async function syncUserAndStreak(user: User): Promise<UserProfileData> {
   let name = local?.name || user.displayName || (user.isAnonymous ? 'Guest' : (user.email ? user.email.split('@')[0] : 'Learner'));
   const email = user.isAnonymous ? null : (user.email || null);
   
-  // Inherit guest streak if user just logged in with existing guest progress
+  // Inherit guest streak and XP if user just logged in with existing guest progress
   let streak = local?.streak ?? (guest.streak > 1 ? guest.streak : 1);
+  let xp = typeof local?.xp === 'number' ? local.xp : (guest.xp || 0);
   let lastActiveDate = local?.lastActiveDate || guest.lastActiveDate || today;
   let longestStreak = Math.max(local?.longestStreak || 1, guest.longestStreak || 1, streak);
   let activeDays = Array.isArray(local?.activeDays) ? [...local.activeDays] : (guest.activeDays || [today]);
@@ -166,6 +170,7 @@ export async function syncUserAndStreak(user: User): Promise<UserProfileData> {
     name,
     email,
     streak,
+    xp,
     lastActiveDate,
     longestStreak,
     activeDays: activeDays.slice(-30),
@@ -179,6 +184,9 @@ export async function syncUserAndStreak(user: User): Promise<UserProfileData> {
       const data = snap.data();
       if (data.name) {
         name = data.name;
+      }
+      if (typeof data.xp === 'number') {
+        xp = Math.max(data.xp, xp);
       }
       const remoteLastActive = data.lastActiveDate || lastActiveDate;
       const remoteStreak = typeof data.streak === 'number' ? data.streak : streak;
@@ -205,6 +213,7 @@ export async function syncUserAndStreak(user: User): Promise<UserProfileData> {
       name,
       email,
       streak,
+      xp,
       lastActiveDate,
       longestStreak,
       activeDays,
@@ -219,11 +228,23 @@ export async function syncUserAndStreak(user: User): Promise<UserProfileData> {
   }
 }
 
+export interface ClaimStreakResult {
+  profile: UserProfileData;
+  newStreak: number;
+  xpBonus: number;
+  newTotalXp: number;
+  alreadyClaimed: boolean;
+  activitySource?: string;
+}
+
 /**
- * Claims or advances daily streak for today.
- * Works for both authenticated users and guests.
+ * Claims or advances daily streak for today, awarding a small XP bonus for consecutive days visited.
+ * Tracks streak and check-in state in Cloud Firestore for authenticated users.
  */
-export async function claimUserStreak(user: User | null): Promise<UserProfileData> {
+export async function claimUserStreak(
+  user: User | null,
+  activitySource: string = 'check_in'
+): Promise<ClaimStreakResult> {
   const today = getLocalDateString();
 
   if (!user) {
@@ -235,7 +256,14 @@ export async function claimUserStreak(user: User | null): Promise<UserProfileDat
 
     if (guest.lastActiveDate === today && guest.streak > 0) {
       // Already claimed today
-      return guest;
+      return {
+        profile: guest,
+        newStreak: guest.streak,
+        xpBonus: 0,
+        newTotalXp: guest.xp || 0,
+        alreadyClaimed: true,
+        activitySource,
+      };
     } else if (diffDays === 1) {
       // Consecutive day!
       newStreak = (guest.streak || 0) + 1;
@@ -244,15 +272,29 @@ export async function claimUserStreak(user: User | null): Promise<UserProfileDat
       newStreak = 1;
     }
 
+    // Small XP bonus for consecutive days visited: 5 XP (Day 1), 10 XP (Day 2), 15 XP (Day 3), 20 XP (Day 4+)
+    const xpBonus = Math.min(20, 5 * Math.min(newStreak, 4));
+    const newTotalXp = (guest.xp || 0) + xpBonus;
+
     const updatedGuest: UserProfileData = {
       ...guest,
       streak: newStreak,
       lastActiveDate: today,
+      lastCheckInDate: today,
+      lastXpBonus: xpBonus,
       longestStreak: Math.max(guest.longestStreak || 0, newStreak),
       activeDays,
+      xp: newTotalXp,
     };
     saveGuestProfile(updatedGuest);
-    return updatedGuest;
+    return {
+      profile: updatedGuest,
+      newStreak,
+      xpBonus,
+      newTotalXp,
+      alreadyClaimed: false,
+      activitySource,
+    };
   }
 
   // Authenticated user
@@ -263,6 +305,7 @@ export async function claimUserStreak(user: User | null): Promise<UserProfileDat
     lastActiveDate: '',
     longestStreak: 0,
     activeDays: [],
+    xp: 0,
   };
 
   const diffDays = getDateDiffInDays(local.lastActiveDate, today);
@@ -271,31 +314,74 @@ export async function claimUserStreak(user: User | null): Promise<UserProfileDat
 
   if (local.lastActiveDate === today && local.streak > 0) {
     // Already claimed today
-    return local;
+    return {
+      profile: local,
+      newStreak: local.streak,
+      xpBonus: 0,
+      newTotalXp: local.xp || 0,
+      alreadyClaimed: true,
+      activitySource,
+    };
   } else if (diffDays === 1) {
     newStreak = (local.streak || 0) + 1;
   } else {
     newStreak = 1;
   }
 
+  // Consecutive day XP bonus: Day 1 (5 XP), Day 2 (10 XP), Day 3 (15 XP), Day 4+ (20 XP)
+  const xpBonus = Math.min(20, 5 * Math.min(newStreak, 4));
+
+  // Retrieve current XP from Firestore if available
+  let currentXp = typeof local.xp === 'number' ? local.xp : 0;
+  const userRef = doc(db, 'users', user.uid);
+  try {
+    const snap = await getDoc(userRef);
+    if (snap.exists() && typeof snap.data().xp === 'number') {
+      currentXp = snap.data().xp;
+    }
+  } catch (_) {}
+
+  const newTotalXp = currentXp + xpBonus;
+
   const updatedProfile: UserProfileData = {
     ...local,
     streak: newStreak,
     lastActiveDate: today,
+    lastCheckInDate: today,
+    lastXpBonus: xpBonus,
     longestStreak: Math.max(local.longestStreak || 0, newStreak),
     activeDays,
+    xp: newTotalXp,
   };
 
   saveLocalProfile(user.uid, updatedProfile);
 
   try {
-    const userRef = doc(db, 'users', user.uid);
     await setDoc(userRef, updatedProfile, { merge: true });
+
+    // Track check-in event in Firestore subcollection for audit and history
+    const checkInRef = doc(db, 'users', user.uid, 'checkIns', today);
+    await setDoc(checkInRef, {
+      date: today,
+      streak: newStreak,
+      xpBonus,
+      newTotalXp,
+      timestamp: new Date().toISOString(),
+      activitySource,
+    }, { merge: true });
+    console.log(`[Firestore] Daily check-in secured for user ${user.uid}: Day ${newStreak} streak (+${xpBonus} XP). New Total: ${newTotalXp} XP.`);
   } catch (err) {
     console.debug('Failed to sync claimed streak to Firestore (offline):', err);
   }
 
-  return updatedProfile;
+  return {
+    profile: updatedProfile,
+    newStreak,
+    xpBonus,
+    newTotalXp,
+    alreadyClaimed: false,
+    activitySource,
+  };
 }
 
 export async function updateUserName(uid: string, newName: string): Promise<void> {
@@ -375,9 +461,234 @@ export async function addUserXp(user: User | null, amount: number): Promise<User
   return updated;
 }
 
+export interface ChapterRewardResult {
+  awarded: boolean;
+  xpAdded: number;
+  newTotal: number;
+  message: string;
+}
+
+/**
+ * Claim stage XP reward (Shravan 10 XP, Manan 5 XP) for a chapter.
+ * Enforces per-user separation and prevents duplicate rewards even across sessions and cache clears.
+ */
+export async function claimChapterStageReward(
+  chapter: {
+    id: string;
+    uniqueCode?: string;
+    title?: string;
+    fileName?: string;
+    shravanXpClaimed?: boolean;
+    mananXpClaimed?: boolean;
+  },
+  stage: 'shravan' | 'manan',
+  user: User | null
+): Promise<ChapterRewardResult> {
+  const xpToAdd = stage === 'shravan' ? 10 : 5;
+  const stageLabel = stage === 'shravan' ? 'Shravan (10 XP)' : 'Manan (5 XP)';
+
+  // Determine user identifier
+  let effectiveUserId = user?.uid;
+  if (!effectiveUserId && auth.currentUser) {
+    effectiveUserId = auth.currentUser.uid;
+  }
+  if (!effectiveUserId) {
+    try {
+      const anon = await signInAnonymously(auth);
+      effectiveUserId = anon.user.uid;
+    } catch {
+      effectiveUserId = 'guest_session';
+    }
+  }
+
+  // Ensure chapter has a valid 10-digit uniqueCode (from 0000000000 to 9999999999)
+  let uniqueCode = chapter.uniqueCode;
+  if (!uniqueCode || typeof uniqueCode !== 'string' || uniqueCode.length !== 10) {
+    let generated = '';
+    for (let i = 0; i < 10; i++) {
+      generated += Math.floor(Math.random() * 10).toString();
+    }
+    uniqueCode = generated;
+    chapter.uniqueCode = uniqueCode;
+  }
+
+  // 1. Fast check: in-memory state
+  if (stage === 'shravan' && chapter.shravanXpClaimed) {
+    const local = effectiveUserId ? getLocalProfile(effectiveUserId) : getGuestProfile();
+    return {
+      awarded: false,
+      xpAdded: 0,
+      newTotal: local?.xp || 0,
+      message: `${stageLabel} has already been claimed for this chapter.`,
+    };
+  }
+  if (stage === 'manan' && chapter.mananXpClaimed) {
+    const local = effectiveUserId ? getLocalProfile(effectiveUserId) : getGuestProfile();
+    return {
+      awarded: false,
+      xpAdded: 0,
+      newTotal: local?.xp || 0,
+      message: `${stageLabel} has already been claimed for this chapter.`,
+    };
+  }
+
+  // 2. Definitive check in Cloud Firestore database (survives cache clears and cross-device sessions)
+  try {
+    // Check individual user claimed reward doc
+    const rewardDocRef = doc(db, 'users', effectiveUserId, 'claimedRewards', `${uniqueCode}_${stage}`);
+    const rewardSnap = await getDoc(rewardDocRef);
+    if (rewardSnap.exists()) {
+      if (stage === 'shravan') chapter.shravanXpClaimed = true;
+      if (stage === 'manan') chapter.mananXpClaimed = true;
+      const userDocSnap = await getDoc(doc(db, 'users', effectiveUserId));
+      const currentXp = userDocSnap.exists() && typeof userDocSnap.data()?.xp === 'number' ? userDocSnap.data().xp : 0;
+      return {
+        awarded: false,
+        xpAdded: 0,
+        newTotal: currentXp,
+        message: `${stageLabel} was already claimed for this chapter.`,
+      };
+    }
+
+    // Check dedicated /chapterCodes/{code} collection
+    const chapterCodeDocRef = doc(db, 'chapterCodes', uniqueCode);
+    const chapterCodeSnap = await getDoc(chapterCodeDocRef);
+    if (chapterCodeSnap.exists()) {
+      const data = chapterCodeSnap.data();
+      const claimedArray = (data?.[`${stage}ClaimedBy`] as string[]) || [];
+      const stageObj = data?.rewards?.[stage];
+      if (claimedArray.includes(effectiveUserId) || (stageObj?.claimed && stageObj?.userId === effectiveUserId)) {
+        if (stage === 'shravan') chapter.shravanXpClaimed = true;
+        if (stage === 'manan') chapter.mananXpClaimed = true;
+        const userDocSnap = await getDoc(doc(db, 'users', effectiveUserId));
+        const currentXp = userDocSnap.exists() && typeof userDocSnap.data()?.xp === 'number' ? userDocSnap.data().xp : 0;
+        return {
+          awarded: false,
+          xpAdded: 0,
+          newTotal: currentXp,
+          message: `${stageLabel} was already claimed for this chapter.`,
+        };
+      }
+    }
+  } catch (checkErr) {
+    console.warn('Firestore reward verification notice:', checkErr);
+  }
+
+  // 3. User is eligible! Fetch current XP from Firestore and add reward
+  let currentTotalXp = 0;
+  try {
+    const userDocRef = doc(db, 'users', effectiveUserId);
+    const userSnap = await getDoc(userDocRef);
+    if (userSnap.exists() && typeof userSnap.data()?.xp === 'number') {
+      currentTotalXp = userSnap.data().xp;
+    } else {
+      const local = getLocalProfile(effectiveUserId) || getGuestProfile();
+      currentTotalXp = typeof local?.xp === 'number' ? local.xp : 0;
+    }
+  } catch {
+    const local = getLocalProfile(effectiveUserId) || getGuestProfile();
+    currentTotalXp = typeof local?.xp === 'number' ? local.xp : 0;
+  }
+
+  const newTotal = currentTotalXp + xpToAdd;
+
+  // Mark chapter flags in memory
+  if (stage === 'shravan') chapter.shravanXpClaimed = true;
+  if (stage === 'manan') chapter.mananXpClaimed = true;
+
+  // Update local profile
+  const localProf = getLocalProfile(effectiveUserId) || getGuestProfile();
+  const updatedProfile: UserProfileData = { ...localProf, xp: newTotal };
+  saveLocalProfile(effectiveUserId, updatedProfile);
+  if (effectiveUserId === 'guest_session') {
+    saveGuestProfile(updatedProfile);
+  }
+
+  // Update local chapters list in localStorage
+  try {
+    const localKey = `gyan_quest_chapters_${effectiveUserId}`;
+    const rawChs = localStorage.getItem(localKey);
+    if (rawChs) {
+      const parsed = JSON.parse(rawChs);
+      if (Array.isArray(parsed)) {
+        const mod = parsed.map((c: any) =>
+          c.id === chapter.id || c.uniqueCode === uniqueCode
+            ? { ...c, uniqueCode, [`${stage}XpClaimed`]: true }
+            : c
+        );
+        localStorage.setItem(localKey, JSON.stringify(mod));
+      }
+    }
+  } catch {}
+
+  // 4. Persist reward atomically to Cloud Firestore:
+  try {
+    // A. Update user document with new XP balance
+    await setDoc(doc(db, 'users', effectiveUserId), { xp: newTotal }, { merge: true });
+
+    // B. Register claim in /chapterCodes/{code} collection
+    await setDoc(
+      doc(db, 'chapterCodes', uniqueCode),
+      {
+        code: uniqueCode,
+        chapterId: chapter.id,
+        fileName: chapter.fileName || 'document.pdf',
+        title: chapter.title || 'Chapter Notes',
+        [`${stage}ClaimedBy`]: arrayUnion(effectiveUserId),
+        rewards: {
+          [stage]: {
+            claimed: true,
+            claimedAt: new Date().toISOString(),
+            userId: effectiveUserId,
+            xp: xpToAdd,
+          },
+        },
+      },
+      { merge: true }
+    );
+
+    // C. Write to user's claimedRewards subcollection
+    await setDoc(
+      doc(db, 'users', effectiveUserId, 'claimedRewards', `${uniqueCode}_${stage}`),
+      {
+        code: uniqueCode,
+        chapterId: chapter.id,
+        stage,
+        xp: xpToAdd,
+        claimedAt: new Date().toISOString(),
+        userId: effectiveUserId,
+      },
+      { merge: true }
+    );
+
+    // D. Update chapter document in user's chapters subcollection
+    if (chapter.id) {
+      await setDoc(
+        doc(db, 'users', effectiveUserId, 'chapters', chapter.id),
+        {
+          uniqueCode,
+          [`${stage}XpClaimed`]: true,
+        },
+        { merge: true }
+      );
+    }
+
+    console.log(`[Firestore] Awarded ${xpToAdd} XP for ${stage} on chapter code ${uniqueCode}. Total: ${newTotal} XP.`);
+  } catch (firestoreErr) {
+    console.warn('Failed to persist reward to Firestore:', firestoreErr);
+  }
+
+  return {
+    awarded: true,
+    xpAdded: xpToAdd,
+    newTotal,
+    message: `+${xpToAdd} XP added to your balance!`,
+  };
+}
+
 export async function logOut(): Promise<void> {
   await signOut(auth);
 }
 
-export { onAuthStateChanged, sendEmailVerification, onSnapshot, doc };
+export { onAuthStateChanged, sendEmailVerification, onSnapshot, doc, getLocalProfile, saveLocalProfile };
 export type { User };

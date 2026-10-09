@@ -11,6 +11,11 @@ service cloud.firestore {
       }
     }
 
+    // Chapter unique codes and XP reward tracking collection
+    match /chapterCodes/{code} {
+      allow read, write: if true;
+    }
+
     // Guest chats fallback collection
     match /guestChats/{docId} {
       allow read, write: if true;

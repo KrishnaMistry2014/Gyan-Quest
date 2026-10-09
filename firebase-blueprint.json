@@ -2,13 +2,15 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "User profile with academic streak data and identity information",
+      "description": "User profile with academic streak data, XP points, and identity information",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
         "email": { "type": "string" },
         "streak": { "type": "number" },
+        "xp": { "type": "number" },
         "lastActiveDate": { "type": "string" },
+        "lastCheckInDate": { "type": "string" },
         "longestStreak": { "type": "number" },
         "activeDays": { "type": "array" }
       },
@@ -16,28 +18,60 @@
     },
     "Chapter": {
       "title": "Chapter",
-      "description": "Uploaded PDF chapter with extracted study notes and diagrams explanation",
+      "description": "Uploaded PDF chapter with extracted study notes, 10-digit code, and stage reward status",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "uniqueCode": { "type": "string" },
         "userId": { "type": "string" },
         "fileName": { "type": "string" },
         "title": { "type": "string" },
         "summary": { "type": "string" },
         "createdAt": { "type": "string" },
-        "fileSize": { "type": "number" }
+        "fileSize": { "type": "number" },
+        "shravanXpClaimed": { "type": "boolean" },
+        "mananXpClaimed": { "type": "boolean" }
       },
       "required": ["id", "fileName", "title", "summary", "createdAt"]
+    },
+    "ChapterCode": {
+      "title": "ChapterCode",
+      "description": "Unique 10-digit code mapping (0000000000-9999999999) tracking XP rewards per user for Shravan (10XP) and Manan (5XP)",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "chapterId": { "type": "string" },
+        "userId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "title": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "shravanClaimedBy": { "type": "array" },
+        "mananClaimedBy": { "type": "array" },
+        "rewards": { "type": "object" }
+      },
+      "required": ["code", "chapterId", "createdAt"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "UserProfile",
-      "description": "User profile document storing streaks and learner details"
+      "description": "User profile document storing streaks, XP balance, and learner details"
     },
     "/users/{userId}/chapters/{chapterId}": {
       "schema": "Chapter",
       "description": "Extracted chapters and generated study guides belonging to the user"
+    },
+    "/users/{userId}/checkIns/{date}": {
+      "schema": "object",
+      "description": "Daily check-in records storing streak count, XP bonus, and timestamp"
+    },
+    "/users/{userId}/claimedRewards/{rewardKey}": {
+      "schema": "object",
+      "description": "Individual chapter reward claims by stage (shravan, manan)"
+    },
+    "/chapterCodes/{code}": {
+      "schema": "ChapterCode",
+      "description": "Unique 10-digit chapter code records tracking reward claims for Vidya, Shravan, and Manan"
     }
   }
 }
