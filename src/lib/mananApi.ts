@@ -1,11 +1,13 @@
 import { SavedChapter } from './chapters';
 
 /**
- * Endpoint for the Gyan Quest Image Generation Service deployed on Render.
- * Calls the Hugging Face Gradio Space (Turbo model, 8 steps, 1024x1024) securely.
+ * Endpoints for image generation and diagnostics.
+ * Primary: Render Image API (Gyan Quest service)
+ * Direct Fallback: Hugging Face Gradio Space (krea-krea-2.hf.space - Krea 2 Turbo)
  */
 export const GYANQUEST_IMAGE_API_URL = 'https://gyanquest-image-api.onrender.com/generate';
 export const GRADIO_SPACE_INFO_URL = 'https://krea-krea-2.hf.space/gradio_api/info';
+export const GRADIO_SPACE_CALL_URL = 'https://krea-krea-2.hf.space/gradio_api/call/generate';
 export const RENDER_BACKEND_ROOT_URL = 'https://gyanquest-image-api.onrender.com/';
 
 /**
@@ -38,18 +40,18 @@ export class MananImageError extends Error {
 }
 
 /**
- * Cleans chapter title and summary text to extract core educational subject matter
- * strictly from the uploaded chapter context.
+ * Intelligent domain heuristic builder that extracts the true core concepts from the chapter
+ * without confusing homonyms (e.g. electric cells vs biological living cells).
  */
-function extractCleanSubject(chapter?: SavedChapter | null): { topic: string; sceneContext: string } {
+export function buildFallbackEducationalPrompt(chapter?: SavedChapter | null): string {
   if (!chapter) {
-    return {
-      topic: 'Chapter Concept Study',
-      sceneContext: 'a scenic educational landscape illustrating the core study concepts',
-    };
+    return (
+      'A vivid, beautiful scenic educational illustration depicting an inspiring landscape of knowledge and learning. ' +
+      'Completely text-free, strictly no text, no words, no letters, no numbers, no labels, no typography, no watermarks.'
+    );
   }
 
-  // Clean title: remove prefixes like "Vidya:", "Chapter 1:", "Class 10:", file extensions
+  // Clean title
   let cleanTitle = (chapter.title || '')
     .trim()
     .replace(/^(Vidya|Chapter\s*\d+|Class\s*\d+|Unit\s*\d+)[:\-–\s]*/i, '')
@@ -64,97 +66,178 @@ function extractCleanSubject(chapter?: SavedChapter | null): { topic: string; sc
       .trim();
   }
 
-  // Extract key concept sentences from the summary (first ~400 chars, stripping markdown)
-  const summarySnippet = (chapter.summary || '')
+  const rawSummary = (chapter.summary || '')
     .replace(/^#+.*$/gm, '')
     .replace(/[\*`_>#-]/g, '')
     .replace(/\[.*?\]\(.*?\)/g, '')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 400);
+    .trim();
 
-  const combinedText = `${cleanTitle} ${summarySnippet}`.toLowerCase();
+  const titleLower = cleanTitle.toLowerCase();
+  const summaryLower = rawSummary.slice(0, 1500).toLowerCase();
+  const combined = `${titleLower} ${summaryLower}`;
 
-  let sceneContext = '';
-  // Check for ancient Indian Gurukul hermitage context
-  if (
-    combinedText.includes('gurukul') ||
-    combinedText.includes('ashram') ||
-    combinedText.includes('ancient india') ||
-    combinedText.includes('vedic') ||
-    combinedText.includes('guru') ||
-    combinedText.includes('shishya')
-  ) {
-    sceneContext =
-      'a serene scenic view of an ancient Indian Gurukul hermitage: a revered guru and young students seated under a majestic banyan tree in a peaceful forest hermitage, simple thatched cottages (kutir) in a tranquil clearing by a flowing river';
-  } else if (
-    combinedText.includes('cell') ||
-    combinedText.includes('microscope') ||
-    combinedText.includes('bacteria') ||
-    combinedText.includes('dna') ||
-    combinedText.includes('nucleus')
-  ) {
-    sceneContext =
-      'a vivid, colorful microscopic landscape inside a biological cell showing glowing mitochondria and nucleus in organic detail';
-  } else if (
-    combinedText.includes('planet') ||
-    combinedText.includes('solar system') ||
-    combinedText.includes('space') ||
-    combinedText.includes('galaxy') ||
-    combinedText.includes('orbit')
-  ) {
-    sceneContext =
-      'a panoramic astronomical view of orbiting celestial bodies and glowing colorful nebulae across space';
-  } else if (
-    combinedText.includes('plant') ||
-    combinedText.includes('photosynthesis') ||
-    combinedText.includes('leaf') ||
-    combinedText.includes('chlorophyll') ||
-    combinedText.includes('botany')
-  ) {
-    sceneContext =
-      'a lush scenic botanical landscape with golden morning sunlight illuminating vibrant green plant leaves and nature';
-  } else if (
-    combinedText.includes('history') ||
-    combinedText.includes('palace') ||
-    combinedText.includes('empire') ||
-    combinedText.includes('dynasty') ||
-    combinedText.includes('monument')
-  ) {
-    sceneContext =
-      `a majestic historical landscape depicting ${cleanTitle || 'the historical era'} with classical architecture, courtyards, and gardens`;
-  } else if (
-    combinedText.includes('water') ||
-    combinedText.includes('ocean') ||
-    combinedText.includes('river') ||
-    combinedText.includes('marine')
-  ) {
-    sceneContext =
-      'a breathtaking scenic aquatic landscape with flowing crystal clear water and vibrant natural surroundings';
+  let scene = '';
+
+  // 1. ELECTRICITY / CIRCUITS / ELECTRONICS / MAGNETISM (Must check BEFORE generic words like 'cell')
+  const isElectricity =
+    titleLower.includes('electric') ||
+    titleLower.includes('circuit') ||
+    titleLower.includes('current') ||
+    titleLower.includes('voltage') ||
+    titleLower.includes('ohm') ||
+    titleLower.includes('magnet') ||
+    combined.includes('electric current') ||
+    combined.includes('electric circuit') ||
+    combined.includes('potential difference') ||
+    combined.includes('electric cell') ||
+    combined.includes('dry cell') ||
+    combined.includes('battery') ||
+    combined.includes('light bulb') ||
+    combined.includes('incandescent') ||
+    combined.includes('conductor') ||
+    combined.includes('resistance') ||
+    combined.includes('switch and wire') ||
+    combined.includes('ammeter') ||
+    combined.includes('voltmeter');
+
+  // 2. ANCIENT GURUKUL / ASHRAM / VEDIC EDUCATION
+  const isGurukul =
+    combined.includes('gurukul') ||
+    combined.includes('ashram') ||
+    combined.includes('ancient india') ||
+    combined.includes('vedic') ||
+    combined.includes('guru') ||
+    combined.includes('shishya') ||
+    combined.includes('hermitage');
+
+  // 3. BIOLOGY: LIVING CELLS / CYTOLOGY (Explicitly check biological context, exclude electricity)
+  const isBiologicalCell =
+    !isElectricity &&
+    (combined.includes('plant cell') ||
+      combined.includes('animal cell') ||
+      combined.includes('biological cell') ||
+      combined.includes('cell membrane') ||
+      combined.includes('mitochondria') ||
+      combined.includes('chloroplast') ||
+      combined.includes('cytoplasm') ||
+      combined.includes('organelle') ||
+      combined.includes('amoeba') ||
+      combined.includes('cytology') ||
+      (combined.includes('cell') && (combined.includes('tissue') || combined.includes('organism') || combined.includes('microscope'))));
+
+  // 4. CHEMISTRY: ACIDS, BASES, SALTS, REACTIONS
+  const isChemistry =
+    combined.includes('acid') ||
+    combined.includes('base') ||
+    combined.includes('chemical reaction') ||
+    combined.includes('periodic table') ||
+    combined.includes('solution') ||
+    combined.includes('beaker') ||
+    combined.includes('litmus') ||
+    combined.includes('crystallization');
+
+  // 5. ASTRONOMY / SPACE / SOLAR SYSTEM
+  const isAstronomy =
+    combined.includes('planet') ||
+    combined.includes('solar system') ||
+    combined.includes('galaxy') ||
+    combined.includes('orbit') ||
+    combined.includes('celestial') ||
+    combined.includes('nebula');
+
+  // 6. BOTANY / PLANT PHYSIOLOGY
+  const isBotany =
+    !isElectricity &&
+    (combined.includes('photosynthesis') ||
+      combined.includes('chlorophyll') ||
+      combined.includes('stomata') ||
+      combined.includes('plant growth') ||
+      combined.includes('botany'));
+
+  // 7. HISTORY / MONUMENTS / ARCHITECTURE
+  const isHistory =
+    combined.includes('empire') ||
+    combined.includes('dynasty') ||
+    combined.includes('civilization') ||
+    combined.includes('monument') ||
+    combined.includes('palace') ||
+    combined.includes('reign') ||
+    combined.includes('archaeology');
+
+  if (isElectricity) {
+    scene =
+      'a high-detail educational physical science scene on a wooden laboratory workbench: a brightly glowing incandescent glass light bulb connected by neat copper wires in a closed circuit to a cylindrical electric battery cell and a brass knife switch, with warm golden illumination casting soft shadows, completely realistic physics apparatus with no biological elements';
+  } else if (isGurukul) {
+    scene =
+      'an atmospheric scenic view of an ancient Indian Gurukul hermitage: a revered guru and young students seated peacefully under a sprawling sacred banyan tree in a tranquil forest clearing, modest thatched mud kutirs nearby, and a calm flowing river at golden sunrise';
+  } else if (isBiologicalCell) {
+    scene =
+      'a colorful scientific cross-section inside a living biological cell, showing the transparent cell membrane, glowing mitochondria, and cellular organelles in vivid detail';
+  } else if (isChemistry) {
+    scene =
+      'a vibrant chemistry laboratory scene with clear glass beakers containing colorful liquid reaction solutions, test tubes on a wooden stand, and crystalline salt formations on a glass plate';
+  } else if (isAstronomy) {
+    scene =
+      'a breathtaking panoramic cosmic view of planets with visible rings orbiting in deep space, glowing distant stars, and colorful nebulae';
+  } else if (isBotany) {
+    scene =
+      'a vibrant botanical macro scene showing lush green plant leaves bathed in morning sunlight, with visible leaf veins and morning dew droplets in pure nature';
+  } else if (isHistory) {
+    scene =
+      `a majestic historical landscape representing ${cleanTitle || 'the historical era'} with classical stone architectural monuments, grand courtyards, and scenic period environment`;
   } else {
-    // For any other subject uploaded by student, faithfully depict the specific title and concepts
-    sceneContext = `an educational scenic view representing ${cleanTitle || 'the uploaded study concepts'}`;
+    // Extract key meaningful words from summary
+    const words = rawSummary
+      .replace(/[^a-zA-Z\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 3 && !['this', 'that', 'with', 'from', 'have', 'were', 'also', 'chapter', 'study'].includes(w.toLowerCase()))
+      .slice(0, 4)
+      .join(', ');
+
+    scene = `a scenic educational digital painting representing the key concepts of "${cleanTitle}"${words ? ` featuring ${words}` : ''} in clear daylight`;
   }
 
-  return {
-    topic: cleanTitle || 'Educational Study',
-    sceneContext,
-  };
+  return (
+    `A vivid, beautiful scenic educational illustration depicting ${scene}. ` +
+    `Rich scenic visual storytelling, colorful atmospheric digital painting, harmonious daylight illumination. ` +
+    `Completely text-free, strictly no text, no words, no letters, no numbers, no labels, no typography, no captions, no watermarks, no speech bubbles.`
+  );
 }
 
 /**
  * Builds an effective, student-friendly prompt tailored strictly to the uploaded chapter.
- * Explicitly instructs the AI to generate a purely pictorial composition WITHOUT any text,
- * labels, words, or typography.
+ * Calls the server's Gemini prompt synthesizer first to extract exact domain nuance,
+ * falling back gracefully to the domain-disambiguated local generator.
  */
-export function buildEducationalImagePrompt(chapter?: SavedChapter | null): string {
-  const { topic, sceneContext } = extractCleanSubject(chapter);
+export async function buildEducationalImagePrompt(chapter?: SavedChapter | null): Promise<string> {
+  if (!chapter) {
+    return buildFallbackEducationalPrompt(null);
+  }
 
-  return (
-    `A vivid, beautiful scenic educational illustration depicting ${sceneContext}, representing "${topic}". ` +
-    `Rich scenic visual storytelling, colorful atmospheric digital painting, harmonious daylight illumination. ` +
-    `Completely text-free, strictly no text, no words, no letters, no numbers, no labels, no typography, no captions, no watermarks, no speech bubbles.`
-  );
+  try {
+    const res = await fetch('/api/generate-image-prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: chapter.title,
+        summary: chapter.summary,
+        fileName: chapter.fileName,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.prompt && typeof data.prompt === 'string' && data.prompt.trim().length > 30) {
+        return data.prompt.trim();
+      }
+    }
+  } catch (err) {
+    console.warn('Server prompt synthesis unavailable, using smart local parser:', err);
+  }
+
+  // Fallback to domain-aware local prompt builder
+  return buildFallbackEducationalPrompt(chapter);
 }
 
 export interface ChapterImageResult {
@@ -216,6 +299,106 @@ export function preloadImage(url: string, timeoutMs = 25000): Promise<void> {
     };
 
     img.src = url;
+  });
+}
+
+/**
+ * Direct call to Hugging Face Gradio Space (Krea 2 Turbo) via Server-Sent Events.
+ * Used as a dependable failover if Render is asleep or returning 502.
+ */
+export async function generateViaDirectGradio(prompt: string, signal?: AbortSignal): Promise<string> {
+  // Step 1: Initiate job on Gradio Space
+  const initRes = await fetch(GRADIO_SPACE_CALL_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: [
+        prompt,
+        'text, watermark, blurry, words, letters, labels, typography',
+        'Turbo',
+        8,
+        0.0,
+        1024,
+        1024,
+        Math.floor(Math.random() * 100000),
+        true,
+      ],
+    }),
+    signal,
+  });
+
+  if (!initRes.ok) {
+    throw new MananImageError({
+      statusCode: initRes.status,
+      errorCode: `HTTP_${initRes.status}_GRADIO_INIT_FAILED`,
+      message: `Hugging Face Space returned status ${initRes.status}`,
+      endpoint: GRADIO_SPACE_CALL_URL,
+      promptSent: prompt,
+    });
+  }
+
+  const { event_id } = await initRes.json();
+  if (!event_id) {
+    throw new MananImageError({
+      statusCode: 502,
+      errorCode: 'ERR_NO_EVENT_ID',
+      message: 'Hugging Face Space did not return an event ID.',
+      endpoint: GRADIO_SPACE_CALL_URL,
+      promptSent: prompt,
+    });
+  }
+
+  // Step 2: Stream SSE events until 'complete'
+  const eventRes = await fetch(`${GRADIO_SPACE_CALL_URL}/${event_id}`, { signal });
+  if (!eventRes.ok || !eventRes.body) {
+    throw new MananImageError({
+      statusCode: eventRes.status,
+      errorCode: `HTTP_${eventRes.status}_GRADIO_STREAM_FAILED`,
+      message: 'Failed to open event stream from Hugging Face Space.',
+      endpoint: `${GRADIO_SPACE_CALL_URL}/${event_id}`,
+      promptSent: prompt,
+    });
+  }
+
+  const reader = eventRes.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    if (buffer.includes('event: complete')) {
+      const match = buffer.match(/data:\s*(\[[\s\S]*?\])(?:\n|$)/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[1]);
+          const fileData = parsed[0];
+          if (fileData?.url) {
+            return fileData.url;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (buffer.includes('event: error')) {
+      throw new MananImageError({
+        statusCode: 500,
+        errorCode: 'ERR_GRADIO_JOB_ERROR',
+        message: 'Hugging Face Space encountered an error during image generation.',
+        endpoint: `${GRADIO_SPACE_CALL_URL}/${event_id}`,
+        promptSent: prompt,
+      });
+    }
+  }
+
+  throw new MananImageError({
+    statusCode: 502,
+    errorCode: 'ERR_STREAM_ENDED_WITHOUT_IMAGE',
+    message: 'Hugging Face Space finished stream without returning an image URL.',
+    endpoint: `${GRADIO_SPACE_CALL_URL}/${event_id}`,
+    promptSent: prompt,
   });
 }
 
@@ -287,8 +470,9 @@ export async function checkRenderBackendStatus(): Promise<{
 }
 
 /**
- * Calls the Render image-generation endpoint and preloads the resulting image.
- * Never masks errors with predefined placeholder images: always returns clear error codes
+ * Calls the image-generation pipeline and preloads the resulting image.
+ * Uses Render API with seamless failover to direct Hugging Face Space.
+ * NEVER masks errors with predefined placeholder images: always returns clear error codes
  * and transparent failure diagnostics when the backend fails.
  */
 export async function generateChapterImage(
@@ -306,9 +490,11 @@ export async function generateChapterImage(
     });
   }
 
-  let response: Response;
+  let finalImageUrl = '';
+
+  // 1. Try Render API first
   try {
-    response = await fetch(GYANQUEST_IMAGE_API_URL, {
+    const response = await fetch(GYANQUEST_IMAGE_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -316,74 +502,59 @@ export async function generateChapterImage(
       body: JSON.stringify({ prompt: prompt.trim() }),
       signal,
     });
-  } catch (err: any) {
-    if (err?.name === 'AbortError') {
-      throw err;
+
+    if (response.ok) {
+      const data = await response.json().catch(() => null);
+      if (data?.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.startsWith('http')) {
+        finalImageUrl = data.imageUrl.trim();
+      }
+    } else {
+      console.warn(`Render API returned HTTP ${response.status}, attempting direct Gradio fallback...`);
     }
-    throw new MananImageError({
-      statusCode: 0,
-      errorCode: 'ERR_NETWORK_DISCONNECTED',
-      message:
-        'Network error: Failed to reach the image generation backend (https://gyanquest-image-api.onrender.com). Please check your internet connection.',
-      backendMessage: err?.message || 'Network fetch failure',
-      endpoint: GYANQUEST_IMAGE_API_URL,
-      promptSent: prompt,
-    });
+  } catch (renderErr: any) {
+    if (renderErr?.name === 'AbortError') throw renderErr;
+    console.warn('Render API error, attempting direct Gradio fallback:', renderErr?.message);
   }
 
-  // Handle non-2xx responses transparently with clear status and error code
-  if (!response.ok) {
-    let errorDetail = '';
+  // 2. If Render didn't succeed, failover to direct Hugging Face Space
+  if (!finalImageUrl) {
     try {
-      const errorJson = await response.json();
-      errorDetail = errorJson?.error || JSON.stringify(errorJson);
-    } catch {
-      errorDetail = await response.text().catch(() => '');
+      console.log('Generating image directly via Hugging Face Space (Krea 2 Turbo)...');
+      finalImageUrl = await generateViaDirectGradio(prompt, signal);
+    } catch (gradioErr: any) {
+      if (gradioErr?.name === 'AbortError') throw gradioErr;
+      console.error('Direct Gradio Space also failed:', gradioErr);
+
+      // If both fail, throw transparent error with clear codes
+      if (gradioErr instanceof MananImageError) {
+        throw gradioErr;
+      }
+      throw new MananImageError({
+        statusCode: 502,
+        errorCode: 'HTTP_502_BAD_GATEWAY',
+        message: `Both Render API and Hugging Face Space failed to generate image: ${gradioErr?.message || 'Service unavailable'}`,
+        backendMessage: gradioErr?.message || 'Gateway Failure',
+        endpoint: GRADIO_SPACE_CALL_URL,
+        promptSent: prompt,
+      });
     }
+  }
 
-    const cleanErrorMsg = errorDetail || `HTTP status ${response.status} (${response.statusText || 'Error'})`;
-
+  if (!finalImageUrl) {
     throw new MananImageError({
-      statusCode: response.status,
-      errorCode: `HTTP_${response.status}_${response.status === 502 ? 'BAD_GATEWAY' : response.status === 500 ? 'INTERNAL_ERROR' : 'API_ERROR'}`,
-      message: `Image API failed with status ${response.status}: "${cleanErrorMsg}"`,
-      backendMessage: cleanErrorMsg,
+      statusCode: 500,
+      errorCode: 'ERR_NO_IMAGE_URL',
+      message: 'Image generator completed but returned no valid image URL.',
       endpoint: GYANQUEST_IMAGE_API_URL,
       promptSent: prompt,
     });
   }
 
-  // Handle 200 OK response
-  let data: any;
-  try {
-    data = await response.json();
-  } catch (err: any) {
-    throw new MananImageError({
-      statusCode: 200,
-      errorCode: 'ERR_INVALID_JSON',
-      message: 'Image API returned an unreadable response format.',
-      backendMessage: err?.message || 'JSON parse error',
-      endpoint: GYANQUEST_IMAGE_API_URL,
-      promptSent: prompt,
-    });
-  }
-
-  if (!data || typeof data.imageUrl !== 'string' || !data.imageUrl.startsWith('http')) {
-    throw new MananImageError({
-      statusCode: 200,
-      errorCode: 'ERR_MISSING_IMAGE_URL',
-      message: 'Image API completed successfully but returned no valid imageUrl field.',
-      backendMessage: JSON.stringify(data),
-      endpoint: GYANQUEST_IMAGE_API_URL,
-      promptSent: prompt,
-    });
-  }
-
-  const generatedUrl = data.imageUrl.trim();
-  await preloadImage(generatedUrl);
+  // Preload into browser cache
+  await preloadImage(finalImageUrl);
 
   return {
-    imageUrl: generatedUrl,
+    imageUrl: finalImageUrl,
     isAiGenerated: true,
   };
 }

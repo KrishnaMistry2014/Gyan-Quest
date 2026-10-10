@@ -629,6 +629,106 @@ SAFEGUARDS & CORE BEHAVIOR RULES:
   }
 });
 
+/**
+ * Synthesizes an accurate, text-free visual scene prompt strictly derived from the uploaded chapter.
+ * Uses Gemini to understand nuanced chapter concepts (e.g. electrical circuits vs living cells).
+ */
+app.post('/api/generate-image-prompt', async (req, res) => {
+  try {
+    const { title, summary, fileName } = req.body || {};
+    if (!title && !summary && !fileName) {
+      return res.status(400).json({ error: 'Chapter title or summary is required.' });
+    }
+
+    const chapterTitle = (title || fileName || 'Textbook Chapter').trim();
+    const chapterSnippet = (summary || '').slice(0, 3500).trim();
+
+    const promptInstruction = `You are an expert prompt engineer for educational visual illustrations.
+A student uploaded a textbook chapter for an interactive learning puzzle.
+
+CHAPTER DETAILS:
+Title: "${chapterTitle}"
+Key Summary / Concepts:
+"${chapterSnippet || 'Core concepts of ' + chapterTitle}"
+
+MISSION:
+Write a single, highly specific, vivid visual prompt for an image generator (Krea 2 Turbo).
+
+CRITICAL REQUIREMENTS:
+1. STRICT SUBJECT ACCURACY:
+   - The scene must depict ONLY the genuine subject matter and concepts of this chapter.
+   - Disambiguate overloaded terms: For example, if the chapter is about Electricity or Circuits, depict an electric circuit with a glowing incandescent light bulb, copper wires, a battery/dry cell, a knife switch, and meters on a physics laboratory bench. NEVER depict living biological cells (no mitochondria, amoebas, or cell membranes).
+   - If the chapter is about Ancient Gurukulas or Vedic Education, depict a peaceful ancient Indian Gurukul hermitage with guru and students in a serene forest under a banyan tree by a river.
+   - If the chapter is about Biology / Living Cells, depict cellular organelles and biological structures.
+   - If the chapter is about Chemistry, depict chemistry glassware, beakers with colorful reaction fluids, and crystals.
+   - If the chapter is about Astronomy, depict planets, stars, and celestial bodies.
+   - If the chapter is about History, depict authentic classical architecture and scenery of that specific era.
+2. COMPLETELY TEXT-FREE:
+   - The scene must contain ZERO text, no words, no letters, no numbers, no labels, no equations, no diagrams with writing, no typography, and no watermarks.
+3. VISUAL STYLE:
+   - Colorful, atmospheric digital art or realistic educational painting, clear illumination, rich storytelling.
+
+Output format: Return ONLY a valid JSON object:
+{
+  "prompt": "A vivid educational illustration depicting [highly detailed scene strictly matching the chapter concepts]... Completely text-free, strictly no text, no words, no letters, no labels, no watermarks."
+}`;
+
+    let generatedPrompt = '';
+    try {
+      const response = await callWithTimeout(
+        ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents: promptInstruction,
+          config: {
+            responseMimeType: 'application/json',
+            maxOutputTokens: 1024,
+            temperature: 0.4,
+          },
+        }),
+        12000,
+        'Gemini 3.1 Flash-Lite Prompt Synthesis'
+      );
+      const parsed = JSON.parse(response.text || '{}');
+      if (parsed.prompt && typeof parsed.prompt === 'string') {
+        generatedPrompt = parsed.prompt.trim();
+      }
+    } catch (err: any) {
+      console.warn('[Gemini 3.1 Prompt Synthesis notice]:', err?.message || err);
+      // Fallback to gemini-3.8-flash
+      try {
+        const fallbackRes = await callWithTimeout(
+          ai.models.generateContent({
+            model: 'gemini-3.8-flash',
+            contents: promptInstruction,
+            config: {
+              responseMimeType: 'application/json',
+              maxOutputTokens: 1024,
+              temperature: 0.4,
+            },
+          }),
+          12000,
+          'Gemini 3.8 Flash Prompt Synthesis'
+        );
+        const parsed = JSON.parse(fallbackRes.text || '{}');
+        if (parsed.prompt && typeof parsed.prompt === 'string') {
+          generatedPrompt = parsed.prompt.trim();
+        }
+      } catch (fbErr: any) {
+        console.warn('[Gemini 3.8 Prompt Synthesis notice]:', fbErr?.message || fbErr);
+      }
+    }
+
+    if (!generatedPrompt) {
+      return res.status(502).json({ error: 'Failed to synthesize prompt from AI model.' });
+    }
+
+    return res.json({ success: true, prompt: generatedPrompt });
+  } catch (error: any) {
+    console.error('[Generate Image Prompt Error]:', error);
+    return res.status(500).json({ error: error?.message || 'Server error generating prompt.' });
+  }
+});
+
 // Global Express error handler to guarantee all middleware errors return JSON, never HTML
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[API Middleware Error]:', err?.message || err);

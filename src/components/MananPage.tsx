@@ -127,7 +127,12 @@ export const MananPage: React.FC<MananPageProps> = ({
     abortControllerRef.current = controller;
 
     // Check session cache first to prevent duplicate API generation
-    const sessionCacheKey = `gq_manan_img_${chapter.id || chapter.uniqueCode}`;
+    const sessionCacheKey = `gq_manan_v3_${chapter.id || chapter.uniqueCode}`;
+    const legacyCacheKey = `gq_manan_img_${chapter.id || chapter.uniqueCode}`;
+    try {
+      sessionStorage.removeItem(legacyCacheKey);
+    } catch (_) {}
+
     if (!forceNew) {
       const cachedUrl = sessionStorage.getItem(sessionCacheKey);
       if (cachedUrl) {
@@ -148,7 +153,7 @@ export const MananPage: React.FC<MananPageProps> = ({
 
     let activePrompt = '';
     try {
-      activePrompt = buildEducationalImagePrompt(chapter);
+      activePrompt = await buildEducationalImagePrompt(chapter);
       setStatusMessage('Requesting illustration from Krea 2 Turbo...');
 
       const result = await generateChapterImage(activePrompt, controller.signal, chapter);
