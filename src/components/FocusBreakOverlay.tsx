@@ -1,14 +1,64 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Footprints, Sparkles, Clock, CheckCircle2, Play, EyeOff } from 'lucide-react';
+import { Footprints, Sparkles, Clock, EyeOff, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { playMindfulChime } from '../lib/chime';
 
-const BREAK_DURATION_SECONDS = 300; // 5 minutes
+const BREAK_DURATION_SECONDS = 180; // 3 minutes
+
+/**
+ * Checks if a break countdown was in progress before reload.
+ */
+function getInitialBreakState() {
+  try {
+    const storedBreakEnd = localStorage.getItem('gyanquest_break_end_time');
+    if (storedBreakEnd) {
+      const endTime = parseInt(storedBreakEnd, 10);
+      const diffSeconds = Math.ceil((endTime - Date.now()) / 1000);
+      if (diffSeconds > 0) {
+        return { active: true, remaining: diffSeconds };
+      } else {
+        localStorage.removeItem('gyanquest_break_end_time');
+      }
+    }
+  } catch (_) {}
+  return { active: false, remaining: BREAK_DURATION_SECONDS };
+}
+
+/**
+ * Halts any active audio narration, speech synthesis, and broadcasts events
+ * to stop in-progress learning activities when the break triggers.
+ */
+function stopAllActiveOperations() {
+  // Pause all playing audio elements across the document
+  try {
+    const audios = document.querySelectorAll('audio');
+    audios.forEach((audioEl) => {
+      try {
+        audioEl.pause();
+      } catch (_) {}
+    });
+  } catch (err) {
+    console.debug('Error pausing document audio:', err);
+  }
+
+  // Cancel any browser Web Speech synthesis
+  try {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  } catch (_) {}
+
+  // Broadcast window events to notify learning pages and modals
+  try {
+    window.dispatchEvent(new CustomEvent('gyanquest_stop_activity'));
+    window.dispatchEvent(new CustomEvent('gyanquest_break_started'));
+  } catch (_) {}
+}
 
 export const FocusBreakOverlay: React.FC = () => {
   const { user, isEmailUnverified } = useAuth();
-  const [isBreakActive, setIsBreakActive] = useState(false);
-  const [remainingSeconds, setRemainingSeconds] = useState(BREAK_DURATION_SECONDS);
+  const [isBreakActive, setIsBreakActive] = useState(() => getInitialBreakState().active);
+  const [remainingSeconds, setRemainingSeconds] = useState(() => getInitialBreakState().remaining);
   const [focusSetting, setFocusSetting] = useState<string>(() => {
     return localStorage.getItem('gyanquest_focus_mode_minutes') || 'none';
   });
@@ -34,25 +84,45 @@ export const FocusBreakOverlay: React.FC = () => {
     };
 
     window.addEventListener('gyanquest_focus_mode_changed', handleSettingChange);
+    window.addEventListener('gyanquest_settings_applied', handleSettingChange);
     window.addEventListener('storage', handleSettingChange);
     return () => {
       window.removeEventListener('gyanquest_focus_mode_changed', handleSettingChange);
+      window.removeEventListener('gyanquest_settings_applied', handleSettingChange);
       window.removeEventListener('storage', handleSettingChange);
     };
   }, []);
 
-  // When user signs in, initialize session start timestamp in sessionStorage
+  // When user signs in or app reloads, initialize session start timestamp & verify break state
   useEffect(() => {
     if (user && !isEmailUnverified) {
-      const storedStart = sessionStorage.getItem('gq_session_signin_time');
+      // Check if break is currently still active from storage
+      const storedBreakEnd = localStorage.getItem('gyanquest_break_end_time');
+      if (storedBreakEnd) {
+        const endTime = parseInt(storedBreakEnd, 10);
+        const diffSeconds = Math.ceil((endTime - Date.now()) / 1000);
+        if (diffSeconds > 0) {
+          setIsBreakActive(true);
+          setRemainingSeconds(diffSeconds);
+          stopAllActiveOperations();
+        } else {
+          localStorage.removeItem('gyanquest_break_end_time');
+          setIsBreakActive(false);
+        }
+      }
+
+      const storedStart = localStorage.getItem('gq_session_signin_time') || sessionStorage.getItem('gq_session_signin_time');
       if (storedStart) {
         sessionStartRef.current = parseInt(storedStart, 10);
       } else {
         sessionStartRef.current = Date.now();
+        localStorage.setItem('gq_session_signin_time', String(sessionStartRef.current));
         sessionStorage.setItem('gq_session_signin_time', String(sessionStartRef.current));
       }
     } else {
+      localStorage.removeItem('gq_session_signin_time');
       sessionStorage.removeItem('gq_session_signin_time');
+      localStorage.removeItem('gyanquest_break_end_time');
       setIsBreakActive(false);
     }
   }, [user?.uid, isEmailUnverified]);
@@ -69,56 +139,86 @@ export const FocusBreakOverlay: React.FC = () => {
       const targetMs = targetMins * 60 * 1000;
 
       if (elapsedMs >= targetMs) {
-        // Time has passed! Trigger 5-minute break
+        // Stop any currently playing audio and running activities immediately!
+        stopAllActiveOperations();
+
+        // Trigger mandatory 3-minute break & persist end timestamp
+        const breakEndTime = Date.now() + BREAK_DURATION_SECONDS * 1000;
+        localStorage.setItem('gyanquest_break_end_time', String(breakEndTime));
         setIsBreakActive(true);
         setRemainingSeconds(BREAK_DURATION_SECONDS);
 
-        // Sound audible chime
+        // Sound audible chime when the "take a walk" screen appears
         if (!hasChimedBreakStartRef.current) {
           playMindfulChime();
           hasChimedBreakStartRef.current = true;
         }
       }
-    }, 1000);
+    }, 500);
 
     timerCheckRef.current = interval;
     return () => clearInterval(interval);
   }, [user, isEmailUnverified, isBreakActive, focusSetting]);
 
-  // 5-minute break countdown handler
+  // 3-minute break countdown handler - precise timestamp comparison every 250ms to prevent skipping seconds
   useEffect(() => {
     if (!isBreakActive) {
       hasChimedBreakStartRef.current = false;
       return;
     }
 
+    // Immediately ensure activities remain stopped while break is active
+    stopAllActiveOperations();
+
     const countdown = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev <= 1) {
-          // Break finished!
+      try {
+        const storedEnd = localStorage.getItem('gyanquest_break_end_time');
+        const endTime = storedEnd ? parseInt(storedEnd, 10) : 0;
+        const now = Date.now();
+        const diff = Math.ceil((endTime - now) / 1000);
+
+        if (diff <= 0 || !storedEnd) {
+          // Break strictly finished! Learning time resumes!
           clearInterval(countdown);
-          playMindfulChime(); // Welcome back chime
+          localStorage.removeItem('gyanquest_break_end_time');
+          playMindfulChime(); // Play chime when learning time resumes
           setIsBreakActive(false);
 
           // Reset session timer for the next focus period
           sessionStartRef.current = Date.now();
+          localStorage.setItem('gq_session_signin_time', String(sessionStartRef.current));
           sessionStorage.setItem('gq_session_signin_time', String(sessionStartRef.current));
-          return BREAK_DURATION_SECONDS;
+
+          try {
+            window.dispatchEvent(new CustomEvent('gyanquest_break_ended'));
+          } catch (_) {}
+
+          setRemainingSeconds(BREAK_DURATION_SECONDS);
+          return;
         }
-        return prev - 1;
-      });
-    }, 1000);
+
+        setRemainingSeconds(diff);
+      } catch (_) {
+        setRemainingSeconds((prev) => Math.max(0, prev - 1));
+      }
+    }, 250);
 
     breakCountdownRef.current = countdown;
     return () => clearInterval(countdown);
   }, [isBreakActive]);
 
-  const handleResumeEarly = () => {
-    playMindfulChime();
-    setIsBreakActive(false);
-    sessionStartRef.current = Date.now();
-    sessionStorage.setItem('gq_session_signin_time', String(sessionStartRef.current));
-  };
+  // Prevent closing via Escape or keyboard during mandatory 5-min break
+  useEffect(() => {
+    if (!isBreakActive) return;
+    const preventEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', preventEscape, true);
+    return () => window.removeEventListener('keydown', preventEscape, true);
+  }, [isBreakActive]);
 
   if (!isBreakActive || !user) return null;
 
@@ -131,11 +231,16 @@ export const FocusBreakOverlay: React.FC = () => {
     <aside
       id="focus-break-screen-blur"
       aria-label="Focus Break & Walking Pause"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-2xl bg-black/80 text-white select-none transition-all duration-700 animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-2xl bg-black/85 text-white select-none transition-all duration-700 animate-in fade-in cursor-default"
+      onClick={(e) => {
+        // Prevent dismissal on clicking backdrop
+        e.stopPropagation();
+      }}
     >
       <div
         id="focus-break-card"
-        className="w-full max-w-lg rounded-[36px] border border-amber-500/30 bg-stone-900/90 p-8 sm:p-10 text-center shadow-2xl relative flex flex-col items-center space-y-6"
+        className="w-full max-w-lg rounded-[36px] border border-amber-500/40 bg-stone-900/95 p-8 sm:p-10 text-center shadow-2xl relative flex flex-col items-center space-y-6"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Animated Mindful Walking Icon */}
         <div className="w-20 h-20 rounded-3xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-inner">
@@ -150,16 +255,16 @@ export const FocusBreakOverlay: React.FC = () => {
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-bold font-serif-heading text-amber-100">
-            Time to Walk Around & Rest
+            Mandatory Walking & Eye Rest
           </h2>
 
           <p className="text-xs sm:text-sm text-stone-300 leading-relaxed max-w-md mx-auto">
-            You've completed your designated study duration! Step away from your screen, stretch your body, drink some water, and walk around for <strong>5 minutes</strong> to recharge your focus.
+            Your focus study session has elapsed. Ongoing narration and learning tasks have been paused. Please step away from your screen and take a <strong>full 3-minute break</strong> to rest your eyes and stretch your body.
           </p>
         </div>
 
-        {/* 5-Minute Countdown Display */}
-        <div className="w-full py-4 px-6 rounded-2xl bg-black/40 border border-stone-800 space-y-3">
+        {/* 3-Minute Countdown Display */}
+        <div className="w-full py-4 px-6 rounded-2xl bg-black/50 border border-stone-800 space-y-3">
           <div className="flex items-center justify-center gap-2 text-stone-400 text-xs font-semibold uppercase tracking-wider">
             <Clock className="w-4 h-4 text-amber-400" />
             <span>Walking Pause Countdown</span>
@@ -178,7 +283,7 @@ export const FocusBreakOverlay: React.FC = () => {
           </div>
 
           <span className="text-[11px] text-stone-400 block">
-            Screen is blurred to protect your eyes and encourage movement
+            Screen is blurred to protect your eyesight and encourage healthy movement
           </span>
         </div>
 
@@ -194,15 +299,12 @@ export const FocusBreakOverlay: React.FC = () => {
           </div>
         </div>
 
-        {/* Early Resume Action */}
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={handleResumeEarly}
-            className="text-xs font-semibold text-stone-400 hover:text-amber-300 underline underline-offset-4 transition-colors cursor-pointer"
-          >
-            I'm back, resume learning now
-          </button>
+        {/* Enforced Waiting Notice */}
+        <div className="pt-2 w-full">
+          <div className="flex items-center justify-center gap-2 text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 rounded-2xl">
+            <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Mandatory 3-min break in progress • Learning unlocks automatically at 00:00</span>
+          </div>
         </div>
       </div>
     </aside>

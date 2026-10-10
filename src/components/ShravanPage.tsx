@@ -390,13 +390,98 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     };
   }, [chapter.id]);
 
+  const getTargetAudioSpeed = (): number => {
+    try {
+      const raw = localStorage.getItem('gyanquest_audio_speed') || '1.0';
+      const parsed = parseFloat(raw);
+      return !isNaN(parsed) && parsed > 0 ? parsed : 1.0;
+    } catch (_) {
+      return 1.0;
+    }
+  };
+
+  // Dynamically apply audio speed from settings and stop playback on focus break
+  useEffect(() => {
+    const applySpeed = (newSpeed?: number) => {
+      const speed = typeof newSpeed === 'number' ? newSpeed : getTargetAudioSpeed();
+      if (audioRef.current) {
+        audioRef.current.playbackRate = speed;
+        audioRef.current.defaultPlaybackRate = speed;
+      }
+    };
+
+    applySpeed();
+
+    const handleSpeedApplied = (e: any) => {
+      const spd = typeof e.detail?.speed === 'number' ? e.detail.speed : parseFloat(e.detail?.speed || '1.0');
+      if (!isNaN(spd) && spd > 0) {
+        applySpeed(spd);
+      } else {
+        applySpeed();
+      }
+    };
+
+    const handleSettingsApplied = (e: any) => {
+      if (e.detail?.audioSpeed) {
+        const spd = parseFloat(e.detail.audioSpeed);
+        if (!isNaN(spd) && spd > 0) {
+          applySpeed(spd);
+          return;
+        }
+      }
+      applySpeed();
+    };
+
+    const handleStopActivity = () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      setIsPlaying(false);
+    };
+
+    const handleStorageChange = () => applySpeed();
+
+    window.addEventListener('gyanquest_audio_speed_applied', handleSpeedApplied);
+    window.addEventListener('gyanquest_settings_applied', handleSettingsApplied);
+    window.addEventListener('gyanquest_stop_activity', handleStopActivity);
+    window.addEventListener('gyanquest_break_started', handleStopActivity);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('gyanquest_audio_speed_applied', handleSpeedApplied);
+      window.removeEventListener('gyanquest_settings_applied', handleSettingsApplied);
+      window.removeEventListener('gyanquest_stop_activity', handleStopActivity);
+      window.removeEventListener('gyanquest_break_started', handleStopActivity);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // Autoplay support when status transitions to ready
+  useEffect(() => {
+    if (status === 'ready' && audioRef.current) {
+      const speed = getTargetAudioSpeed();
+      audioRef.current.playbackRate = speed;
+      audioRef.current.defaultPlaybackRate = speed;
+      const autoplay = localStorage.getItem('gyanquest_autoplay_audio') === 'true';
+      if (autoplay && !isPlaying) {
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch((err) => {
+          console.debug('Autoplay policy caught:', err);
+        });
+      }
+    }
+  }, [status, audioUrl, audioBase64]);
+
   const handleTogglePlay = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.playbackRate = 1.0;
+      const targetSpeed = getTargetAudioSpeed();
+      audioRef.current.playbackRate = targetSpeed;
+      audioRef.current.defaultPlaybackRate = targetSpeed;
       audioRef.current.play().then(() => {
         setIsPlaying(true);
       }).catch((err) => {
@@ -418,8 +503,18 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
       setDuration(audioRef.current.duration);
-      audioRef.current.playbackRate = 1.0;
-      audioRef.current.defaultPlaybackRate = 1.0;
+      const targetSpeed = getTargetAudioSpeed();
+      audioRef.current.playbackRate = targetSpeed;
+      audioRef.current.defaultPlaybackRate = targetSpeed;
+
+      const autoplay = localStorage.getItem('gyanquest_autoplay_audio') === 'true';
+      if (autoplay && !isPlaying) {
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch((err) => {
+          console.debug('Autoplay policy notice:', err);
+        });
+      }
     }
   };
 
@@ -428,8 +523,9 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     setCurrentTime(val);
     if (audioRef.current) {
       audioRef.current.currentTime = val;
-      // Ensure playbackRate remains exactly 1.0
-      audioRef.current.playbackRate = 1.0;
+      const targetSpeed = getTargetAudioSpeed();
+      audioRef.current.playbackRate = targetSpeed;
+      audioRef.current.defaultPlaybackRate = targetSpeed;
     }
   };
 
@@ -458,7 +554,9 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       setCurrentTime(0);
-      audioRef.current.playbackRate = 1.0;
+      const targetSpeed = getTargetAudioSpeed();
+      audioRef.current.playbackRate = targetSpeed;
+      audioRef.current.defaultPlaybackRate = targetSpeed;
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   };
@@ -469,8 +567,9 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       const targetTime = Math.max(0, Math.min(maxDuration, audioRef.current.currentTime + seconds));
       audioRef.current.currentTime = targetTime;
       setCurrentTime(targetTime);
-      // Ensure playback rate remains unchanged and never increases
-      audioRef.current.playbackRate = 1.0;
+      const targetSpeed = getTargetAudioSpeed();
+      audioRef.current.playbackRate = targetSpeed;
+      audioRef.current.defaultPlaybackRate = targetSpeed;
     }
   };
 

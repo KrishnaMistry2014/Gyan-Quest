@@ -12,7 +12,11 @@ import {
   doc,
   getGuestProfile,
   claimUserStreak,
-  ClaimStreakResult
+  ClaimStreakResult,
+  UserSettingsData,
+  DEFAULT_USER_SETTINGS,
+  saveUserSettings,
+  getUserSettings
 } from '../lib/firebase';
 import { getLocalDateString } from '../lib/streak';
 import { clearLocalChapters } from '../lib/chapters';
@@ -20,6 +24,7 @@ import { clearLocalChapters } from '../lib/chapters';
 interface AuthContextType {
   user: User | null;
   profile: UserProfileData | null;
+  settings: UserSettingsData;
   loading: boolean;
   isEmailUnverified: boolean;
   isAuthModalOpen: boolean;
@@ -39,6 +44,7 @@ interface AuthContextType {
   openSettingsModal: () => void;
   closeSettingsModal: () => void;
   updateName: (newName: string) => Promise<void>;
+  updateSettings: (newSettings: Partial<UserSettingsData>) => Promise<UserSettingsData>;
   claimDailyStreak: (activitySource?: string) => Promise<ClaimStreakResult>;
   recordStreakActivity: (reason?: string) => Promise<ClaimStreakResult | null>;
   refreshUser: () => Promise<void>;
@@ -49,6 +55,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
+  settings: DEFAULT_USER_SETTINGS,
   loading: true,
   isEmailUnverified: false,
   isAuthModalOpen: false,
@@ -68,6 +75,7 @@ const AuthContext = createContext<AuthContextType>({
   openSettingsModal: () => {},
   closeSettingsModal: () => {},
   updateName: async () => {},
+  updateSettings: async () => DEFAULT_USER_SETTINGS,
   claimDailyStreak: async () => ({
     profile: getGuestProfile(),
     newStreak: 1,
@@ -84,6 +92,22 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfileData | null>(() => getGuestProfile());
+  const [settings, setSettings] = useState<UserSettingsData>(() => {
+    try {
+      const speed = localStorage.getItem('gyanquest_audio_speed') || '1.0';
+      const autoplay = localStorage.getItem('gyanquest_autoplay_audio') === 'true';
+      const focus = localStorage.getItem('gyanquest_focus_mode_minutes') || 'none';
+      return {
+        ...DEFAULT_USER_SETTINGS,
+        audioSpeed: speed,
+        autoplayAudio: autoplay,
+        focusModeMinutes: focus,
+        streakAlerts: true,
+      };
+    } catch (_) {
+      return DEFAULT_USER_SETTINGS;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -121,6 +145,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             (snapshot) => {
               if (snapshot.exists()) {
                 const data = snapshot.data() as Partial<UserProfileData>;
+                if (data.settings) {
+                  const s: UserSettingsData = {
+                    ...DEFAULT_USER_SETTINGS,
+                    ...data.settings,
+                    streakAlerts: true,
+                  };
+                  setSettings(s);
+                  try {
+                    localStorage.setItem(`gq_settings_${currentUser.uid}`, JSON.stringify(s));
+                    if (s.audioSpeed) localStorage.setItem('gyanquest_audio_speed', s.audioSpeed);
+                    if (typeof s.autoplayAudio === 'boolean') {
+                      localStorage.setItem('gyanquest_autoplay_audio', String(s.autoplayAudio));
+                    }
+                    if (s.focusModeMinutes) {
+                      const eff = s.focusModeMinutes === 'custom' && s.customMinutes ? String(s.customMinutes) : s.focusModeMinutes;
+                      localStorage.setItem('gyanquest_focus_mode_minutes', eff);
+                    }
+                    localStorage.setItem('gyanquest_streak_alerts', 'true');
+                  } catch (_) {}
+                }
                 setProfile((prev) => ({
                   name: data.name ?? prev?.name ?? 'Learner',
                   email: data.email ?? (currentUser.isAnonymous ? null : currentUser.email),
@@ -129,6 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   lastActiveDate: data.lastActiveDate ?? prev?.lastActiveDate ?? getLocalDateString(),
                   longestStreak: typeof data.longestStreak === 'number' ? data.longestStreak : (prev?.longestStreak ?? 1),
                   activeDays: Array.isArray(data.activeDays) ? data.activeDays : (prev?.activeDays ?? [getLocalDateString()]),
+                  settings: data.settings ? { ...DEFAULT_USER_SETTINGS, ...data.settings, streakAlerts: true } : prev?.settings,
                 }));
               }
             },
@@ -227,11 +272,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfile((prev) => (prev ? { ...prev, xp: newXp } : null));
   }, []);
 
+  const updateSettings = useCallback(async (newSettings: Partial<UserSettingsData>): Promise<UserSettingsData> => {
+    const targetUid = user ? user.uid : 'guest';
+    const saved = await saveUserSettings(targetUid, newSettings);
+    setSettings(saved);
+    setProfile((prev) => (prev ? { ...prev, settings: saved } : null));
+    return saved;
+  }, [user]);
+
   return (
     <AuthContext.Provider
       value={{
         user,
         profile,
+        settings,
         loading,
         isEmailUnverified,
         isAuthModalOpen,
@@ -251,6 +305,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         openSettingsModal,
         closeSettingsModal,
         updateName,
+        updateSettings,
         claimDailyStreak,
         recordStreakActivity,
         refreshUser,

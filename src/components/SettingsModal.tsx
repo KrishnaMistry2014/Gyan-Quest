@@ -7,7 +7,6 @@ import {
   Volume2,
   Clock,
   User,
-  Bell,
   Trash2,
   Check,
   RotateCcw,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useToast } from '../context/ToastContext';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -29,9 +29,12 @@ export const SettingsModal: React.FC = () => {
     openProfileModal,
     user,
     profile,
-    streak
+    streak,
+    settings,
+    updateSettings
   } = useAuth();
   const { isDark, toggleTheme } = useTheme();
+  const { showToast } = useToast();
 
   // Settings State with LocalStorage Persistence
   const [audioSpeed, setAudioSpeed] = useState<string>(() => {
@@ -57,23 +60,36 @@ export const SettingsModal: React.FC = () => {
     return 25;
   });
 
-  const [streakAlerts, setStreakAlerts] = useState<boolean>(() => {
-    const val = localStorage.getItem('gyanquest_streak_alerts');
-    return val === null ? true : val === 'true';
-  });
-
   const [activeTab, setActiveTab] = useState<'appearance' | 'focus' | 'account'>('appearance');
+
+  // Sync state with user profile settings whenever modal opens
+  useEffect(() => {
+    if (isSettingsModalOpen && settings) {
+      if (settings.audioSpeed) setAudioSpeed(settings.audioSpeed);
+      if (typeof settings.autoplayAudio === 'boolean') setAutoplayAudio(settings.autoplayAudio);
+      if (settings.focusModeMinutes) {
+        if (['15', '30', '45', '60', 'none'].includes(settings.focusModeMinutes)) {
+          setFocusModeOption(settings.focusModeMinutes);
+        } else {
+          setFocusModeOption('custom');
+          const parsed = parseInt(settings.focusModeMinutes, 10);
+          if (!isNaN(parsed) && parsed > 0) setCustomMinutes(parsed);
+        }
+      }
+      if (settings.customMinutes) setCustomMinutes(settings.customMinutes);
+    }
+  }, [isSettingsModalOpen, settings]);
 
   // Close on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isSettingsModalOpen) {
-        closeSettingsModal();
+        handleDone();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSettingsModalOpen, closeSettingsModal]);
+  }, [isSettingsModalOpen, audioSpeed, autoplayAudio, focusModeOption, customMinutes, isDark]);
 
   // Settings are strictly available to signed-in users
   if (!isSettingsModalOpen || !user) return null;
@@ -113,30 +129,118 @@ export const SettingsModal: React.FC = () => {
     }
   };
 
-  const handleToggleStreakAlerts = () => {
-    const nextVal = !streakAlerts;
-    setStreakAlerts(nextVal);
-    localStorage.setItem('gyanquest_streak_alerts', String(nextVal));
-  };
-
   const handleClearCache = () => {
     try {
       localStorage.removeItem('gyanquest_cached_chapters');
+      showToast({
+        title: 'Cache Cleared',
+        message: 'Offline chapter cache has been emptied.',
+        type: 'info',
+      });
     } catch (_) {}
   };
 
-  const handleResetDefaults = () => {
+  const handleResetDefaults = async () => {
     setAudioSpeed('1.0');
     setAutoplayAudio(false);
     setFocusModeOption('none');
     setCustomMinutes(25);
-    setStreakAlerts(true);
 
     localStorage.setItem('gyanquest_audio_speed', '1.0');
     localStorage.setItem('gyanquest_autoplay_audio', 'false');
     localStorage.setItem('gyanquest_focus_mode_minutes', 'none');
     localStorage.setItem('gyanquest_streak_alerts', 'true');
+
+    // Immediately reset audio playback rate on DOM elements
+    try {
+      document.querySelectorAll('audio').forEach((el) => {
+        try {
+          el.playbackRate = 1.0;
+          el.defaultPlaybackRate = 1.0;
+        } catch (_) {}
+      });
+    } catch (_) {}
+
+    window.dispatchEvent(new CustomEvent('gyanquest_audio_speed_applied', { detail: { speed: 1.0 } }));
+    window.dispatchEvent(new CustomEvent('gyanquest_settings_applied', {
+      detail: {
+        audioSpeed: '1.0',
+        autoplayAudio: false,
+        focusModeMinutes: 'none',
+        customMinutes: 25,
+        streakAlerts: true,
+      }
+    }));
     notifyFocusModeChanged();
+
+    if (user) {
+      try {
+        await updateSettings({
+          audioSpeed: '1.0',
+          autoplayAudio: false,
+          focusModeMinutes: 'none',
+          customMinutes: 25,
+          streakAlerts: true,
+        });
+      } catch (_) {}
+    }
+
+    showToast({
+      title: 'Defaults Restored',
+      message: 'All settings have been reset to default values.',
+      type: 'info',
+    });
+  };
+
+  /**
+   * Applies all settings, immediately updates any currently playing audio speed,
+   * saves preferences in Firestore, and closes the modal.
+   */
+  const handleDone = async () => {
+    const speedNum = parseFloat(audioSpeed) || 1.0;
+
+    // 1. Immediately apply audio speed to all active <audio> elements in the DOM
+    try {
+      const audioElements = document.querySelectorAll('audio');
+      audioElements.forEach((el) => {
+        try {
+          el.playbackRate = speedNum;
+          el.defaultPlaybackRate = speedNum;
+        } catch (err) {
+          console.debug('Error adjusting audio playback rate on DOM element:', err);
+        }
+      });
+    } catch (err) {
+      console.debug('Error querying audio elements:', err);
+    }
+
+    // 2. Broadcast events for audio speed and full settings
+    const effFocus = focusModeOption === 'custom' ? String(customMinutes) : focusModeOption;
+    const currentSettingsPayload = {
+      audioSpeed,
+      autoplayAudio,
+      focusModeMinutes: effFocus,
+      customMinutes,
+      theme: (isDark ? 'dark' : 'light') as 'light' | 'dark',
+      streakAlerts: true, // Always on
+    };
+
+    try {
+      window.dispatchEvent(new CustomEvent('gyanquest_audio_speed_applied', { detail: { speed: speedNum } }));
+      window.dispatchEvent(new CustomEvent('gyanquest_settings_applied', { detail: currentSettingsPayload }));
+      window.dispatchEvent(new Event('gyanquest_focus_mode_changed'));
+    } catch (_) {}
+
+    // 3. Save settings in Firestore and local storage
+    if (user) {
+      try {
+        await updateSettings(currentSettingsPayload);
+      } catch (err) {
+        console.warn('Error saving settings to Firestore:', err);
+      }
+    }
+
+    closeSettingsModal();
   };
 
   return (
@@ -144,7 +248,7 @@ export const SettingsModal: React.FC = () => {
       id="settings-modal-backdrop"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
       onClick={(e) => {
-        if (e.target === e.currentTarget) closeSettingsModal();
+        if (e.target === e.currentTarget) handleDone();
       }}
     >
       <div
@@ -184,10 +288,10 @@ export const SettingsModal: React.FC = () => {
           <button
             id="settings-modal-close"
             type="button"
-            onClick={closeSettingsModal}
+            onClick={handleDone}
             className="p-2 rounded-xl transition-transform hover:scale-105 active:scale-95 cursor-pointer"
             style={{ backgroundColor: 'var(--bg-icon)', color: 'var(--text-primary)' }}
-            aria-label="Close settings modal"
+            aria-label="Close settings modal and apply"
           >
             <X className="w-5 h-5" />
           </button>
@@ -419,7 +523,7 @@ export const SettingsModal: React.FC = () => {
                 </div>
 
                 <p className="text-xs leading-relaxed mb-4" style={{ color: 'var(--text-muted)' }}>
-                  When your study duration elapses after signing in, an audible chime will sound, your screen will be blurred for <strong>5 minutes</strong>, and you'll be prompted to walk around and rest your eyes.
+                  When your study duration elapses after signing in, an audible chime will sound, your screen will be blurred for <strong>mandatory 3 minutes</strong>, and ongoing learning activities will pause to ensure you rest your eyes and move.
                 </p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3.5">
@@ -496,7 +600,7 @@ export const SettingsModal: React.FC = () => {
                 )}
               </div>
 
-              {/* Informational banner about the 5-min walk pause */}
+              {/* Informational banner about the mandatory 5-min walk pause */}
               <div
                 className="p-4 rounded-2xl border space-y-2"
                 style={{
@@ -506,45 +610,11 @@ export const SettingsModal: React.FC = () => {
               >
                 <div className="flex items-center gap-2 font-bold text-xs" style={{ color: 'var(--accent-saffron-text)' }}>
                   <Footprints className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span>5-Minute Walking Pause & Screen Blur</span>
+                  <span>Mandatory 3-Minute Walking Pause & Screen Blur</span>
                 </div>
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  Regular physical movement and resting your eyes from digital screens prevents cognitive fatigue and improves recall by up to 25%.
+                  When your timer ends, you will be required to take the full 3-minute break. Physical movement and resting your eyes from digital screens prevents cognitive fatigue and improves recall by up to 25%.
                 </p>
-              </div>
-
-              {/* Streak Alerts */}
-              <div
-                className="flex items-center justify-between p-4 rounded-2xl border"
-                style={{
-                  backgroundColor: 'var(--bg-card-subtle)',
-                  borderColor: 'var(--border-warm)',
-                }}
-              >
-                <div className="flex items-start gap-3 pr-2">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: 'var(--bg-icon)' }}>
-                    <Bell className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold block leading-tight" style={{ color: 'var(--text-primary)' }}>
-                      Daily Streak Reminders
-                    </span>
-                    <span className="text-xs leading-relaxed block mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      Alerts to safeguard your momentum and daily check-in
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleToggleStreakAlerts}
-                  className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
-                    streakAlerts ? 'bg-amber-600 justify-end' : 'bg-stone-300 dark:bg-stone-700 justify-start'
-                  }`}
-                  aria-label="Toggle streak alerts"
-                >
-                  <div className="bg-white w-4 h-4 rounded-full shadow-md transform transition-transform" />
-                </button>
               </div>
             </div>
           )}
@@ -681,7 +751,7 @@ export const SettingsModal: React.FC = () => {
           <button
             type="button"
             id="settings-done-btn"
-            onClick={closeSettingsModal}
+            onClick={handleDone}
             className="px-6 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer"
             style={{
               backgroundColor: 'var(--accent-saffron)',

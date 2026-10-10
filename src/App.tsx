@@ -240,7 +240,7 @@ const MainAppContent: React.FC = () => {
       {/* Settings Modal */}
       <SettingsModal />
 
-      {/* Focus Mode 5-min Walking Break Blur Overlay */}
+      {/* Focus Mode 3-min Walking Break Blur Overlay */}
       <FocusBreakOverlay />
 
       {/* Profile Modal (Contains name textbox and Submit button, saving to Firestore) */}

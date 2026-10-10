@@ -231,7 +231,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartL
               openStreakModal();
             }
           }}
-          aria-label={`Daily Streak: ${streak} days. Click to view streak details or claim daily check-in.`}
+          aria-label={`Daily Streak: ${streak} days. Click to view streak details.`}
           className="aspect-square rounded-3xl border p-6 sm:p-8 shadow-sm flex flex-col justify-between cursor-pointer transition-all hover:border-orange-400 hover:shadow-md group focus:outline-none focus:ring-2 focus:ring-orange-400"
           style={{
             backgroundColor: 'var(--bg-card)',

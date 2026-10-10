@@ -57,6 +57,24 @@ export const db = firestoreDb;
 
 import { getLocalDateString, getDateDiffInDays } from './streak';
 
+export interface UserSettingsData {
+  audioSpeed: string; // '0.75' | '1.0' | '1.25' | '1.5'
+  autoplayAudio: boolean;
+  focusModeMinutes: string; // '15' | '30' | '45' | '60' | 'custom' | 'none'
+  customMinutes?: number;
+  theme?: 'light' | 'dark';
+  streakAlerts?: boolean; // always true
+  updatedAt?: number;
+}
+
+export const DEFAULT_USER_SETTINGS: UserSettingsData = {
+  audioSpeed: '1.0',
+  autoplayAudio: false,
+  focusModeMinutes: 'none',
+  customMinutes: 25,
+  streakAlerts: true,
+};
+
 export interface UserProfileData {
   name: string;
   email: string | null;
@@ -65,6 +83,7 @@ export interface UserProfileData {
   longestStreak?: number;
   activeDays?: string[];
   xp?: number;
+  settings?: UserSettingsData;
 }
 
 const GUEST_STORAGE_KEY = 'gq_guest_profile';
@@ -83,6 +102,7 @@ export const getGuestProfile = (): UserProfileData => {
         longestStreak: typeof parsed.longestStreak === 'number' ? parsed.longestStreak : 1,
         activeDays: Array.isArray(parsed.activeDays) ? parsed.activeDays : [today],
         xp: typeof parsed.xp === 'number' ? parsed.xp : 0,
+        settings: parsed.settings || DEFAULT_USER_SETTINGS,
       };
     }
   } catch {
@@ -96,6 +116,7 @@ export const getGuestProfile = (): UserProfileData => {
     longestStreak: 1,
     activeDays: [today],
     xp: 0,
+    settings: DEFAULT_USER_SETTINGS,
   };
   saveGuestProfile(defaultGuest);
   return defaultGuest;
@@ -118,6 +139,97 @@ const getLocalProfile = (uid: string): UserProfileData | null => {
   }
   return null;
 };
+
+/**
+ * Save user settings to Firestore and local storage.
+ * Ensures settings like streak reminders remain always true.
+ */
+export async function saveUserSettings(
+  uid: string,
+  newSettings: Partial<UserSettingsData>
+): Promise<UserSettingsData> {
+  let existingSettings = DEFAULT_USER_SETTINGS;
+  try {
+    const local = localStorage.getItem(`gq_settings_${uid}`);
+    if (local) existingSettings = { ...DEFAULT_USER_SETTINGS, ...JSON.parse(local) };
+  } catch (_) {}
+
+  const merged: UserSettingsData = {
+    ...existingSettings,
+    ...newSettings,
+    streakAlerts: true, // Always on per requirements
+    updatedAt: Date.now(),
+  };
+
+  // Synchronize localStorage immediately
+  try {
+    localStorage.setItem(`gq_settings_${uid}`, JSON.stringify(merged));
+    localStorage.setItem('gyanquest_audio_speed', merged.audioSpeed);
+    localStorage.setItem('gyanquest_autoplay_audio', String(merged.autoplayAudio));
+    const effectiveFocus = merged.focusModeMinutes === 'custom' && merged.customMinutes
+      ? String(merged.customMinutes)
+      : merged.focusModeMinutes;
+    localStorage.setItem('gyanquest_focus_mode_minutes', effectiveFocus);
+    localStorage.setItem('gyanquest_streak_alerts', 'true');
+  } catch (_) {}
+
+  // Synchronize Firestore
+  try {
+    const userRef = doc(db, 'users', uid);
+    await setDoc(userRef, { settings: merged }, { merge: true });
+  } catch (err) {
+    console.debug('Firestore user settings sync notice:', err);
+  }
+
+  return merged;
+}
+
+/**
+ * Retrieve user settings from Firestore with local storage fallback.
+ */
+export async function getUserSettings(uid: string): Promise<UserSettingsData> {
+  let localData: UserSettingsData | null = null;
+  try {
+    const raw = localStorage.getItem(`gq_settings_${uid}`);
+    if (raw) localData = JSON.parse(raw);
+  } catch (_) {}
+
+  try {
+    const userRef = doc(db, 'users', uid);
+    const snap = await getDoc(userRef);
+    if (snap.exists() && snap.data().settings) {
+      const remote = snap.data().settings as Partial<UserSettingsData>;
+      const combined: UserSettingsData = {
+        ...DEFAULT_USER_SETTINGS,
+        ...localData,
+        ...remote,
+        streakAlerts: true,
+      };
+      try {
+        localStorage.setItem(`gq_settings_${uid}`, JSON.stringify(combined));
+      } catch (_) {}
+      return combined;
+    }
+  } catch (err) {
+    console.debug('Firestore getUserSettings notice:', err);
+  }
+
+  if (localData) {
+    return {
+      ...DEFAULT_USER_SETTINGS,
+      ...localData,
+      streakAlerts: true,
+    };
+  }
+
+  return {
+    audioSpeed: localStorage.getItem('gyanquest_audio_speed') || '1.0',
+    autoplayAudio: localStorage.getItem('gyanquest_autoplay_audio') === 'true',
+    focusModeMinutes: localStorage.getItem('gyanquest_focus_mode_minutes') || 'none',
+    customMinutes: 25,
+    streakAlerts: true,
+  };
+}
 
 const saveLocalProfile = (uid: string, data: UserProfileData) => {
   try {
@@ -215,6 +327,30 @@ export async function syncUserAndStreak(user: User): Promise<UserProfileData> {
       activeDays = Array.from(new Set([...activeDays, ...remoteActiveDays])).slice(-30);
     }
 
+    let loadedSettings: UserSettingsData = DEFAULT_USER_SETTINGS;
+    if (snap.exists() && snap.data().settings) {
+      loadedSettings = {
+        ...DEFAULT_USER_SETTINGS,
+        ...snap.data().settings,
+        streakAlerts: true,
+      };
+      try {
+        localStorage.setItem(`gq_settings_${user.uid}`, JSON.stringify(loadedSettings));
+        if (loadedSettings.audioSpeed) localStorage.setItem('gyanquest_audio_speed', loadedSettings.audioSpeed);
+        if (typeof loadedSettings.autoplayAudio === 'boolean') {
+          localStorage.setItem('gyanquest_autoplay_audio', String(loadedSettings.autoplayAudio));
+        }
+        if (loadedSettings.focusModeMinutes) {
+          const effFocus = loadedSettings.focusModeMinutes === 'custom' && loadedSettings.customMinutes
+            ? String(loadedSettings.customMinutes)
+            : loadedSettings.focusModeMinutes;
+          localStorage.setItem('gyanquest_focus_mode_minutes', effFocus);
+        }
+        localStorage.setItem('gyanquest_streak_alerts', 'true');
+        window.dispatchEvent(new CustomEvent('gyanquest_settings_applied', { detail: loadedSettings }));
+      } catch (_) {}
+    }
+
     const profileData: UserProfileData = {
       name,
       email,
@@ -223,6 +359,7 @@ export async function syncUserAndStreak(user: User): Promise<UserProfileData> {
       lastActiveDate,
       longestStreak,
       activeDays,
+      settings: loadedSettings,
     };
 
     saveLocalProfile(user.uid, profileData);
