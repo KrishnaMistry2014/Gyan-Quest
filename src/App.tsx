@@ -23,14 +23,16 @@ import { VerificationScreen } from './components/VerificationScreen';
 import { BlankPage } from './components/BlankPage';
 import { MyChapters } from './components/MyChapters';
 import { ShravanPage } from './components/ShravanPage';
+import { MananPage } from './components/MananPage';
 import { SavedChapter } from './lib/chapters';
 
 const MainAppContent: React.FC = () => {
   const { openAuthModal, user, isEmailUnverified, loading } = useAuth();
-  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'blank' | 'my-chapters' | 'shravan'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'blank' | 'my-chapters' | 'shravan' | 'manan'>('landing');
   const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<SavedChapter | null>(null);
   const [activeShravanChapter, setActiveShravanChapter] = useState<SavedChapter | null>(null);
+  const [activeMananChapter, setActiveMananChapter] = useState<SavedChapter | null>(null);
   const [activeSection, setActiveSection] = useState<string>('home');
   const [isGuruModalOpen, setIsGuruModalOpen] = useState<boolean>(false);
 
@@ -45,6 +47,7 @@ const MainAppContent: React.FC = () => {
       setCurrentView('landing');
       setSelectedChapter(null);
       setActiveShravanChapter(null);
+      setActiveMananChapter(null);
       setUploadedPdf(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -183,6 +186,42 @@ const MainAppContent: React.FC = () => {
                 setCurrentView('dashboard');
               }
               window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateManan={(ch) => {
+              setSelectedChapter(ch);
+              setActiveShravanChapter(ch);
+              setActiveMananChapter(ch);
+              setCurrentView('manan');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        ) : currentView === 'manan' && (activeMananChapter || activeShravanChapter || selectedChapter) ? (
+          /* Manan Reflection Jigsaw Puzzle View */
+          <MananPage
+            chapter={(activeMananChapter || activeShravanChapter || selectedChapter)!}
+            onBackToShravan={() => {
+              setCurrentView('shravan');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onBackToVidya={() => {
+              setCurrentView('blank');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateDashboard={() => {
+              if (!user) {
+                setCurrentView('landing');
+              } else {
+                setCurrentView('dashboard');
+              }
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateMyChapters={() => {
+              if (!user) {
+                openAuthModal();
+              } else {
+                setCurrentView('my-chapters');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
             }}
           />
         ) : currentView === 'my-chapters' && user ? (

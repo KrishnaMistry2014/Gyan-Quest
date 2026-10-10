@@ -23,7 +23,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
 interface NavbarProps {
-  currentView: 'landing' | 'dashboard' | 'blank' | 'my-chapters';
+  currentView: 'landing' | 'dashboard' | 'blank' | 'my-chapters' | 'shravan' | 'manan';
   onNavigateView: (view: 'landing' | 'dashboard' | 'blank' | 'my-chapters') => void;
   activeSection?: string;
   onNavigateSection?: (sectionId: string) => void;

@@ -25,6 +25,7 @@ interface ShravanPageProps {
   chapter: SavedChapter;
   onBackToVidya: () => void;
   onNavigateDashboard?: () => void;
+  onNavigateManan?: (chapter: SavedChapter) => void;
 }
 
 // Helper to resolve an audio source string (data URI, blob URL, or base64)
@@ -118,6 +119,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   chapter,
   onBackToVidya,
   onNavigateDashboard,
+  onNavigateManan,
 }) => {
   const { user, refreshUser, updateProfileXp, isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
@@ -133,7 +135,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [duration, setDuration] = useState<number>(0);
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [hasPlayedFullAudio, setHasPlayedFullAudio] = useState<boolean>(false);
+  const [hasPlayedFullAudio, setHasPlayedFullAudio] = useState<boolean>(Boolean(chapter.shravanCompleted));
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -146,27 +148,9 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     }
   }, [isStreakActiveToday, recordStreakActivity]);
 
-  const handleGoToManan = async () => {
-    try {
-      const reward = await claimChapterStageReward(chapter, 'manan', user);
-      if (reward.awarded) {
-        showToast({
-          title: `+${reward.xpAdded} XP Added!`,
-          message: 'Completed Shravan listening',
-          type: 'xp',
-          xpAmount: reward.xpAdded,
-        });
-        updateProfileXp(reward.newTotal);
-        await refreshUser?.();
-      } else {
-        showToast({
-          title: 'Manan Stage',
-          message: 'Completed Shravan listening',
-          type: 'info',
-        });
-      }
-    } catch (err) {
-      console.warn('Error claiming Manan XP:', err);
+  const handleGoToManan = () => {
+    if (onNavigateManan) {
+      onNavigateManan(chapter);
     }
   };
 
