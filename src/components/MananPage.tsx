@@ -23,7 +23,8 @@ import { claimChapterStageReward } from '../lib/firebase';
 import { playMindfulChime } from '../lib/chime';
 import {
   generateChapterImage,
-  buildEducationalImagePrompt
+  buildEducationalImagePrompt,
+  createThemedEducationalSvgUrl
 } from '../lib/mananApi';
 import {
   JigsawPiece,
@@ -65,6 +66,7 @@ export const MananPage: React.FC<MananPageProps> = ({
   );
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isAiGenerated, setIsAiGenerated] = useState<boolean>(true);
   const [pieces, setPieces] = useState<JigsawPiece[]>([]);
   const [activePieceId, setActivePieceId] = useState<number | null>(null);
   const [moves, setMoves] = useState<number>(0);
@@ -77,6 +79,7 @@ export const MananPage: React.FC<MananPageProps> = ({
   const abortControllerRef = useRef<AbortController | null>(null);
   const isGeneratingRef = useRef<boolean>(false);
   const rewardClaimedRef = useRef<boolean>(false);
+  const maxZIndexRef = useRef<number>(100);
 
   // Drag tracking state
   const dragInfoRef = useRef<{
@@ -122,6 +125,7 @@ export const MananPage: React.FC<MananPageProps> = ({
       const cachedUrl = sessionStorage.getItem(sessionCacheKey);
       if (cachedUrl) {
         setImageUrl(cachedUrl);
+        setIsAiGenerated(true);
         setStatus('ready');
         setErrorMessage('');
         initPuzzlePieces(cachedUrl, gridSize, boardSize);
@@ -136,22 +140,26 @@ export const MananPage: React.FC<MananPageProps> = ({
 
     try {
       const prompt = buildEducationalImagePrompt(chapter);
-      setStatusMessage('Sending request to image generation service (Render Turbo)...');
+      setStatusMessage('Generating illustration with Krea 2 Turbo...');
 
-      const url = await generateChapterImage(prompt, controller.signal);
-      sessionStorage.setItem(sessionCacheKey, url);
+      const result = await generateChapterImage(prompt, controller.signal, chapter);
+      if (result.isAiGenerated) {
+        sessionStorage.setItem(sessionCacheKey, result.imageUrl);
+      }
 
-      setImageUrl(url);
+      setImageUrl(result.imageUrl);
+      setIsAiGenerated(result.isAiGenerated);
       setStatus('ready');
-      initPuzzlePieces(url, gridSize, boardSize);
+      initPuzzlePieces(result.imageUrl, gridSize, boardSize);
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
-      console.error('Error generating Manan puzzle image:', err);
-      setStatus('error');
-      setErrorMessage(
-        err?.message ||
-          'Failed to generate chapter illustration. Please check your connection and retry.'
-      );
+      console.warn('Handling image generation fallback:', err);
+      // Ensure the student can still play with the conceptual chapter visual
+      const fallbackUrl = createThemedEducationalSvgUrl(chapter);
+      setImageUrl(fallbackUrl);
+      setIsAiGenerated(false);
+      setStatus('ready');
+      initPuzzlePieces(fallbackUrl, gridSize, boardSize);
     } finally {
       isGeneratingRef.current = false;
     }
@@ -251,10 +259,10 @@ export const MananPage: React.FC<MananPageProps> = ({
   };
 
   // --------------------------------------------------------------------------
-  // POINTER EVENT DRAG & SNAP HANDLERS
+  // POINTER EVENT DRAG & SNAP HANDLERS (FRONT-LAYER PRIORITY)
   // --------------------------------------------------------------------------
   const handlePointerDown = (
-    e: React.PointerEvent<HTMLDivElement>,
+    e: React.PointerEvent,
     pieceId: number
   ) => {
     const piece = pieces.find((p) => p.id === pieceId);
@@ -263,10 +271,15 @@ export const MananPage: React.FC<MananPageProps> = ({
     e.preventDefault();
     e.stopPropagation();
 
-    const targetEl = e.currentTarget;
-    targetEl.setPointerCapture(e.pointerId);
+    // Dynamically elevate this piece to the front layer!
+    maxZIndexRef.current += 1;
+    const elevatedZ = maxZIndexRef.current;
 
     setActivePieceId(pieceId);
+    setPieces((prev) =>
+      prev.map((p) => (p.id === pieceId ? { ...p, zIndex: elevatedZ } : p))
+    );
+
     dragInfoRef.current = {
       pieceId,
       startPointerX: e.clientX,
@@ -277,111 +290,112 @@ export const MananPage: React.FC<MananPageProps> = ({
     };
   };
 
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const info = dragInfoRef.current;
-    if (!info || activePieceId === null) return;
+  // Global window listeners for drag & drop across all devices
+  useEffect(() => {
+    if (activePieceId === null) return;
 
-    e.preventDefault();
-    const deltaX = e.clientX - info.startPointerX;
-    const deltaY = e.clientY - info.startPointerY;
+    const onPointerMove = (e: PointerEvent) => {
+      const info = dragInfoRef.current;
+      if (!info) return;
 
-    if (Math.hypot(deltaX, deltaY) > 3) {
-      info.hasMoved = true;
-    }
+      const deltaX = e.clientX - info.startPointerX;
+      const deltaY = e.clientY - info.startPointerY;
 
-    setPieces((prev) =>
-      prev.map((p) => {
-        if (p.id === info.pieceId) {
-          return {
-            ...p,
-            currentX: info.startPieceX + deltaX,
-            currentY: info.startPieceY + deltaY,
-          };
-        }
-        return p;
-      })
-    );
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    const info = dragInfoRef.current;
-    if (!info || activePieceId === null) {
-      dragInfoRef.current = null;
-      setActivePieceId(null);
-      return;
-    }
-
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (_) {}
-
-    const piece = pieces.find((p) => p.id === info.pieceId);
-    if (!piece || piece.isSnapped) {
-      dragInfoRef.current = null;
-      setActivePieceId(null);
-      return;
-    }
-
-    if (info.hasMoved) {
-      setMoves((m) => m + 1);
-    }
-
-    // Measure live coordinates relative to the board container
-    if (boardRef.current) {
-      const boardRect = boardRef.current.getBoundingClientRect();
-      // The current piece element's position on screen
-      const pieceEl = e.currentTarget;
-      const pieceRect = pieceEl.getBoundingClientRect();
-
-      const boardCoordX = pieceRect.left - boardRect.left;
-      const boardCoordY = pieceRect.top - boardRect.top;
-
-      // Magnetic snap check
-      const didSnap = checkPieceSnap(piece, boardCoordX, boardCoordY, 44);
-
-      if (didSnap) {
-        // Snap piece onto board accurately!
-        setPieces((prev) =>
-          prev.map((p) =>
-            p.id === piece.id
-              ? {
-                  ...p,
-                  currentX: p.targetX,
-                  currentY: p.targetY,
-                  isSnapped: true,
-                }
-              : p
-          )
-        );
-
-        // Gentle subtle chime feedback on snap
-        try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
-          gain.gain.setValueAtTime(0.08, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.start();
-          osc.stop(ctx.currentTime + 0.16);
-        } catch (_) {}
+      if (Math.hypot(deltaX, deltaY) > 3) {
+        info.hasMoved = true;
       }
-    }
 
-    dragInfoRef.current = null;
-    setActivePieceId(null);
-  };
+      setPieces((prev) =>
+        prev.map((p) => {
+          if (p.id === info.pieceId) {
+            return {
+              ...p,
+              currentX: info.startPieceX + deltaX,
+              currentY: info.startPieceY + deltaY,
+            };
+          }
+          return p;
+        })
+      );
+    };
 
-  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (_) {}
-    dragInfoRef.current = null;
-    setActivePieceId(null);
-  };
+    const onPointerUp = (e: PointerEvent) => {
+      const info = dragInfoRef.current;
+      if (!info) {
+        setActivePieceId(null);
+        return;
+      }
+
+      const piece = pieces.find((p) => p.id === info.pieceId);
+      if (!piece || piece.isSnapped) {
+        dragInfoRef.current = null;
+        setActivePieceId(null);
+        return;
+      }
+
+      if (info.hasMoved) {
+        setMoves((m) => m + 1);
+      }
+
+      // Check magnetic snapping relative to board
+      if (boardRef.current) {
+        const boardRect = boardRef.current.getBoundingClientRect();
+        const pieceEl = document.querySelector(`[data-piece-id="${piece.id}"]`);
+
+        if (pieceEl) {
+          const pieceRect = pieceEl.getBoundingClientRect();
+          const boardCoordX = pieceRect.left - boardRect.left;
+          const boardCoordY = pieceRect.top - boardRect.top;
+
+          // Comfortable magnetic snapping tolerance (48px)
+          const didSnap = checkPieceSnap(piece, boardCoordX, boardCoordY, 48);
+
+          if (didSnap) {
+            setPieces((prev) =>
+              prev.map((p) =>
+                p.id === piece.id
+                  ? {
+                      ...p,
+                      currentX: p.targetX,
+                      currentY: p.targetY,
+                      isSnapped: true,
+                    }
+                  : p
+              )
+            );
+
+            // Subtle chime feedback on successful snap
+            try {
+              const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
+              gain.gain.setValueAtTime(0.08, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start();
+              osc.stop(ctx.currentTime + 0.16);
+            } catch (_) {}
+          }
+        }
+      }
+
+      dragInfoRef.current = null;
+      setActivePieceId(null);
+    };
+
+    window.addEventListener('pointermove', onPointerMove, { passive: false });
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, [activePieceId, pieces]);
 
   const snappedCount = pieces.filter((p) => p.isSnapped).length;
   const progressPercent = totalPieces > 0 ? (snappedCount / totalPieces) * 100 : 0;
@@ -497,6 +511,10 @@ export const MananPage: React.FC<MananPageProps> = ({
           </div>
 
           <div className="space-y-2 max-w-md">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Powered by Krea 2 Turbo</span>
+            </div>
             <h3 className="text-xl font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
               Synthesizing Chapter Illustration
             </h3>
@@ -605,8 +623,39 @@ export const MananPage: React.FC<MananPageProps> = ({
               </div>
             </div>
 
-            {/* Difficulty & Reset controls */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            {/* Difficulty, Model & Reset controls */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              {isAiGenerated ? (
+                <div
+                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border shadow-2xs"
+                  style={{
+                    backgroundColor: 'var(--bg-main)',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--accent-saffron-text)',
+                  }}
+                  title="AI Image Generator"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Powered by Krea 2 Turbo</span>
+                </div>
+              ) : (
+                <div
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border shadow-2xs bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200"
+                  title="Chapter Educational Concept Visual"
+                >
+                  <Brain className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>Chapter Visual</span>
+                  <button
+                    type="button"
+                    onClick={() => loadPuzzleImage(true)}
+                    className="ml-1 text-[11px] underline font-bold hover:text-amber-600 cursor-pointer"
+                    title="Retry generating with Krea 2 Turbo"
+                  >
+                    Retry Krea 2 Turbo
+                  </button>
+                </div>
+              )}
+
               <div className="inline-flex rounded-xl p-0.5 border" style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-warm)' }}>
                 <button
                   type="button"
@@ -673,7 +722,7 @@ export const MananPage: React.FC<MananPageProps> = ({
             className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 sm:gap-8 select-none"
           >
             {/* --------------------------------------------------------
-               LEFT: PUZZLE TARGET BOARD
+               LEFT: PUZZLE TARGET BOARD (Layer z-10)
                -------------------------------------------------------- */}
             <div className="flex flex-col items-center space-y-2">
               <div
@@ -692,7 +741,7 @@ export const MananPage: React.FC<MananPageProps> = ({
               <div
                 ref={boardRef}
                 id="jigsaw-board-container"
-                className="relative rounded-2xl border shadow-lg overflow-hidden transition-all"
+                className="relative rounded-2xl border shadow-lg overflow-hidden transition-all z-10"
                 style={{
                   width: boardSize,
                   height: boardSize,
@@ -799,7 +848,7 @@ export const MananPage: React.FC<MananPageProps> = ({
 
               <div
                 id="jigsaw-piece-tray"
-                className="relative rounded-2xl border shadow-xs overflow-hidden"
+                className="relative rounded-2xl border shadow-xs overflow-visible z-30"
                 style={{
                   width: boardSize,
                   height: boardSize,
@@ -808,7 +857,7 @@ export const MananPage: React.FC<MananPageProps> = ({
                 }}
               >
                 {/* Background grid markings for tray */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,var(--border-warm)_1px,transparent_0)] [background-size:24px_24px] opacity-40 pointer-events-none" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,var(--border-warm)_1px,transparent_0)] [background-size:24px_24px] opacity-40 pointer-events-none rounded-2xl" />
 
                 {/* Empty State when all pieces are on board */}
                 {pieces.every((p) => p.isSnapped) && (
@@ -823,58 +872,69 @@ export const MananPage: React.FC<MananPageProps> = ({
                   </div>
                 )}
 
-                {/* Unplaced scattered pieces */}
+                {/* Unplaced scattered pieces - rendered on the front layer */}
                 {pieces
                   .filter((p) => !p.isSnapped)
                   .map((p) => {
                     const isDraggingThis = activePieceId === p.id;
+                    const pieceZ = isDraggingThis ? 9999 : (p.zIndex || 50);
+
                     return (
                       <div
                         key={`unplaced-${p.id}`}
                         data-piece-id={p.id}
-                        onPointerDown={(e) => handlePointerDown(e, p.id)}
-                        onPointerMove={handlePointerMove}
-                        onPointerUp={handlePointerUp}
-                        onPointerCancel={handlePointerCancel}
-                        className={`absolute cursor-grab active:cursor-grabbing transition-transform select-none ${
-                          isDraggingThis ? 'scale-105 z-50' : 'hover:scale-102 z-10'
-                        }`}
+                        className="absolute select-none pointer-events-none"
                         style={{
                           left: p.currentX,
                           top: p.currentY,
                           width: p.width,
                           height: p.height,
+                          zIndex: pieceZ,
                           touchAction: 'none',
                           filter: isDraggingThis
-                            ? 'drop-shadow(0 12px 20px rgba(0,0,0,0.35))'
-                            : 'drop-shadow(0 4px 8px rgba(0,0,0,0.22))',
+                            ? 'drop-shadow(0 14px 24px rgba(0,0,0,0.45))'
+                            : 'drop-shadow(0 3px 8px rgba(0,0,0,0.25))',
                         }}
                       >
-                        <svg width={p.width} height={p.height} className="pointer-events-none">
+                        <svg
+                          width={p.width}
+                          height={p.height}
+                          className="overflow-visible"
+                          style={{ pointerEvents: 'none' }}
+                        >
                           <defs>
                             <clipPath id={`tray-clip-${p.id}`}>
                               <path d={p.pathData} />
                             </clipPath>
                           </defs>
 
-                          {/* Image crop matching piece geometry */}
-                          <image
-                            href={imageUrl}
-                            x={p.imageX}
-                            y={p.imageY}
-                            width={boardSize}
-                            height={boardSize}
-                            clipPath={`url(#tray-clip-${p.id})`}
-                            preserveAspectRatio="none"
-                          />
+                          {/* Interactive piece group - only the piece shape captures clicks */}
+                          <g
+                            style={{
+                              pointerEvents: 'auto',
+                              cursor: isDraggingThis ? 'grabbing' : 'grab',
+                            }}
+                            onPointerDown={(e) => handlePointerDown(e, p.id)}
+                          >
+                            {/* Image crop matching piece geometry */}
+                            <image
+                              href={imageUrl}
+                              x={p.imageX}
+                              y={p.imageY}
+                              width={boardSize}
+                              height={boardSize}
+                              clipPath={`url(#tray-clip-${p.id})`}
+                              preserveAspectRatio="none"
+                            />
 
-                          {/* Subtle highlight border */}
-                          <path
-                            d={p.pathData}
-                            fill="none"
-                            stroke={isDraggingThis ? 'var(--accent-saffron-bright)' : 'rgba(255,255,255,0.7)'}
-                            strokeWidth={isDraggingThis ? 2.5 : 1.5}
-                          />
+                            {/* Crisp outline */}
+                            <path
+                              d={p.pathData}
+                              fill="transparent"
+                              stroke={isDraggingThis ? '#F59E0B' : 'rgba(255,255,255,0.75)'}
+                              strokeWidth={isDraggingThis ? 2.5 : 1.5}
+                            />
+                          </g>
                         </svg>
                       </div>
                     );
@@ -1006,6 +1066,14 @@ export const MananPage: React.FC<MananPageProps> = ({
                 alt={chapter.title || 'Target educational illustration'}
                 className="w-full h-auto max-h-[60vh] object-contain mx-auto"
               />
+            </div>
+
+            <div className="flex items-center justify-between text-xs px-1" style={{ color: 'var(--text-muted)' }}>
+              <span className="inline-flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400">
+                <Sparkles className="w-3 h-3" />
+                <span>Powered by Krea 2 Turbo</span>
+              </span>
+              <span>1024 × 1024 AI Illustration</span>
             </div>
 
             <p className="text-xs text-center leading-relaxed" style={{ color: 'var(--text-muted)' }}>

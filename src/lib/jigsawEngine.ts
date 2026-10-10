@@ -25,6 +25,7 @@ export interface JigsawPiece {
   targetY: number;
   currentX: number; // Current coordinates in the active play arena
   currentY: number;
+  zIndex?: number;  // Visual layering index
   isSnapped: boolean;
 }
 
@@ -229,22 +230,27 @@ export function generateJigsawPuzzle(
   // Position pieces across an accessible grid inside tray area
   const trayCols = Math.min(cols, 3);
   const trayRows = Math.ceil(pieces.length / trayCols);
-  const slotW = trayWidth / trayCols;
-  const slotH = trayHeight / trayRows;
+
+  const maxAvailableX = Math.max(0, trayWidth - pieceWidth);
+  const maxAvailableY = Math.max(0, trayHeight - pieceHeight);
+
+  const spanX = trayCols > 1 ? maxAvailableX / (trayCols - 1) : 0;
+  const spanY = trayRows > 1 ? maxAvailableY / (trayRows - 1) : 0;
 
   shuffledIndices.forEach((pieceIdx, slotIdx) => {
     const slotCol = slotIdx % trayCols;
     const slotRow = Math.floor(slotIdx / trayCols);
 
-    // Center piece in slot with small organic jitter (+/- 8px)
-    const jitterX = (Math.random() - 0.5) * 16;
-    const jitterY = (Math.random() - 0.5) * 16;
+    // Organic jitter within safe bounds (+/- 6px)
+    const jitterX = (Math.random() - 0.5) * 12;
+    const jitterY = (Math.random() - 0.5) * 12;
 
-    const startX = slotCol * slotW + (slotW - pieceWidth) / 2 + jitterX;
-    const startY = slotRow * slotH + (slotH - pieceHeight) / 2 + jitterY;
+    const startX = Math.max(4, Math.min(maxAvailableX, slotCol * spanX + jitterX));
+    const startY = Math.max(4, Math.min(maxAvailableY, slotRow * spanY + jitterY));
 
     pieces[pieceIdx].currentX = Math.round(startX);
     pieces[pieceIdx].currentY = Math.round(startY);
+    pieces[pieceIdx].zIndex = 20 + slotIdx;
   });
 
   return pieces;
