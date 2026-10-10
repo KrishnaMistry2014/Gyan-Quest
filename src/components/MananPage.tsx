@@ -24,7 +24,10 @@ import { playMindfulChime } from '../lib/chime';
 import {
   generateChapterImage,
   buildEducationalImagePrompt,
-  createThemedEducationalSvgUrl
+  MananImageError,
+  checkGradioSpaceStatus,
+  checkRenderBackendStatus,
+  GYANQUEST_IMAGE_API_URL,
 } from '../lib/mananApi';
 import {
   JigsawPiece,
@@ -65,6 +68,10 @@ export const MananPage: React.FC<MananPageProps> = ({
     'Crafting an educational illustration for your chapter...'
   );
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [errorDetails, setErrorDetails] = useState<MananImageError | null>(null);
+  const [spaceHealth, setSpaceHealth] = useState<{ isOnline: boolean; statusText: string } | null>(null);
+  const [backendHealth, setBackendHealth] = useState<{ isOnline: boolean; statusText: string } | null>(null);
+  const [isCheckingHealth, setIsCheckingHealth] = useState<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isAiGenerated, setIsAiGenerated] = useState<boolean>(true);
   const [pieces, setPieces] = useState<JigsawPiece[]>([]);
@@ -136,13 +143,15 @@ export const MananPage: React.FC<MananPageProps> = ({
     isGeneratingRef.current = true;
     setStatus('generating');
     setErrorMessage('');
-    setStatusMessage('Formulating educational prompt from chapter concepts...');
+    setErrorDetails(null);
+    setStatusMessage('Formulating educational prompt strictly from chapter concepts...');
 
+    let activePrompt = '';
     try {
-      const prompt = buildEducationalImagePrompt(chapter);
-      setStatusMessage('Generating illustration with Krea 2 Turbo...');
+      activePrompt = buildEducationalImagePrompt(chapter);
+      setStatusMessage('Requesting illustration from Krea 2 Turbo...');
 
-      const result = await generateChapterImage(prompt, controller.signal, chapter);
+      const result = await generateChapterImage(activePrompt, controller.signal, chapter);
       if (result.isAiGenerated) {
         sessionStorage.setItem(sessionCacheKey, result.imageUrl);
       }
@@ -150,20 +159,50 @@ export const MananPage: React.FC<MananPageProps> = ({
       setImageUrl(result.imageUrl);
       setIsAiGenerated(result.isAiGenerated);
       setStatus('ready');
+      setErrorDetails(null);
       initPuzzlePieces(result.imageUrl, gridSize, boardSize);
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
-      console.warn('Handling image generation fallback:', err);
-      // Ensure the student can still play with the conceptual chapter visual
-      const fallbackUrl = createThemedEducationalSvgUrl(chapter);
-      setImageUrl(fallbackUrl);
-      setIsAiGenerated(false);
-      setStatus('ready');
-      initPuzzlePieces(fallbackUrl, gridSize, boardSize);
+      console.warn('Image generation error:', err);
+      setStatus('error');
+
+      const details =
+        err instanceof MananImageError
+          ? err
+          : new MananImageError({
+              statusCode: err?.statusCode || 0,
+              errorCode: err?.errorCode || 'ERR_IMAGE_GENERATION',
+              message: err?.message || 'Failed to generate chapter image.',
+              backendMessage: err?.backendMessage || err?.message,
+              endpoint: GYANQUEST_IMAGE_API_URL,
+              promptSent: activePrompt,
+            });
+
+      setErrorDetails(details);
+      setErrorMessage(details.message);
+
+      // Perform background health check on the Hugging Face space and Render backend
+      checkGradioSpaceStatus().then(setSpaceHealth).catch(() => {});
+      checkRenderBackendStatus().then(setBackendHealth).catch(() => {});
     } finally {
       isGeneratingRef.current = false;
     }
   }, [chapter, gridSize, boardSize]);
+
+  // Manually re-check health of upstream services
+  const handleCheckHealth = async () => {
+    setIsCheckingHealth(true);
+    try {
+      const [space, render] = await Promise.all([
+        checkGradioSpaceStatus(),
+        checkRenderBackendStatus(),
+      ]);
+      setSpaceHealth(space);
+      setBackendHealth(render);
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  };
 
   // Initializes piece geometry and scattered tray placement
   const initPuzzlePieces = (
@@ -538,33 +577,181 @@ export const MananPage: React.FC<MananPageProps> = ({
           </p>
         </div>
       ) : status === 'error' ? (
-        /* Error & Retry View */
+        /* Transparent Error & Diagnostics View */
         <div
           id="manan-error-card"
-          className="rounded-3xl border p-8 sm:p-12 text-center shadow-xs flex flex-col items-center justify-center space-y-5 my-8 max-w-xl mx-auto"
+          className="rounded-3xl border p-6 sm:p-10 shadow-md flex flex-col space-y-6 my-6 max-w-2xl mx-auto"
           style={{
             backgroundColor: 'var(--bg-card)',
-            borderColor: '#EF4444',
+            borderColor: '#F87171',
           }}
         >
-          <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950/60 flex items-center justify-center text-red-600 dark:text-red-400">
-            <AlertCircle className="w-7 h-7" />
+          {/* Top Error Banner */}
+          <div className="flex items-start sm:items-center justify-between gap-4 flex-wrap border-b pb-4" style={{ borderColor: 'var(--border-warm)' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950/70 flex items-center justify-center text-red-600 dark:text-red-400 shrink-0">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-red-700 dark:text-red-400 font-serif-heading">
+                  Image Generation Service Error
+                </h3>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Failed to generate a custom chapter illustration from the image API
+                </p>
+              </div>
+            </div>
+
+            {/* Clear Error Code Badge */}
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-300">
+                {errorDetails?.statusCode ? `HTTP ${errorDetails.statusCode}` : 'NETWORK_ERROR'} • {errorDetails?.errorCode || 'ERR_API_FAILED'}
+              </span>
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <h3 className="text-lg font-bold text-red-600 dark:text-red-400">
-              Image Generation Unavailable
-            </h3>
-            <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              {errorMessage}
+          {/* Backend Response Detail */}
+          <div className="rounded-2xl p-4 border bg-stone-50 dark:bg-stone-900/50 space-y-2" style={{ borderColor: 'var(--border-warm)' }}>
+            <div className="flex items-center justify-between text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+              <span>Server Response Message</span>
+              <span className="font-mono text-[11px] text-red-600 dark:text-red-400">
+                {errorDetails?.statusCode ? `Status Code: ${errorDetails.statusCode}` : 'Connection Refused'}
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm font-mono text-red-700 dark:text-red-300 p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 break-all">
+              {errorDetails?.backendMessage || errorDetails?.message || 'No response returned by server'}
             </p>
+            <div className="text-[11px] text-stone-500 dark:text-stone-400 flex items-center justify-between pt-1 font-mono">
+              <span>Endpoint:</span>
+              <span>{errorDetails?.endpoint || GYANQUEST_IMAGE_API_URL}</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
+          {/* Live Space & API Diagnostic Checkers */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--accent-saffron-text)' }}>
+                Service Connectivity Diagnostics
+              </span>
+              <button
+                type="button"
+                onClick={handleCheckHealth}
+                disabled={isCheckingHealth}
+                className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3 h-3 ${isCheckingHealth ? 'animate-spin' : ''}`} />
+                <span>Re-check Services</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Upstream Hugging Face Space Card */}
+              <div
+                className="p-3.5 rounded-2xl border flex items-center justify-between gap-2 shadow-2xs"
+                style={{
+                  backgroundColor: 'var(--bg-main)',
+                  borderColor: 'var(--border-warm)',
+                }}
+              >
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                    Hugging Face Space
+                  </div>
+                  <div className="text-[11px] font-mono text-stone-500 dark:text-stone-400">
+                    krea-krea-2.hf.space
+                  </div>
+                </div>
+                <span
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                    spaceHealth?.isOnline !== false
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300'
+                  }`}
+                >
+                  {spaceHealth ? (spaceHealth.isOnline ? 'Online (Active)' : spaceHealth.statusText) : 'Checking...'}
+                </span>
+              </div>
+
+              {/* Render Image API Card */}
+              <div
+                className="p-3.5 rounded-2xl border flex items-center justify-between gap-2 shadow-2xs"
+                style={{
+                  backgroundColor: 'var(--bg-main)',
+                  borderColor: 'var(--border-warm)',
+                }}
+              >
+                <div className="space-y-0.5">
+                  <div className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                    Render Backend API
+                  </div>
+                  <div className="text-[11px] font-mono text-stone-500 dark:text-stone-400">
+                    gyanquest-image-api
+                  </div>
+                </div>
+                <span
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                    backendHealth?.isOnline
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                      : 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300'
+                  }`}
+                >
+                  {backendHealth ? (backendHealth.isOnline ? 'Online' : backendHealth.statusText) : 'Checking...'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Chapter Specific Prompt Detail */}
+          {errorDetails?.promptSent && (
+            <div className="p-3.5 rounded-2xl border bg-stone-50 dark:bg-stone-900/40 space-y-1.5" style={{ borderColor: 'var(--border-warm)' }}>
+              <div className="flex items-center justify-between text-xs font-bold" style={{ color: 'var(--accent-saffron-text)' }}>
+                <span>Chapter Educational Prompt Sent</span>
+                <span className="text-[11px] font-normal" style={{ color: 'var(--text-muted)' }}>
+                  Chapter: {chapter.title || 'Uploaded PDF'}
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed italic" style={{ color: 'var(--text-secondary)' }}>
+                "{errorDetails.promptSent}"
+              </p>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center justify-between gap-3 pt-2 flex-wrap border-t" style={{ borderColor: 'var(--border-warm)' }}>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onBackToShravan}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                style={{
+                  borderColor: 'var(--border-warm)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Shravan</span>
+              </button>
+
+              {onBackToVidya && (
+                <button
+                  type="button"
+                  onClick={onBackToVidya}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                  style={{
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Vidya Notes</span>
+                </button>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={() => loadPuzzleImage(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition-all hover:opacity-90 active:scale-95 cursor-pointer"
               style={{
                 backgroundColor: 'var(--accent-saffron)',
                 color: '#FFFFFF',
@@ -572,18 +759,6 @@ export const MananPage: React.FC<MananPageProps> = ({
             >
               <RefreshCw className="w-4 h-4" />
               <span>Retry Generation</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onBackToShravan}
-              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-              style={{
-                borderColor: 'var(--border-warm)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              Back to Shravan
             </button>
           </div>
         </div>
@@ -719,7 +894,7 @@ export const MananPage: React.FC<MananPageProps> = ({
           <div
             ref={arenaRef}
             id="jigsaw-play-arena"
-            className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 sm:gap-8 select-none"
+            className="relative isolate flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 sm:gap-8 select-none"
           >
             {/* --------------------------------------------------------
                LEFT: PUZZLE TARGET BOARD (Layer z-10)
