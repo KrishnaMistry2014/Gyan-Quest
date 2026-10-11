@@ -51,3 +51,31 @@ export interface UserProfile {
   isGuest: boolean;
   createdAt?: string;
 }
+
+export type CrosswordDifficulty = 'easy' | 'medium' | 'hard';
+
+export interface CrosswordWord {
+  id: string;
+  number: number;
+  direction: 'across' | 'down';
+  answer: string;
+  clue: string;
+  row: number;
+  col: number;
+}
+
+export interface CrosswordGlossaryItem {
+  term: string;
+  definition: string;
+}
+
+export interface CrosswordData {
+  id: string;
+  title: string;
+  theme: string;
+  summary: string;
+  gridSize: number;
+  words: CrosswordWord[];
+  glossary: CrosswordGlossaryItem[];
+}
+

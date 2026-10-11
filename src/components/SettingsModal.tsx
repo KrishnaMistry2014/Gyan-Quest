@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { useToast } from '../context/ToastContext';
 
 export const SettingsModal: React.FC = () => {
   const {
@@ -34,7 +33,6 @@ export const SettingsModal: React.FC = () => {
     updateSettings
   } = useAuth();
   const { isDark, toggleTheme } = useTheme();
-  const { showToast } = useToast();
 
   // Settings State with LocalStorage Persistence
   const [audioSpeed, setAudioSpeed] = useState<string>(() => {
@@ -132,11 +130,6 @@ export const SettingsModal: React.FC = () => {
   const handleClearCache = () => {
     try {
       localStorage.removeItem('gyanquest_cached_chapters');
-      showToast({
-        title: 'Cache Cleared',
-        message: 'Offline chapter cache has been emptied.',
-        type: 'info',
-      });
     } catch (_) {}
   };
 
@@ -184,12 +177,6 @@ export const SettingsModal: React.FC = () => {
         });
       } catch (_) {}
     }
-
-    showToast({
-      title: 'Defaults Restored',
-      message: 'All settings have been reset to default values.',
-      type: 'info',
-    });
   };
 
   /**

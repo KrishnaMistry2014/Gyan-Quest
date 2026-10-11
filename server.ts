@@ -729,6 +729,263 @@ Output format: Return ONLY a valid JSON object:
   }
 });
 
+// Sample Crosswords endpoint identical to gyanquest-crossword.ai.studio
+const DEFAULT_SAMPLE_CROSSWORDS = [
+  {
+    id: 'gita-6-17',
+    title: 'Bhagavad Gita: Dhyana Yoga (Verse 6.17)',
+    theme: 'Timeless wisdom on prioritization, balanced habits, eating, sleeping, and mindful work.',
+    summary: 'Exploration of Bhagavad Gita Chapter 6 Verse 6.17 emphasizing how regulated habits in eating, sleeping, recreation, and work eliminate stress and bring success.',
+    gridSize: 12,
+    words: [
+      { id: '1_down', number: 1, direction: 'down', answer: 'AHARA', clue: 'Diet and food consumption habits', row: 0, col: 7 },
+      { id: '2_across', number: 2, direction: 'across', answer: 'FOCUS', clue: 'Mental concentration without distractions', row: 1, col: 0 },
+      { id: '3_down', number: 3, direction: 'down', answer: 'SLEEP', clue: 'Rest and circadian rhythm required for cognitive clarity', row: 1, col: 4 },
+      { id: '4_across', number: 4, direction: 'across', answer: 'HABIT', clue: 'Behavior formed by repeating tasks consistently for 21 days', row: 1, col: 7 },
+      { id: '5_across', number: 5, direction: 'across', answer: 'ENERGY', clue: 'Vital fuel produced in the body through healthy routine', row: 3, col: 4 },
+      { id: '6_down', number: 6, direction: 'down', answer: 'YUKTA', clue: 'Regulated, balanced, and disciplined in habits', row: 3, col: 9 },
+      { id: '7_down', number: 7, direction: 'down', answer: 'WORK', clue: 'Discharging duties and studies with full devotion and focus', row: 6, col: 7 },
+      { id: '8_across', number: 8, direction: 'across', answer: 'YOGA', clue: 'Spiritual practice and disciplined union of mind and action', row: 7, col: 6 },
+    ],
+    glossary: [
+      { term: 'Yukta', definition: 'Regulated and balanced in habits of eating, sleeping, and work.' },
+      { term: 'Ahara', definition: 'Nutritious diet that fuels the body like clean fuel for a machine.' },
+      { term: 'Yoga', definition: 'Unified practice of discipline that diminishes pain and mental clutter.' },
+      { term: 'Habit', definition: 'Formed by repeating conscious positive routines for 21 days.' },
+    ],
+  },
+  {
+    id: 'student-success',
+    title: 'Student Success & Timeless Wisdom',
+    theme: 'Architecting your own success through balance, study habits, and mental rejuvenation.',
+    summary: 'A guide for students to manage homework, avoid burnout through healthy breaks, and cultivate gratitude and memory.',
+    gridSize: 11,
+    words: [
+      { id: '1_down', number: 1, direction: 'down', answer: 'BALANCE', clue: 'Equilibrium between effort, rest, and recreation', row: 0, col: 3 },
+      { id: '2_across', number: 2, direction: 'across', answer: 'HEALTH', clue: 'Physical and mental vitality maintained by proper habits', row: 1, col: 1 },
+      { id: '3_down', number: 3, direction: 'down', answer: 'WISDOM', clue: 'Timeless ancient knowledge guiding life decisions', row: 3, col: 5 },
+      { id: '4_across', number: 4, direction: 'across', answer: 'SUCCESS', clue: 'Achievement resulting from balanced discipline and focus', row: 5, col: 0 },
+      { id: '4_down', number: 4, direction: 'down', answer: 'STUDY', clue: 'Acquiring knowledge and completing academic duties', row: 5, col: 0 },
+    ],
+    glossary: [
+      { term: 'Balance', definition: 'Maintaining equilibrium between study duties and rest.' },
+      { term: 'Wisdom', definition: 'Ancient teachings applied to modern student life.' },
+      { term: 'Break', definition: 'Recreational hobbies that refresh the mind and prevent burnout.' },
+    ],
+  },
+];
+
+app.get('/api/sample-crosswords', (_req, res) => {
+  return res.json(DEFAULT_SAMPLE_CROSSWORDS);
+});
+
+app.post('/api/generate-crossword', async (req, res) => {
+  const { topic, summary, pdfData, fileName, difficulty } = req.body;
+  console.log(`[Crossword] Request received for topic: "${topic || ''}", file: "${fileName || ''}"`);
+
+  // Fast Gemini generation directly based on uploaded content
+  try {
+    let sourceContent = (summary && typeof summary === 'string' && summary.trim().length > 0) ? (topic ? (topic + '\n\n' + summary) : summary) : (topic || fileName || 'Indian Learning & Timeless Wisdom');
+    if (pdfData && typeof pdfData === 'string' && pdfData.length > 0) {
+      try {
+        const buf = Buffer.from(pdfData, 'base64');
+        const extracted = extractAsciiFromPdfBuffer(buf);
+        if (extracted.length > 50) {
+          sourceContent = extracted.slice(0, 10000);
+        }
+      } catch (_) {}
+    }
+
+    const promptText = `You are Guru AI, a master educational crossword generator.
+Create an authentic, valid intersecting crossword puzzle based on this content/topic:
+"${sourceContent.slice(0, 4000)}"
+Difficulty: "${difficulty || 'medium'}"
+
+Requirements:
+1. Provide between 6 and 12 words with concise educational clues based strictly on the uploaded text.
+2. Every answer must be single-word English, uppercase [A-Z], strictly 3 to 12 letters without punctuation.
+3. Compute valid grid coordinates (row, col) within gridSize (between 11 and 16) where intersecting words share matching letters.
+4. Direction must be either "across" or "down".
+5. Provide a title, theme, concise 2-sentence summary, and a key terms glossary.
+
+Return JSON in this exact structure:
+{
+  "title": "string",
+  "theme": "string",
+  "summary": "string",
+  "gridSize": 12,
+  "words": [
+    {
+      "id": "1_across",
+      "number": 1,
+      "direction": "across",
+      "answer": "ANSWER",
+      "clue": "Clear definition clue",
+      "row": 1,
+      "col": 2
+    }
+  ],
+  "glossary": [
+    {
+      "term": "Term",
+      "definition": "Definition"
+    }
+  ]
+}`;
+
+    const geminiRes = await callWithTimeout(
+      ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: promptText,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.3,
+        },
+      }),
+      15000,
+      'Gemini Crossword Generation'
+    );
+
+    const parsed = JSON.parse(geminiRes.text || '{}');
+    if (parsed && Array.isArray(parsed.words) && parsed.words.length > 0) {
+      return res.json(parsed);
+    }
+  } catch (geminiErr: any) {
+    console.error('[Crossword] Local generation failed:', geminiErr?.message);
+  }
+
+  // Fallback to sample puzzle
+  return res.json(DEFAULT_SAMPLE_CROSSWORDS[0]);
+});
+
+// Endpoint for Gyan Quest Wordle / Question Deck generation based strictly on uploaded chapter
+app.post('/api/generate-questions', async (req, res) => {
+  const { text, title } = req.body;
+  const sourceText = (text && typeof text === 'string' && text.trim().length > 0)
+    ? text
+    : (title || 'Ancient wisdom, philosophy, and mindful reflection');
+
+  console.log(`[Wordle Questions] Generating questions for chapter: "${title || 'Uploaded Document'}" (${sourceText.length} chars)`);
+
+  try {
+    const prompt = `You are Guru AI, creator of the Gyan Quest Wordle reflection game.
+Generate a deck of 6 to 8 educational Wordle questions based STRICTLY on this uploaded chapter/manuscript:
+"${sourceText.slice(0, 5000)}"
+
+Rules:
+1. Each answer MUST be a single English word between 3 and 10 letters, uppercase [A-Z], strictly found in or directly describing the provided chapter text.
+2. The question must state the letter count and ask a clear riddle or conceptual prompt. Example format: "What 5-letter term in this chapter represents...?"
+3. The hint must follow this pattern: "Directly relates to [context from chapter] — begins with [FIRST_LETTER] and ends with [LAST_LETTER] ([N] letters)."
+4. Lore should be a 1-sentence reflective insight based on the chapter teachings.
+
+Return JSON in this exact structure:
+{
+  "questions": [
+    {
+      "question": "What 5-letter vital principle in this chapter represents...?",
+      "answer": "PRANA",
+      "hint": "Directly relates to vital energy — begins with P and ends with A (5 letters).",
+      "lore": "One sentence philosophical takeaway."
+    }
+  ]
+}`;
+
+    const response = await callWithTimeout(
+      ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.3,
+        },
+      }),
+      15000,
+      'Gemini Wordle Question Generation'
+    );
+
+    const parsed = JSON.parse(response.text || '{}');
+    if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+      const validQuestions = parsed.questions.filter(
+        (q: any) =>
+          q &&
+          typeof q.question === 'string' &&
+          typeof q.answer === 'string' &&
+          q.answer.trim().replace(/[^A-Za-z]/g, '').length >= 3 &&
+          q.answer.trim().replace(/[^A-Za-z]/g, '').length <= 10
+      ).map((q: any) => ({
+        question: q.question,
+        answer: q.answer.trim().toUpperCase().replace(/[^A-Z]/g, ''),
+        hint: q.hint || `Begins with ${q.answer[0]} and ends with ${q.answer[q.answer.length - 1]} (${q.answer.length} letters).`,
+        lore: q.lore || 'A foundational concept from this chapter.',
+      }));
+
+      if (validQuestions.length > 0) {
+        return res.json({ questions: validQuestions });
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Wordle Questions] Gemini generation failed, using fallback:', err?.message);
+  }
+
+  // Fallback term extractor from chapter text
+  const words = sourceText.toUpperCase().replace(/[^A-Z\s]/g, ' ').split(/\s+/);
+  const stopwords = new Set([
+    'THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'ANY', 'CAN', 'HAD', 'HER', 'WAS', 'ONE', 'OUR',
+    'OUT', 'DAY', 'GET', 'HAS', 'HIM', 'HIS', 'HOW', 'MAN', 'NEW', 'NOW', 'OLD', 'SEE', 'TWO', 'WAY', 'WHO',
+    'BOY', 'DID', 'ITS', 'LET', 'PUT', 'SAY', 'SHE', 'TOO', 'USE', 'THAT', 'WITH', 'HAVE', 'THIS', 'FROM',
+    'THEY', 'WENT', 'WERE', 'WHAT', 'WHEN', 'SOME', 'THEM', 'THEN', 'LIKE', 'TIME', 'JUST', 'KNOW', 'TAKE',
+    'INTO', 'YEAR', 'YOUR', 'GOOD', 'COULD', 'WOULD', 'THERE', 'THESE', 'OTHER', 'AFTER', 'FIRST', 'ABOUT',
+    'THEIR', 'WHICH', 'WHERE', 'EVERY', 'BECAUSE', 'THROUGH', 'BEFORE', 'SHOULD', 'PEOPLE', 'LITTLE', 'WILL',
+    'OVER', 'SUCH', 'EVEN', 'MOST', 'MADE', 'ALSO', 'BACK', 'WELL', 'MUCH', 'ONLY', 'VERY', 'SOME'
+  ]);
+  const candidates = [...new Set(words.filter(w => w.length >= 3 && w.length <= 10 && !stopwords.has(w)))];
+  const templates = [
+    (len: number) => `What ${len}-letter core concept highlighted in this chapter represents a foundational principle?`,
+    (len: number) => `According to this chapter, which ${len}-letter keyword signifies a key insight or truth?`,
+    (len: number) => `What ${len}-letter term in the passage guides the reader toward greater understanding?`,
+    (len: number) => `Which ${len}-letter essential term is emphasized as central in this text?`,
+  ];
+
+  let fallbackQuestions: any[] = [];
+  if (candidates.length >= 2) {
+    const selected = candidates.slice(0, 6);
+    fallbackQuestions = selected.map((word: string, idx: number) => {
+      const len = word.length;
+      return {
+        question: templates[idx % templates.length](len),
+        answer: word,
+        hint: `Directly related to chapter — begins with '${word[0]}' and ends with '${word[len - 1]}' (${len} letters).`,
+        lore: `A key concept identified within ${title || 'this chapter'}.`
+      };
+    });
+  }
+
+  if (fallbackQuestions.length === 0) {
+    fallbackQuestions = [
+      {
+        question: "What 5-letter vital breath is celebrated in ancient scripture as the invisible life current?",
+        answer: "PRANA",
+        hint: "Directly relates to breath and vital life energy — begins with P and ends with A (5 letters).",
+        lore: "In Yogic philosophy, prana animates all living beings."
+      },
+      {
+        question: "What 6-letter universal law of cosmic duty and righteousness sustains the entire cosmos?",
+        answer: "DHARMA",
+        hint: "Directly relates to universal duty — begins with D and ends with A (6 letters).",
+        lore: "Dharma upholds cosmic harmony and right action."
+      },
+      {
+        question: "What 5-letter universal law of action teaches that every intention shapes destiny?",
+        answer: "KARMA",
+        hint: "Directly relates to action and consequence — begins with K and ends with A (5 letters).",
+        lore: "Selfless action without attachment yields liberation."
+      }
+    ];
+  }
+
+  return res.json({ questions: fallbackQuestions });
+});
+
 // Global Express error handler to guarantee all middleware errors return JSON, never HTML
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[API Middleware Error]:', err?.message || err);

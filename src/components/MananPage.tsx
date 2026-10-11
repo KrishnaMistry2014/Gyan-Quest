@@ -13,9 +13,12 @@ import {
   BookOpen,
   Headphones,
   Image as ImageIcon,
-  X
+  X,
+  LayoutGrid
 } from 'lucide-react';
 import { SavedChapter } from '../lib/chapters';
+import { GyanQuestCrossword } from './GyanQuestCrossword';
+import { GyanQuestWordle } from './GyanQuestWordle';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { playMindfulChime } from '../lib/chime';
@@ -50,6 +53,9 @@ export const MananPage: React.FC<MananPageProps> = ({
 }) => {
   const { isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
+
+  // Active contemplation activity: Jigsaw puzzle reflection, Wordle Quest, or AI Crossword
+  const [activeActivity, setActiveActivity] = useState<'jigsaw' | 'wordle' | 'crossword'>('jigsaw');
 
   // Difficulty configuration (default 3x3 = 9 genuine jigsaw pieces)
   const [gridSize, setGridSize] = useState<3 | 4>(3);
@@ -521,8 +527,98 @@ export const MananPage: React.FC<MananPageProps> = ({
         </div>
       </header>
 
-      {/* Main Stage Content */}
-      {status === 'generating' ? (
+      {/* Activity Mode Selector: Jigsaw Reflection vs Wordle Quest vs Crossword Quest */}
+      <div className="flex items-center justify-between gap-4 flex-wrap border-b pb-4 pt-1" style={{ borderColor: 'var(--border-warm)' }}>
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl border shadow-2xs" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-warm)' }}>
+          <button
+            type="button"
+            onClick={() => setActiveActivity('jigsaw')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeActivity === 'jigsaw'
+                ? 'shadow-xs'
+                : 'opacity-70 hover:opacity-100'
+            }`}
+            style={{
+              backgroundColor: activeActivity === 'jigsaw' ? 'var(--accent-saffron)' : 'transparent',
+              color: activeActivity === 'jigsaw' ? '#FFFFFF' : 'var(--text-primary)',
+            }}
+          >
+            <Brain className="w-4 h-4" />
+            <span>Jigsaw Reflection</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveActivity('wordle')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeActivity === 'wordle'
+                ? 'shadow-xs'
+                : 'opacity-70 hover:opacity-100'
+            }`}
+            style={{
+              backgroundColor: activeActivity === 'wordle' ? 'var(--accent-saffron)' : 'transparent',
+              color: activeActivity === 'wordle' ? '#FFFFFF' : 'var(--text-primary)',
+            }}
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span>Wordle Quest</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
+              New
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveActivity('crossword')}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeActivity === 'crossword'
+                ? 'shadow-xs'
+                : 'opacity-70 hover:opacity-100'
+            }`}
+            style={{
+              backgroundColor: activeActivity === 'crossword' ? 'var(--accent-saffron)' : 'transparent',
+              color: activeActivity === 'crossword' ? '#FFFFFF' : 'var(--text-primary)',
+            }}
+          >
+            <LayoutGrid className="w-4 h-4" />
+            <span>Crossword Quest</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
+              AI
+            </span>
+          </button>
+        </div>
+
+        <div className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+          {activeActivity === 'jigsaw'
+            ? 'Assemble the concept illustration to internalize chapter teachings'
+            : activeActivity === 'wordle'
+            ? 'Inscribe 3 to 10 letter chapter answers against the sacred 30s countdown timer'
+            : 'Solve the interactive AI crossword puzzle derived directly from this chapter'}
+        </div>
+      </div>
+
+      {activeActivity === 'crossword' ? (
+        <div className="my-6">
+          <GyanQuestCrossword
+            initialChapter={chapter}
+            onExit={() => setActiveActivity('jigsaw')}
+          />
+        </div>
+      ) : activeActivity === 'wordle' ? (
+        <div className="my-6">
+          <GyanQuestWordle
+            chapter={chapter}
+            onExit={() => setActiveActivity('jigsaw')}
+            onCompleteChapter={() => {
+              if (!isStreakActiveToday && recordStreakActivity) {
+                recordStreakActivity('manan').catch(() => {});
+              }
+            }}
+          />
+        </div>
+      ) : (
+        /* Main Stage Content: Jigsaw */
+        status === 'generating' ? (
         /* Loading & Image Generation View */
         <div
           id="manan-loading-card"
@@ -1171,7 +1267,7 @@ export const MananPage: React.FC<MananPageProps> = ({
             </div>
           )}
         </div>
-      )}
+      ))}
 
       {/* Target Image Reference Modal */}
       {showPreviewModal && imageUrl && (

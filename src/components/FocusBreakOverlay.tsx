@@ -3,7 +3,7 @@ import { Footprints, Sparkles, Clock, EyeOff, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { playMindfulChime } from '../lib/chime';
 
-const BREAK_DURATION_SECONDS = 180; // 3 minutes
+const BREAK_DURATION_SECONDS = 300; // 5 minutes (300 seconds)
 
 /**
  * Checks if a break countdown was in progress before reload.
@@ -259,11 +259,11 @@ export const FocusBreakOverlay: React.FC = () => {
           </h2>
 
           <p className="text-xs sm:text-sm text-stone-300 leading-relaxed max-w-md mx-auto">
-            Your focus study session has elapsed. Ongoing narration and learning tasks have been paused. Please step away from your screen and take a <strong>full 3-minute break</strong> to rest your eyes and stretch your body.
+            Your focus study session has elapsed. Ongoing narration and learning tasks have been paused. Please step away from your screen and take a <strong>full 5-minute break</strong> to rest your eyes and stretch your body.
           </p>
         </div>
 
-        {/* 3-Minute Countdown Display */}
+        {/* 5-Minute Countdown Display */}
         <div className="w-full py-4 px-6 rounded-2xl bg-black/50 border border-stone-800 space-y-3">
           <div className="flex items-center justify-center gap-2 text-stone-400 text-xs font-semibold uppercase tracking-wider">
             <Clock className="w-4 h-4 text-amber-400" />
@@ -303,7 +303,7 @@ export const FocusBreakOverlay: React.FC = () => {
         <div className="pt-2 w-full">
           <div className="flex items-center justify-center gap-2 text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 rounded-2xl">
             <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Mandatory 3-min break in progress • Learning unlocks automatically at 00:00</span>
+            <span>Mandatory 5-min break in progress • Learning unlocks automatically at 00:00</span>
           </div>
         </div>
       </div>

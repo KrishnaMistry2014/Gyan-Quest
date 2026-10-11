@@ -207,7 +207,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return (
       <div
         key={id}
-        className="relative group w-full"
+        className={`relative group w-full flex items-center rounded-xl transition-all font-semibold text-xs sm:text-sm select-none ${
+          isCollapsed
+            ? 'justify-center p-2.5'
+            : 'justify-between px-3.5 py-2.5 gap-3'
+        } ${
+          isActive
+            ? 'shadow-2xs border font-bold'
+            : 'hover:bg-amber-500/10'
+        }`}
+        style={{
+          backgroundColor: isActive
+            ? 'var(--accent-saffron-light)'
+            : 'transparent',
+          borderColor: isActive
+            ? 'var(--accent-saffron)'
+            : 'transparent',
+          color: isActive
+            ? 'var(--accent-saffron-text)'
+            : 'var(--text-primary)',
+        }}
         onMouseEnter={() => setHoveredItemId(id)}
         onMouseLeave={() => setHoveredItemId(null)}
       >
@@ -217,55 +236,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => handleItemClick(id)}
           aria-current={isActive ? 'page' : undefined}
           aria-label={label}
-          className={`w-full flex items-center rounded-xl transition-all font-semibold text-xs sm:text-sm cursor-pointer select-none text-left focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none ${
-            isCollapsed
-              ? 'justify-center p-2.5'
-              : 'justify-between px-3.5 py-2.5 gap-3'
-          } ${
-            isActive
-              ? 'shadow-2xs border font-bold'
-              : 'hover:bg-amber-500/10 active:scale-98'
+          className={`flex items-center min-w-0 text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none rounded-lg active:scale-98 transition-transform ${
+            isCollapsed ? 'justify-center w-full' : 'gap-3 flex-1'
           }`}
-          style={{
-            backgroundColor: isActive
-              ? 'var(--accent-saffron-light)'
-              : 'transparent',
-            borderColor: isActive
-              ? 'var(--accent-saffron)'
-              : 'transparent',
-            color: isActive
-              ? 'var(--accent-saffron-text)'
-              : 'var(--text-primary)',
-          }}
         >
-          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3 min-w-0 flex-1'}`}>
-            <div
-              className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                isActive
-                  ? 'text-amber-700 dark:text-amber-400'
-                  : 'text-stone-600 dark:text-stone-300 group-hover:text-amber-600'
-              }`}
-              style={{
-                backgroundColor: isActive ? 'var(--bg-main)' : 'var(--bg-icon)',
-              }}
-            >
-              <Icon className="w-4 h-4" />
-            </div>
-
-            {!isCollapsed && (
-              <span className="truncate leading-tight block">
-                {label}
-              </span>
-            )}
+          <div
+            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+              isActive
+                ? 'text-amber-700 dark:text-amber-400'
+                : 'text-stone-600 dark:text-stone-300 group-hover:text-amber-600'
+            }`}
+            style={{
+              backgroundColor: isActive ? 'var(--bg-main)' : 'var(--bg-icon)',
+            }}
+          >
+            <Icon className="w-4 h-4" />
           </div>
 
           {!isCollapsed && (
-            <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => quickAction && e.stopPropagation()}>
-              {badge}
-              {quickAction}
-            </div>
+            <span className="truncate leading-tight block">
+              {label}
+            </span>
           )}
         </button>
+
+        {!isCollapsed && (badge || quickAction) && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            {badge}
+            {quickAction}
+          </div>
+        )}
 
         {/* Floating Tooltip in Collapsed Desktop Mode */}
         {isCollapsed && hoveredItemId === id && (
