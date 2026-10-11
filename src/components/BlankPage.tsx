@@ -71,17 +71,42 @@ const extractVidyaTitle = (text: string, fallback: string): string => {
 const extractTextFromBuffer = (buffer: ArrayBuffer): string => {
   try {
     const bytes = new Uint8Array(buffer);
-    const len = Math.min(bytes.length, 2 * 1024 * 1024);
+    const len = Math.min(bytes.length, 3 * 1024 * 1024);
     const decoder = new TextDecoder('latin1');
     const str = decoder.decode(bytes.subarray(0, len));
-    const matches = str.match(/\(([^()]{3,})\)\s*(?:Tj|TJ|\'|\")/g) || [];
     const parts: string[] = [];
-    for (const m of matches) {
-      const cleaned = m.replace(/^\(/, '').replace(/\)\s*(?:Tj|TJ|\'|\")$/, '').trim();
+
+    // 1. Match Tj strings: (text) Tj
+    const tjMatches = str.match(/\(([^()]{2,})\)\s*(?:Tj|\'|\")/g) || [];
+    for (const m of tjMatches) {
+      const cleaned = m.replace(/^\(/, '').replace(/\)\s*(?:Tj|\'|\")$/, '').trim();
       if (cleaned.length > 2 && !/[^\x20-\x7E\s]/.test(cleaned)) {
         parts.push(cleaned);
       }
     }
+
+    // 2. Match TJ array strings: [(text) 20 (more text)] TJ
+    const tjArrayMatches = str.match(/\[([^[\]]{4,})\]\s*TJ/g) || [];
+    for (const m of tjArrayMatches) {
+      const innerTexts = m.match(/\(([^()]+)\)/g) || [];
+      const combined = innerTexts.map(t => t.slice(1, -1)).join(' ').trim();
+      if (combined.length > 2 && !/[^\x20-\x7E\s]/.test(combined)) {
+        parts.push(combined);
+      }
+    }
+
+    // 3. Match hex strings in TJ or Tj: <48656C6C6F> Tj
+    const hexMatches = str.match(/<([0-9A-Fa-f]{6,})>\s*(?:Tj|TJ)/g) || [];
+    for (const m of hexMatches) {
+      const hex = m.replace(/^</, '').replace(/>\s*(?:Tj|TJ)$/, '');
+      let decoded = '';
+      for (let i = 0; i < hex.length; i += 2) {
+        const code = parseInt(hex.substr(i, 2), 16);
+        if (code >= 32 && code <= 126) decoded += String.fromCharCode(code);
+      }
+      if (decoded.length > 2) parts.push(decoded);
+    }
+
     return parts.join(' ').replace(/\s+/g, ' ').slice(0, 60000).trim();
   } catch {
     return '';
@@ -277,7 +302,20 @@ export const BlankPage: React.FC<BlankPageProps> = ({
           console.warn('Background chapter cloud save notice:', saveErr);
         }
       } else {
-        const errMsg = data?.error || (response.status !== 200 ? `Extraction failed (HTTP ${response.status})` : 'Could not generate chapter summary from this PDF.');
+        let errMsg = data?.error;
+        if (!errMsg) {
+          if (response.status === 413) {
+            errMsg = 'This PDF file exceeds the maximum allowed upload size. Please select a chapter or handout under 35MB.';
+          } else if (response.status === 422) {
+            errMsg = 'Could not extract readable text or diagrams from this PDF. Please ensure the document is a readable chapter PDF.';
+          } else if (response.status === 504 || response.status === 408) {
+            errMsg = 'Processing timed out. Please try again or use a smaller chapter section.';
+          } else if (!contentType.includes('application/json')) {
+            errMsg = 'Unable to reach the document analysis service. Please try again in a few moments.';
+          } else {
+            errMsg = response.status !== 200 ? `Extraction failed (HTTP ${response.status}). Please try again.` : 'Could not generate chapter summary from this PDF.';
+          }
+        }
         setStatus('error');
         setErrorMessage(errMsg);
       }
@@ -288,7 +326,10 @@ export const BlankPage: React.FC<BlankPageProps> = ({
         return;
       }
       setStatus('error');
-      setErrorMessage(err?.message || 'We were unable to process this file. Please make sure it is a valid PDF and try again.');
+      const networkOrOther = err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')
+        ? 'Could not connect to the document analysis service. Please verify your connection and try again.'
+        : (err?.message || 'We were unable to process this file. Please make sure it is a valid PDF and try again.');
+      setErrorMessage(networkOrOther);
     }
   };
 
@@ -650,13 +691,31 @@ export const BlankPage: React.FC<BlankPageProps> = ({
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+            {activeFile && (
+              <button
+                type="button"
+                id="btn-retry-extraction"
+                onClick={() => startExtraction(activeFile)}
+                className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--accent-saffron)',
+                  color: '#FFFFFF',
+                }}
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Try Again</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all hover:opacity-90 cursor-pointer"
+              className={`w-full ${activeFile ? 'sm:flex-1' : 'sm:flex-1'} inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border transition-all hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer shadow-2xs`}
               style={{
-                backgroundColor: 'var(--accent-saffron)',
-                color: '#FFFFFF',
+                borderColor: 'var(--border-warm)',
+                color: 'var(--text-primary)',
+                backgroundColor: activeFile ? 'var(--bg-main)' : 'var(--accent-saffron)',
+                ...(activeFile ? {} : { color: '#FFFFFF', borderColor: 'var(--accent-saffron)' }),
               }}
             >
               <UploadCloud className="w-4 h-4" />

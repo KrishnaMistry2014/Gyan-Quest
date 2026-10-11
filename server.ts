@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
+import { PDFParse } from 'pdf-parse';
 
 dotenv.config();
 
@@ -23,6 +24,11 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
+  httpOptions: {
+    headers: {
+      'User-Agent': 'aistudio-build',
+    },
+  },
 });
 
 function callWithTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -105,12 +111,40 @@ app.post('/api/extract-pdf', async (req, res) => {
     };
 
     // =========================================================================
-    // STEP 1: Text Extractor (OCR) & Diagram Explainer (Gemini Flash-Lite 3.1 / 3.5)
+    // STEP 1: Text Extraction (PDFParse -> Client Text -> Multimodal Gemini OCR)
     // =========================================================================
     let extractedDetails = '';
 
+    // Step 1A: Extract embedded text with PDFParse directly from the PDF buffer
     if (pdfBase64 && pdfBase64.length > 0) {
-      const ocrPrompt = `You are an expert document OCR engine and scientific diagram interpreter.
+      try {
+        const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+        if (pdfBuffer.length > 0) {
+          console.log(`[Vidya Step 1A] Extracting text with PDFParse from ${pdfBuffer.length} bytes...`);
+          const parser = new PDFParse({ data: pdfBuffer });
+          const parseResult = await parser.getText();
+          if (parseResult?.text && parseResult.text.trim().length > 40) {
+            extractedDetails = parseResult.text.trim();
+            console.log(`[Vidya Step 1A] PDFParse successfully extracted ${extractedDetails.length} characters from ${parseResult.total || 1} pages.`);
+          }
+        }
+      } catch (parseErr: any) {
+        console.warn('[Vidya Step 1A] PDFParse notice:', parseErr?.message || parseErr);
+      }
+    }
+
+    // Step 1B: If PDFParse yielded insufficient text, check client-extracted text
+    if (!extractedDetails || extractedDetails.length < 50) {
+      if (extractedText && typeof extractedText === 'string' && extractedText.trim().length > 40) {
+        extractedDetails = extractedText.trim();
+        console.log(`[Vidya Step 1B] Used client extracted text (${extractedDetails.length} characters).`);
+      }
+    }
+
+    // Step 1C: If still insufficient text (scanned PDF or visual-only), run Gemini multimodal OCR
+    if ((!extractedDetails || extractedDetails.length < 50) && pdfBase64 && pdfBase64.length > 0) {
+      if (pdfBase64.length <= 25 * 1024 * 1024) {
+        const ocrPrompt = `You are an expert document OCR engine and scientific diagram interpreter.
 Analyze this textbook chapter PDF in complete, exhaustive detail.
 Perform two essential tasks across all pages:
 1. COMPREHENSIVE TEXT AND CONTENT EXTRACTION:
@@ -122,35 +156,10 @@ Perform two essential tasks across all pages:
      * Describe all visual elements (components, labeled parts, arrows, directions, states of matter, apparatus).
      * Explain the scientific mechanism, process, or conceptual principle depicted in the visual and what it demonstrates.`;
 
-      // Try gemini-3.1-flash-lite for OCR and diagram analysis
-      try {
-        console.log(`[Vidya Step 1] Extracting text & diagram meanings with Gemini 3.1 Flash-Lite...`);
-        const ocrPromise = ai.models.generateContent({
-          model: 'gemini-3.1-flash-lite',
-          contents: [
-            {
-              inlineData: {
-                mimeType: 'application/pdf',
-                data: pdfBase64,
-              },
-            },
-            ocrPrompt,
-          ],
-          config: {
-            maxOutputTokens: 8192,
-          },
-        });
-        const ocrResponse = await callWithTimeout(ocrPromise, 45000, 'Gemini 3.1 Flash-Lite OCR');
-        if (ocrResponse.text && ocrResponse.text.trim().length > 40) {
-          extractedDetails = ocrResponse.text.trim();
-          console.log(`[Vidya Step 1] OCR extraction successful (${extractedDetails.length} characters)`);
-        }
-      } catch (ocrErr: any) {
-        console.warn('[Vidya Step 1] Gemini 3.1 Flash-Lite OCR notice:', ocrErr?.message || ocrErr);
-        // Fallback to Gemini 3.5 Flash-Lite for OCR
+        // Try gemini-3.5-flash-lite for multimodal OCR
         try {
-          console.log(`[Vidya Step 1] Retrying OCR with Gemini 3.5 Flash-Lite...`);
-          const ocr35Promise = ai.models.generateContent({
+          console.log(`[Vidya Step 1C] Extracting text & diagram meanings with Gemini 3.5 Flash-Lite...`);
+          const ocrPromise = ai.models.generateContent({
             model: 'gemini-3.5-flash-lite',
             contents: [
               {
@@ -165,18 +174,44 @@ Perform two essential tasks across all pages:
               maxOutputTokens: 8192,
             },
           });
-          const ocr35Response = await callWithTimeout(ocr35Promise, 45000, 'Gemini 3.5 Flash-Lite OCR');
-          if (ocr35Response.text && ocr35Response.text.trim().length > 40) {
-            extractedDetails = ocr35Response.text.trim();
-            console.log(`[Vidya Step 1] Gemini 3.5 Flash-Lite OCR successful (${extractedDetails.length} characters)`);
+          const ocrResponse = await callWithTimeout(ocrPromise, 45000, 'Gemini 3.5 Flash-Lite OCR');
+          if (ocrResponse.text && ocrResponse.text.trim().length > 40) {
+            extractedDetails = ocrResponse.text.trim();
+            console.log(`[Vidya Step 1C] Gemini 3.5 Flash-Lite OCR successful (${extractedDetails.length} characters)`);
           }
-        } catch (ocr35Err: any) {
-          console.warn('[Vidya Step 1] Gemini 3.5 Flash-Lite OCR notice:', ocr35Err?.message || ocr35Err);
+        } catch (ocrErr: any) {
+          console.warn('[Vidya Step 1C] Gemini 3.5 Flash-Lite OCR notice:', ocrErr?.message || ocrErr);
+          // Fallback to Gemini 3.1 Flash-Lite
+          try {
+            console.log(`[Vidya Step 1C Fallback] Retrying OCR with Gemini 3.1 Flash-Lite...`);
+            const ocrLitePromise = ai.models.generateContent({
+              model: 'gemini-3.1-flash-lite',
+              contents: [
+                {
+                  inlineData: {
+                    mimeType: 'application/pdf',
+                    data: pdfBase64,
+                  },
+                },
+                ocrPrompt,
+              ],
+              config: {
+                maxOutputTokens: 8192,
+              },
+            });
+            const ocrLiteResponse = await callWithTimeout(ocrLitePromise, 45000, 'Gemini 3.1 Flash-Lite OCR');
+            if (ocrLiteResponse.text && ocrLiteResponse.text.trim().length > 40) {
+              extractedDetails = ocrLiteResponse.text.trim();
+              console.log(`[Vidya Step 1C Fallback] Gemini 3.1 Flash-Lite OCR successful (${extractedDetails.length} characters)`);
+            }
+          } catch (ocrLiteErr: any) {
+            console.warn('[Vidya Step 1C Fallback] Gemini 3.1 Flash-Lite OCR notice:', ocrLiteErr?.message || ocrLiteErr);
+          }
         }
       }
     }
 
-    // If multimodal OCR was unavailable or failed, merge buffer ASCII extraction with client extractedText
+    // Step 1D: Fallback to ASCII stream extraction from buffer if still empty
     if (!extractedDetails || extractedDetails.length < 50) {
       if (pdfBase64 && pdfBase64.length > 0) {
         try {
@@ -186,9 +221,6 @@ Perform two essential tasks across all pages:
             extractedDetails = asciiText;
           }
         } catch (_) {}
-      }
-      if (extractedText && typeof extractedText === 'string' && extractedText.trim().length > (extractedDetails.length || 0)) {
-        extractedDetails = extractedText.trim();
       }
     }
 
@@ -420,47 +452,77 @@ app.post('/api/generate-audio', async (req, res) => {
 
     const totalWordCount = text.split(/\s+/).filter(Boolean).length;
     const chunks = chunkTextByWords(text);
-    console.log(`[Shravan TTS] Starting audio generation strictly with Gemini 3.1 Flash TTS (gemini-3.1-flash-tts-preview)... total words: ${totalWordCount}, chunks: ${chunks.length}`);
+    console.log(`[Shravan TTS] Starting audio generation with Gemini 3.5 Flash-Lite... total words: ${totalWordCount}, chunks: ${chunks.length}`);
 
     const pcmBuffers: Buffer[] = [];
 
     for (let i = 0; i < chunks.length; i++) {
       const chunkText = chunks[i];
       const chunkWordCount = chunkText.split(/\s+/).filter(Boolean).length;
-      console.log(`[Shravan TTS] Synthesizing chunk ${i + 1}/${chunks.length} (~${chunkWordCount} words) with Gemini 3.1 Flash TTS (65s timeout)...`);
+      console.log(`[Shravan TTS] Synthesizing chunk ${i + 1}/${chunks.length} (~${chunkWordCount} words) with Gemini 3.5 Flash-Lite (65s timeout)...`);
 
-      // Strictly Gemini 3.1 Flash TTS ONLY with an Indian accent Female ~30 Years old voice
-      const ttsPromise = ai.models.generateContent({
-        model: 'gemini-3.1-flash-tts-preview',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: `You are an Indian female educator, approximately 30 years old, speaking with a warm, natural, and clear Indian accent at an educational pace. Please narrate the following chapter summary clearly and engagingly for students:\n\n${chunkText}`,
-                speechMetadata: {
-                  style: 'Indian accent female ~30 years old, warm, clear, educational pace',
+      // Gemini 3.5 Flash-Lite with an Indian accent Female ~30 Years old voice
+      let rawBase64Audio = '';
+      try {
+        const ttsPromise = ai.models.generateContent({
+          model: 'gemini-3.5-flash-lite',
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: `You are an Indian female educator, approximately 30 years old, speaking with a warm, natural, and clear Indian accent at an educational pace. Please narrate the following chapter summary clearly and engagingly for students:\n\n${chunkText}`,
+                  speechMetadata: {
+                    style: 'Indian accent female ~30 years old, warm, clear, educational pace',
+                  },
                 },
+              ],
+            } as any,
+          ],
+          config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: 'Kore' },
               },
-            ],
-          } as any,
-        ],
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Kore' },
             },
           },
-        },
-      });
+        });
 
-      // Strict 65s timeout per chunk
-      const ttsResponse = await callWithTimeout(ttsPromise, 65000, `Gemini 3.1 Flash TTS (chunk ${i + 1} of ${chunks.length})`);
-      const rawBase64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        const ttsResponse = await callWithTimeout(ttsPromise, 65000, `Gemini 3.5 Flash-Lite TTS (chunk ${i + 1} of ${chunks.length})`);
+        rawBase64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
+      } catch (ttsErr: any) {
+        console.warn(`[Shravan TTS] Gemini 3.5 Flash-Lite notice for chunk ${i + 1}, retrying with Gemini 3.1 Flash-Lite:`, ttsErr?.message || ttsErr);
+        const ttsLitePromise = ai.models.generateContent({
+          model: 'gemini-3.1-flash-lite',
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: `You are an Indian female educator, approximately 30 years old, speaking with a warm, natural, and clear Indian accent at an educational pace. Please narrate the following chapter summary clearly and engagingly for students:\n\n${chunkText}`,
+                  speechMetadata: {
+                    style: 'Indian accent female ~30 years old, warm, clear, educational pace',
+                  },
+                },
+              ],
+            } as any,
+          ],
+          config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: 'Kore' },
+              },
+            },
+          },
+        });
+        const ttsLiteResponse = await callWithTimeout(ttsLitePromise, 65000, `Gemini 3.1 Flash-Lite TTS (chunk ${i + 1} of ${chunks.length})`);
+        rawBase64Audio = ttsLiteResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
+      }
 
       if (!rawBase64Audio) {
-        throw new Error(`Gemini 3.1 Flash TTS did not return audio data for chunk ${i + 1} of ${chunks.length}.`);
+        throw new Error(`Gemini Flash-Lite TTS did not return audio data for chunk ${i + 1} of ${chunks.length}.`);
       }
 
       const rawChunkBuffer = Buffer.from(rawBase64Audio, 'base64');
@@ -677,7 +739,7 @@ Output format: Return ONLY a valid JSON object:
     try {
       const response = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-3.1-flash-lite',
+          model: 'gemini-3.5-flash-lite',
           contents: promptInstruction,
           config: {
             responseMimeType: 'application/json',
@@ -686,19 +748,19 @@ Output format: Return ONLY a valid JSON object:
           },
         }),
         12000,
-        'Gemini 3.1 Flash-Lite Prompt Synthesis'
+        'Gemini 3.5 Flash-Lite Prompt Synthesis'
       );
       const parsed = JSON.parse(response.text || '{}');
       if (parsed.prompt && typeof parsed.prompt === 'string') {
         generatedPrompt = parsed.prompt.trim();
       }
     } catch (err: any) {
-      console.warn('[Gemini 3.1 Prompt Synthesis notice]:', err?.message || err);
-      // Fallback to gemini-3.8-flash
+      console.warn('[Gemini 3.5 Prompt Synthesis notice]:', err?.message || err);
+      // Fallback to gemini-3.1-flash-lite
       try {
         const fallbackRes = await callWithTimeout(
           ai.models.generateContent({
-            model: 'gemini-3.8-flash',
+            model: 'gemini-3.1-flash-lite',
             contents: promptInstruction,
             config: {
               responseMimeType: 'application/json',
@@ -707,14 +769,14 @@ Output format: Return ONLY a valid JSON object:
             },
           }),
           12000,
-          'Gemini 3.8 Flash Prompt Synthesis'
+          'Gemini 3.1 Flash-Lite Prompt Synthesis'
         );
         const parsed = JSON.parse(fallbackRes.text || '{}');
         if (parsed.prompt && typeof parsed.prompt === 'string') {
           generatedPrompt = parsed.prompt.trim();
         }
       } catch (fbErr: any) {
-        console.warn('[Gemini 3.8 Prompt Synthesis notice]:', fbErr?.message || fbErr);
+        console.warn('[Gemini 3.1 Prompt Synthesis notice]:', fbErr?.message || fbErr);
       }
     }
 
@@ -833,22 +895,44 @@ Return JSON in this exact structure:
   ]
 }`;
 
-    const geminiRes = await callWithTimeout(
-      ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: promptText,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.3,
-        },
-      }),
-      15000,
-      'Gemini Crossword Generation'
-    );
+    let parsedCrossword: any = null;
+    try {
+      const geminiRes = await callWithTimeout(
+        ai.models.generateContent({
+          model: 'gemini-3.5-flash-lite',
+          contents: promptText,
+          config: {
+            responseMimeType: 'application/json',
+            temperature: 0.3,
+          },
+        }),
+        15000,
+        'Gemini 3.5 Flash-Lite Crossword Generation'
+      );
+      parsedCrossword = JSON.parse(geminiRes.text || '{}');
+    } catch (cwErr: any) {
+      console.warn('[Crossword] Gemini 3.5 Flash-Lite notice, retrying with Gemini 3.1 Flash-Lite:', cwErr?.message || cwErr);
+      try {
+        const fallbackRes = await callWithTimeout(
+          ai.models.generateContent({
+            model: 'gemini-3.1-flash-lite',
+            contents: promptText,
+            config: {
+              responseMimeType: 'application/json',
+              temperature: 0.3,
+            },
+          }),
+          15000,
+          'Gemini 3.1 Flash-Lite Crossword Generation'
+        );
+        parsedCrossword = JSON.parse(fallbackRes.text || '{}');
+      } catch (fbErr: any) {
+        console.error('[Crossword] Gemini 3.1 Flash-Lite notice:', fbErr?.message || fbErr);
+      }
+    }
 
-    const parsed = JSON.parse(geminiRes.text || '{}');
-    if (parsed && Array.isArray(parsed.words) && parsed.words.length > 0) {
-      return res.json(parsed);
+    if (parsedCrossword && Array.isArray(parsedCrossword.words) && parsedCrossword.words.length > 0) {
+      return res.json(parsedCrossword);
     }
   } catch (geminiErr: any) {
     console.error('[Crossword] Local generation failed:', geminiErr?.message);
@@ -890,22 +974,44 @@ Return JSON in this exact structure:
   ]
 }`;
 
-    const response = await callWithTimeout(
-      ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.3,
-        },
-      }),
-      15000,
-      'Gemini Wordle Question Generation'
-    );
+    let parsedQuestions: any = null;
+    try {
+      const response = await callWithTimeout(
+        ai.models.generateContent({
+          model: 'gemini-3.5-flash-lite',
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            temperature: 0.3,
+          },
+        }),
+        15000,
+        'Gemini 3.5 Flash-Lite Wordle Question Generation'
+      );
+      parsedQuestions = JSON.parse(response.text || '{}');
+    } catch (wErr: any) {
+      console.warn('[Wordle Questions] Gemini 3.5 Flash-Lite notice, retrying with Gemini 3.1 Flash-Lite:', wErr?.message || wErr);
+      try {
+        const fbResponse = await callWithTimeout(
+          ai.models.generateContent({
+            model: 'gemini-3.1-flash-lite',
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              temperature: 0.3,
+            },
+          }),
+          15000,
+          'Gemini 3.1 Flash-Lite Wordle Question Generation'
+        );
+        parsedQuestions = JSON.parse(fbResponse.text || '{}');
+      } catch (fbErr: any) {
+        console.warn('[Wordle Questions] Gemini 3.1 Flash-Lite notice:', fbErr?.message || fbErr);
+      }
+    }
 
-    const parsed = JSON.parse(response.text || '{}');
-    if (parsed && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
-      const validQuestions = parsed.questions.filter(
+    if (parsedQuestions && Array.isArray(parsedQuestions.questions) && parsedQuestions.questions.length > 0) {
+      const validQuestions = parsedQuestions.questions.filter(
         (q: any) =>
           q &&
           typeof q.question === 'string' &&
