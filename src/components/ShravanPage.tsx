@@ -148,7 +148,22 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     }
   }, [isStreakActiveToday, recordStreakActivity]);
 
-  const handleGoToManan = () => {
+  const handleGoToManan = async () => {
+    try {
+      const reward = await claimChapterStageReward(chapter, 'manan', user);
+      if (reward.awarded) {
+        showToast({
+          title: `+${reward.xpAdded} XP Added!`,
+          message: 'Manan stage unlocked (+5 XP)',
+          type: 'xp',
+          xpAmount: reward.xpAdded,
+        });
+        updateProfileXp(reward.newTotal);
+        refreshUser?.();
+      }
+    } catch (err) {
+      console.warn('Error claiming Manan XP:', err);
+    }
     if (onNavigateManan) {
       onNavigateManan(chapter);
     }

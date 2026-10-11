@@ -10,7 +10,6 @@ import {
   AlertCircle,
   HelpCircle,
   Trophy,
-  ArrowRight,
   BookOpen,
   Headphones,
   Image as ImageIcon,
@@ -19,7 +18,6 @@ import {
 import { SavedChapter } from '../lib/chapters';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { claimChapterStageReward } from '../lib/firebase';
 import { playMindfulChime } from '../lib/chime';
 import {
   generateChapterImage,
@@ -50,7 +48,7 @@ export const MananPage: React.FC<MananPageProps> = ({
   onNavigateDashboard,
   onNavigateMyChapters,
 }) => {
-  const { user, updateProfileXp, refreshUser, isStreakActiveToday, recordStreakActivity } = useAuth();
+  const { isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
 
   // Difficulty configuration (default 3x3 = 9 genuine jigsaw pieces)
@@ -247,7 +245,7 @@ export const MananPage: React.FC<MananPageProps> = ({
     };
   }, []);
 
-  // Completion check and reward claiming
+  // Completion check
   useEffect(() => {
     if (pieces.length === 0) return;
     const allSnapped = pieces.every((p) => p.isSnapped);
@@ -256,29 +254,13 @@ export const MananPage: React.FC<MananPageProps> = ({
       setIsCompleted(true);
       playMindfulChime();
 
-      // Claim stage reward once per completed session
       if (!rewardClaimedRef.current) {
         rewardClaimedRef.current = true;
-        claimChapterStageReward(chapter, 'manan', user)
-          .then((reward) => {
-            if (reward.awarded) {
-              showToast({
-                title: `+${reward.xpAdded} XP Added!`,
-                message: 'Manan Reflection Puzzle Mastered!',
-                type: 'xp',
-                xpAmount: reward.xpAdded,
-              });
-              updateProfileXp(reward.newTotal);
-              refreshUser?.();
-            } else {
-              showToast({
-                title: 'Puzzle Solved!',
-                message: 'Excellent reflection! All pieces aligned.',
-                type: 'success',
-              });
-            }
-          })
-          .catch((err) => console.warn('Reward claim notification:', err));
+        showToast({
+          title: 'Puzzle Solved!',
+          message: 'Excellent reflection! All pieces aligned.',
+          type: 'success',
+        });
 
         // Maintain daily streak for Manan
         if (!isStreakActiveToday && recordStreakActivity) {
@@ -286,7 +268,7 @@ export const MananPage: React.FC<MananPageProps> = ({
         }
       }
     }
-  }, [pieces, isCompleted, chapter, user, isStreakActiveToday, recordStreakActivity, showToast, updateProfileXp, refreshUser]);
+  }, [pieces, isCompleted, isStreakActiveToday, recordStreakActivity, showToast]);
 
   // Reset current puzzle arrangement without re-generating the image
   const handleResetPuzzle = () => {
@@ -878,20 +860,6 @@ export const MananPage: React.FC<MananPageProps> = ({
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Reset</span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => loadPuzzleImage(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs"
-                style={{
-                  borderColor: 'var(--border-warm)',
-                  color: 'var(--text-primary)',
-                }}
-                title="Generate a fresh illustration for this chapter"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">New Image</span>
-              </button>
             </div>
           </div>
 
@@ -1147,7 +1115,7 @@ export const MananPage: React.FC<MananPageProps> = ({
                 <div className="space-y-1">
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Stage 03 Completed • +5 XP Added</span>
+                    <span>Stage 03 Completed • Reflection Mastered</span>
                   </div>
                   <h3 className="text-xl font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
                     Reflection Puzzle Mastered!
@@ -1189,15 +1157,15 @@ export const MananPage: React.FC<MananPageProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => loadPuzzleImage(true)}
+                  onClick={handleResetPuzzle}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
                   style={{
                     backgroundColor: 'var(--accent-saffron)',
                     color: '#FFFFFF',
                   }}
                 >
-                  <span>New Reflection</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Play Again</span>
                 </button>
               </div>
             </div>
