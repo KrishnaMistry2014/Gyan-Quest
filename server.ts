@@ -7,8 +7,63 @@ import { GoogleGenAI } from '@google/genai';
 import { PDFParse } from 'pdf-parse';
 import fs from 'fs';
 import crypto from 'crypto';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 dotenv.config();
+
+const serverFirebaseConfig = {
+  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyDkCU1DHUqnRjuWvCiMi3m4Q8G2uJ6ECZU",
+  authDomain: "gyanquest-edu.firebaseapp.com",
+  projectId: "gyanquest-edu",
+  storageBucket: "gyanquest-edu.firebasestorage.app",
+  messagingSenderId: "1056592118463",
+  appId: "1:1056592118463:web:0f60a0638d3df51edcfc0a",
+};
+const sApp = !getApps().length ? initializeApp(serverFirebaseConfig) : getApp();
+const serverDb = getFirestore(sApp);
+
+async function getServerExceededModels(): Promise<string[]> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const snap = await getDoc(doc(serverDb, 'systemStatus', 'dailyQuotaStatus'));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.date === today && Array.isArray(data.exceededModels)) {
+        return data.exceededModels;
+      }
+    }
+  } catch (err) {
+    console.warn('[Server Quota] Error reading daily quota from Firestore:', err);
+  }
+  return [];
+}
+
+async function recordServerExceededModel(model: string) {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const ref = doc(serverDb, 'systemStatus', 'dailyQuotaStatus');
+    const snap = await getDoc(ref);
+    if (!snap.exists() || snap.data()?.date !== today) {
+      await setDoc(ref, {
+        date: today,
+        exceededModels: [model],
+        updatedAt: Date.now(),
+      });
+    } else {
+      const current = snap.data()?.exceededModels || [];
+      if (!current.includes(model)) {
+        await updateDoc(ref, {
+          exceededModels: arrayUnion(model),
+          updatedAt: Date.now(),
+        });
+      }
+    }
+    console.log(`[Server Quota] Recorded model ${model} as exceeded for today (${today}).`);
+  } catch (err) {
+    console.warn('[Server Quota] Error recording exceeded model to Firestore:', err);
+  }
+}
 
 if (process.env.VITE_FIREBASE_API_KEY && !process.env.VITE_FIREBASE_API_KEY.startsWith('AIza')) {
   process.env.VITE_FIREBASE_API_KEY = 'AIzaSyDkCU1DHUqnRjuWvCiMi3m4Q8G2uJ6ECZU';
@@ -536,9 +591,17 @@ async function synthesizeGuruSpeech(
   // 2. Iterate through 4-model fallback chain in exact order
   const errors: { model: string; error: string }[] = [];
   const now = Date.now();
+  const dbExceededModels = await getServerExceededModels();
 
   for (let i = 0; i < TTS_FALLBACK_MODELS.length; i++) {
     const model = TTS_FALLBACK_MODELS[i];
+
+    if (dbExceededModels.includes(model)) {
+      console.warn(`[Shravan TTS] Skipping ${model} (exceeded quota for today per Firestore database)`);
+      errors.push({ model, error: 'Exceeded quota for today in Firestore' });
+      continue;
+    }
+
     const status = modelTracker.get(model) || {
       cooldownUntil: 0,
       quotaExhausted: false,
@@ -642,7 +705,8 @@ async function synthesizeGuruSpeech(
         // 60-second cooldown on quota exhaustion
         status.cooldownUntil = Date.now() + 60000;
         status.lastError = 'Rate limit / quota exhausted';
-        console.warn(`[Shravan TTS Quota] Model ${model} marked in cooldown for 60 seconds.`);
+        await recordServerExceededModel(model);
+        console.warn(`[Shravan TTS Quota] Model ${model} marked in cooldown for 60 seconds and recorded in Firestore.`);
       } else {
         status.lastError = errMsg;
       }

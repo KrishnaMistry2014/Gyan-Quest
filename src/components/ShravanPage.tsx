@@ -167,7 +167,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [ttsMeta, setTtsMeta] = useState<{ voice?: string; fromCache?: boolean } | null>(null);
   const [audioBase64, setAudioBase64] = useState<string | null>(chapter.audioBase64 || null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(chapter.audioBase64 ? 'ready' : 'loading');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(chapter.audioBase64 ? 'ready' : 'idle');
   const [isWakingUp, setIsWakingUp] = useState<boolean>(false);
   const [chunkProgress, setChunkProgress] = useState<{ current: number; total: number } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -258,8 +258,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       const plainText = stripMarkdownForSpeech(chapter.summary);
       const wordsCount = plainText.split(/\s+/).length;
 
-      // For standard summaries (under 750 words), synthesize in a single coherent request
-      if (wordsCount <= 750) {
+      // For standard summaries (under 2000 words), synthesize in a single fast request
+      if (wordsCount <= 2000) {
         setChunkProgress({ current: 1, total: 1 });
         const response = await fetch('/api/tts', {
           method: 'POST',
@@ -382,7 +382,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     }
   };
 
-  // Generate audio or retrieve cached version on mount / chapter change / voice selection change
+  // Reset audio state on chapter or voice change; wait for user to click generate
   useEffect(() => {
     // Abort any in-flight request before initiating a new one
     if (abortControllerRef.current) {
@@ -394,11 +394,17 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       objectUrlRef.current = null;
     }
     setAudioUrl(null);
-    setAudioBase64(selectedVoice === 'Adinath' ? (chapter.audioBase64 || null) : null);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-    generateAudio(selectedVoice);
+
+    if (chapter.audioBase64 && selectedVoice === 'Adinath') {
+      setAudioBase64(chapter.audioBase64);
+      setStatus('ready');
+    } else {
+      setAudioBase64(null);
+      setStatus('idle');
+    }
 
     return () => {
       // Abort in-flight request when component unmounts
@@ -704,6 +710,39 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             </button>
           </div>
         </div>
+
+        {/* IDLE STATE */}
+        {status === 'idle' && (
+          <div className="flex flex-col items-center justify-center py-12 text-center space-y-5 max-w-md mx-auto">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-xs border"
+              style={{
+                backgroundColor: 'var(--accent-saffron-light)',
+                borderColor: 'var(--border-warm)',
+                color: 'var(--accent-saffron-text)',
+              }}
+            >
+              <Headphones className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+                Ready to Listen with Guru {selectedVoice}
+              </h3>
+              <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Select your preferred teacher above and click the button below to start the immersive audio narration.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => generateAudio(selectedVoice)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold shadow-sm transition-all hover:opacity-95 cursor-pointer"
+              style={{ backgroundColor: 'var(--accent-saffron)', color: '#FFFFFF' }}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Generate Narration with Guru {selectedVoice}</span>
+            </button>
+          </div>
+        )}
 
         {/* LOADING STATE */}
         {status === 'loading' && (
