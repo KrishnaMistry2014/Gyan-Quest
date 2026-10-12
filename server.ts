@@ -5,6 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { PDFParse } from 'pdf-parse';
+import fs from 'fs';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -441,121 +443,299 @@ function pcmToWav(pcmBuffer: Buffer, sampleRate = 24000, numChannels = 1, bitsPe
   return Buffer.concat([header, pcmBuffer]);
 }
 
-// Shravan Audio Generation Endpoint strictly using Gemini 3.1 Flash TTS ONLY
-// Chunks text into 3,000-4,000 word sections, applies 65s timeout per chunk, and stitches resulting WAVs
-app.post('/api/generate-audio', async (req, res) => {
-  try {
-    const { text } = req.body;
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      return res.status(400).json({ success: false, error: 'No text provided for audio generation.' });
+// ============================================================================
+// Shravan TTS: Natural Indian Guru Voice Engine
+// 4-Model Fallback Chain:
+//   1. Primary:        gemini-3.8-flash-tts
+//   2. First Fallback: gemini-3.8-flash-lite-tts
+//   3. Second Fallback: gemini-3.1-flash-tts-preview
+//   4. Third Fallback:  gemini-2.5-flash-preview-tts
+// ============================================================================
+
+const GURU_SPEECH_DIRECTION = `Speak in authentic, contemporary Indian English with a strong, distinctive Indian accent as a warm, knowledgeable Indian teacher explaining a school textbook chapter to a student. Sound friendly, confident, patient, and genuinely interested in the subject. Use clear, rich Indian English intonation and rhythm.
+
+Deliver the explanation with a moderate, conversational pace and natural variations in pitch, rhythm, and emphasis. Give important facts and key concepts a little extra emphasis so they stand out and are easier to remember. Use natural pauses between ideas and slightly more energy when introducing an interesting discovery, example, or surprising fact.
+
+Maintain a steady, engaging presence throughout the lesson. Be expressive enough to prevent the narration from sounding flat, but restrained enough that it remains comfortable to listen to for several minutes.
+
+Avoid robotic rhythm, monotonous pitch, excessively uniform sentence endings, and mechanical textbook-reading delivery. Also avoid theatrical acting, booming declarations, exaggerated excitement, forced cheerfulness, dramatic suspense, artificial gravitas, and movie-trailer narration.
+
+Do not sound like a newsreader, advertisement, meditation narrator, or fictional fantasy guru. Sound like a real, friendly Indian teacher who understands the subject and enjoys helping students learn.
+
+Pronounce all Indian names, Sanskrit terminology, and unfamiliar textbook vocabulary with accurate and strong Indian English pronunciation.`;
+
+const TTS_FALLBACK_MODELS = [
+  'gemini-3.8-flash-tts',          // 1. Primary: Gemini 3.8 Flash TTS
+  'gemini-3.8-flash-lite-tts',     // 2. First fallback: Gemini 3.8 Flash-Lite TTS
+  'gemini-3.1-flash-tts-preview',  // 3. Second fallback: Gemini 3.1 Flash TTS Preview
+  'gemini-2.5-flash-preview-tts',  // 4. Third fallback: Gemini 2.5 Flash Preview TTS
+] as const;
+
+// Disk caching configuration (.cache/tts)
+const TTS_CACHE_DIR = path.join(process.cwd(), '.cache', 'tts');
+if (!fs.existsSync(TTS_CACHE_DIR)) {
+  fs.mkdirSync(TTS_CACHE_DIR, { recursive: true });
+}
+
+function getTtsCacheKey(text: string, voice: string): string {
+  return crypto
+    .createHash('sha256')
+    .update(`${text.trim()}|${voice}|v1-indian-guru`)
+    .digest('hex');
+}
+
+// In-memory model status and rate-limit tracking
+interface ModelTrackerStatus {
+  cooldownUntil: number;
+  lastError?: string;
+  quotaExhausted: boolean;
+  totalCalls: number;
+  totalFailures: number;
+}
+const modelTracker = new Map<string, ModelTrackerStatus>();
+
+async function synthesizeGuruSpeech(
+  cleanText: string,
+  requestedVoice: string = 'Puck'
+): Promise<{
+  audioBuffer: Buffer;
+  modelUsed: string;
+  fromCache: boolean;
+  voiceUsed: string;
+}> {
+  // Voice selection: valid male voices are Puck (default), Charon, Fenrir
+  const validVoices = ['Puck', 'Charon', 'Fenrir'];
+  const voice = validVoices.includes(requestedVoice) ? requestedVoice : 'Puck';
+
+  // 1. Check disk cache first
+  const cacheKey = getTtsCacheKey(cleanText, voice);
+  const cacheFilePath = path.join(TTS_CACHE_DIR, `${cacheKey}.wav`);
+  const cacheMetaPath = path.join(TTS_CACHE_DIR, `${cacheKey}.json`);
+
+  if (fs.existsSync(cacheFilePath)) {
+    try {
+      const cachedBuffer = fs.readFileSync(cacheFilePath);
+      if (cachedBuffer.length > 100) {
+        console.log(`[Shravan TTS] Cache HIT for key ${cacheKey.slice(0, 8)} (${cachedBuffer.length} bytes, voice: ${voice})`);
+        let meta: any = {};
+        if (fs.existsSync(cacheMetaPath)) {
+          meta = JSON.parse(fs.readFileSync(cacheMetaPath, 'utf8'));
+        }
+        return {
+          audioBuffer: cachedBuffer,
+          modelUsed: meta.model || 'cached',
+          fromCache: true,
+          voiceUsed: voice,
+        };
+      }
+    } catch (cacheReadErr) {
+      console.warn('[Shravan TTS] Error reading cache file:', cacheReadErr);
+    }
+  }
+
+  // 2. Iterate through 4-model fallback chain in exact order
+  const errors: { model: string; error: string }[] = [];
+  const now = Date.now();
+
+  for (let i = 0; i < TTS_FALLBACK_MODELS.length; i++) {
+    const model = TTS_FALLBACK_MODELS[i];
+    const status = modelTracker.get(model) || {
+      cooldownUntil: 0,
+      quotaExhausted: false,
+      totalCalls: 0,
+      totalFailures: 0,
+    };
+
+    // If model is in cooldown due to recent 429/quota exhaustion, check if cooldown expired
+    if (status.cooldownUntil > now) {
+      const remainingSec = Math.ceil((status.cooldownUntil - now) / 1000);
+      console.warn(`[Shravan TTS] Skipping ${model} (in cooldown for another ${remainingSec}s due to quota)`);
+      errors.push({ model, error: `In cooldown (${remainingSec}s remaining): ${status.lastError}` });
+      continue;
     }
 
-    const totalWordCount = text.split(/\s+/).filter(Boolean).length;
-    const chunks = chunkTextByWords(text);
-    console.log(`[Shravan TTS] Starting audio generation with Gemini 3.5 Flash-Lite... total words: ${totalWordCount}, chunks: ${chunks.length}`);
+    console.log(`[Shravan TTS] Attempting synthesis with fallback level ${i + 1}/${TTS_FALLBACK_MODELS.length}: ${model} (Voice: ${voice})...`);
+    status.totalCalls++;
 
-    const pcmBuffers: Buffer[] = [];
-
-    for (let i = 0; i < chunks.length; i++) {
-      const chunkText = chunks[i];
-      const chunkWordCount = chunkText.split(/\s+/).filter(Boolean).length;
-      console.log(`[Shravan TTS] Synthesizing chunk ${i + 1}/${chunks.length} (~${chunkWordCount} words) with Gemini 3.5 Flash-Lite (65s timeout)...`);
-
-      // Gemini 3.5 Flash-Lite with an Indian accent Female ~30 Years old voice
-      let rawBase64Audio = '';
-      try {
-        const ttsPromise = ai.models.generateContent({
-          model: 'gemini-3.5-flash-lite',
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  text: `You are an Indian female educator, approximately 30 years old, speaking with a warm, natural, and clear Indian accent at an educational pace. Please narrate the following chapter summary clearly and engagingly for students:\n\n${chunkText}`,
-                  speechMetadata: {
-                    style: 'Indian accent female ~30 years old, warm, clear, educational pace',
-                  },
+    try {
+      const ttsPromise = ai.models.generateContent({
+        model,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: `${GURU_SPEECH_DIRECTION}\n\nPlease narrate this chapter lesson to the student:\n\n${cleanText}`,
+                speechMetadata: {
+                  style: 'Warm, knowledgeable, natural contemporary Indian English male teacher with moderate pace and clear pronunciation of Sanskrit and Indian terms',
                 },
-              ],
-            } as any,
-          ],
-          config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: 'Kore' },
               },
+            ],
+          },
+        ] as any,
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: voice },
             },
           },
-        });
+        },
+      });
 
-        const ttsResponse = await callWithTimeout(ttsPromise, 65000, `Gemini 3.5 Flash-Lite TTS (chunk ${i + 1} of ${chunks.length})`);
-        rawBase64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
-      } catch (ttsErr: any) {
-        console.warn(`[Shravan TTS] Gemini 3.5 Flash-Lite notice for chunk ${i + 1}, retrying with Gemini 3.1 Flash-Lite:`, ttsErr?.message || ttsErr);
-        const ttsLitePromise = ai.models.generateContent({
-          model: 'gemini-3.1-flash-lite',
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  text: `You are an Indian female educator, approximately 30 years old, speaking with a warm, natural, and clear Indian accent at an educational pace. Please narrate the following chapter summary clearly and engagingly for students:\n\n${chunkText}`,
-                  speechMetadata: {
-                    style: 'Indian accent female ~30 years old, warm, clear, educational pace',
-                  },
-                },
-              ],
-            } as any,
-          ],
-          config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: 'Kore' },
-              },
-            },
-          },
-        });
-        const ttsLiteResponse = await callWithTimeout(ttsLitePromise, 65000, `Gemini 3.1 Flash-Lite TTS (chunk ${i + 1} of ${chunks.length})`);
-        rawBase64Audio = ttsLiteResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
-      }
+      // 45 second timeout per call
+      const ttsResponse = await callWithTimeout(ttsPromise, 45000, `${model} TTS`);
+      const rawBase64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
 
       if (!rawBase64Audio) {
-        throw new Error(`Gemini Flash-Lite TTS did not return audio data for chunk ${i + 1} of ${chunks.length}.`);
+        throw new Error(`Model ${model} returned empty audio data.`);
       }
 
-      const rawChunkBuffer = Buffer.from(rawBase64Audio, 'base64');
-      // If the model chunk already has a 44-byte WAV header, strip it to extract pure PCM before stitching
-      const pcmChunk = (rawChunkBuffer.length >= 44 && rawChunkBuffer.toString('ascii', 0, 4) === 'RIFF')
-        ? rawChunkBuffer.subarray(44)
-        : rawChunkBuffer;
+      const audioBuffer = Buffer.from(rawBase64Audio, 'base64');
+      console.log(`[Shravan TTS] Successfully generated audio with ${model} (${audioBuffer.length} bytes, voice: ${voice})`);
 
-      pcmBuffers.push(pcmChunk);
-      console.log(`[Shravan TTS] Chunk ${i + 1}/${chunks.length} completed successfully (${pcmChunk.length} bytes PCM).`);
+      // Reset failure state on success
+      status.quotaExhausted = false;
+      modelTracker.set(model, status);
+
+      // Save to disk cache for repeat plays and other students
+      try {
+        fs.writeFileSync(cacheFilePath, audioBuffer);
+        fs.writeFileSync(
+          cacheMetaPath,
+          JSON.stringify(
+            {
+              model,
+              voice,
+              createdAt: new Date().toISOString(),
+              textLength: cleanText.length,
+              audioBytes: audioBuffer.length,
+            },
+            null,
+            2
+          )
+        );
+        console.log(`[Shravan TTS] Saved audio to cache (.cache/tts/${cacheKey.slice(0, 8)}.wav)`);
+      } catch (cacheWriteErr) {
+        console.warn('[Shravan TTS] Notice writing to cache:', cacheWriteErr);
+      }
+
+      return {
+        audioBuffer,
+        modelUsed: model,
+        fromCache: false,
+        voiceUsed: voice,
+      };
+    } catch (err: any) {
+      status.totalFailures++;
+      const errMsg = err?.message || String(err);
+      console.warn(`[Shravan TTS Fallback Notice] Model ${model} failed: ${errMsg}`);
+
+      const isQuota =
+        errMsg.includes('429') ||
+        errMsg.includes('RESOURCE_EXHAUSTED') ||
+        errMsg.includes('quota') ||
+        errMsg.includes('Quota exceeded');
+
+      if (isQuota) {
+        status.quotaExhausted = true;
+        // 60-second cooldown on quota exhaustion
+        status.cooldownUntil = Date.now() + 60000;
+        status.lastError = 'Rate limit / quota exhausted';
+        console.warn(`[Shravan TTS Quota] Model ${model} marked in cooldown for 60 seconds.`);
+      } else {
+        status.lastError = errMsg;
+      }
+      modelTracker.set(model, status);
+
+      errors.push({ model, error: errMsg });
+
+      // Fast fail on unrecoverable authentication errors
+      if (errMsg.includes('API_KEY_INVALID') || errMsg.includes('401') || errMsg.includes('PERMISSION_DENIED')) {
+        throw new Error(`Authentication error on Gemini API: ${errMsg}. Please verify your API key.`);
+      }
+
+      // Continue to next model in the four-model chain
+    }
+  }
+
+  // All 4 models failed
+  const errorDetails = errors.map((e) => `[${e.model}: ${e.error}]`).join('; ');
+  throw new Error(`All 4 TTS fallback models failed. Details: ${errorDetails}. Please try again later.`);
+}
+
+// Health probe endpoint for TTS and API status
+app.get(['/api/health', '/api/tts/health'], (req, res) => {
+  return res.json({
+    status: 'ok',
+    service: 'GyanQuest Indian Guru TTS Engine',
+    models: TTS_FALLBACK_MODELS,
+    defaultVoice: 'Puck (Natural Indian Guru)',
+  });
+});
+
+// Status endpoint to check fallback chain health and cache stats
+app.get('/api/tts/status', (req, res) => {
+  const modelStats: Record<string, any> = {};
+  for (const m of TTS_FALLBACK_MODELS) {
+    modelStats[m] = modelTracker.get(m) || {
+      cooldownUntil: 0,
+      quotaExhausted: false,
+      totalCalls: 0,
+      totalFailures: 0,
+    };
+  }
+
+  let cachedFilesCount = 0;
+  try {
+    cachedFilesCount = fs.readdirSync(TTS_CACHE_DIR).filter(f => f.endsWith('.wav')).length;
+  } catch (_) {}
+
+  return res.json({
+    status: 'ok',
+    primaryModel: TTS_FALLBACK_MODELS[0],
+    fallbackChain: TTS_FALLBACK_MODELS,
+    defaultVoice: 'Puck',
+    alternativeVoice: 'Charon',
+    cachedAudioItems: cachedFilesCount,
+    models: modelStats,
+  });
+});
+
+// Shravan Indian Guru TTS Endpoint
+// Accepts POST { text, voice } and returns audio/wav directly or JSON
+app.post(['/api/tts', '/api/generate-audio'], async (req, res) => {
+  try {
+    const { text, voice } = req.body;
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'No text provided for audio narration.' });
     }
 
-    // Stitch all PCM chunks together seamlessly
-    const completePcm = Buffer.concat(pcmBuffers);
-    // Wrap the stitched audio track into a standard, universally playable WAV file
-    const stitchedWavBuffer = pcmToWav(completePcm, 24000, 1, 16);
-    const finalBase64Audio = stitchedWavBuffer.toString('base64');
+    const cleanText = text.replace(/[*_#>`~]/g, '').trim();
+    const result = await synthesizeGuruSpeech(cleanText, voice);
 
-    console.log(`[Shravan TTS] All ${chunks.length} chunks synthesized and stitched successfully into complete WAV (${stitchedWavBuffer.length} bytes, base64 length: ${finalBase64Audio.length})!`);
+    // If client expects binary blob (like ShravanPage's response.blob())
+    const acceptHeader = req.headers.accept || '';
+    if (req.path === '/api/tts' || acceptHeader.includes('audio/')) {
+      res.setHeader('Content-Type', 'audio/wav');
+      res.setHeader('Content-Length', result.audioBuffer.length);
+      res.setHeader('X-TTS-Model', result.modelUsed);
+      res.setHeader('X-TTS-Voice', result.voiceUsed);
+      res.setHeader('X-TTS-Cached', result.fromCache ? 'true' : 'false');
+      return res.send(result.audioBuffer);
+    }
 
+    // Default JSON response
     return res.json({
       success: true,
-      model: 'Gemini 3.1 Flash TTS',
-      voice: 'Indian accent female (~30 years old)',
-      chunksCount: chunks.length,
-      audioBase64: finalBase64Audio,
+      model: result.modelUsed,
+      voice: result.voiceUsed,
+      fromCache: result.fromCache,
+      audioBase64: result.audioBuffer.toString('base64'),
     });
   } catch (error: any) {
     console.error('[Shravan TTS Error]:', error);
-    let userMsg = error?.message || 'Failed to generate audio with Gemini 3.1 Flash TTS.';
-    if (userMsg.includes('429') || userMsg.includes('RESOURCE_EXHAUSTED') || userMsg.includes('quota') || userMsg.includes('Quota exceeded')) {
-      userMsg = 'Gemini 3.1 Flash TTS rate limit / quota exceeded (Free tier daily limit: 10 requests). Please try again later or configure billing for your Gemini API key.';
-    }
+    const userMsg = error?.message || 'Failed to synthesize speech audio with Indian Guru voice.';
     return res.status(500).json({
       success: false,
       error: userMsg,

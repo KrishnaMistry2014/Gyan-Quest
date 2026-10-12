@@ -7,11 +7,8 @@ import {
   Brain,
   MessageCircleQuestion,
   ClipboardCheck,
-  ShieldCheck,
-  Award,
-  Sparkles,
   Compass,
-  FileText
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,12 +22,47 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
   const { openAuthModal, user } = useAuth();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const stagesList = [
-    { step: '01', label: 'Vidya (विद्या)', xp: '10 XP' },
-    { step: '02', label: 'Shravan (श्रवण)', xp: '5 XP' },
-    { step: '03', label: 'Manan (मनन)', xp: '15 XP' },
-    { step: '04', label: 'Prashna (प्रश्न)', xp: '0 XP' },
-    { step: '05', label: 'Pariksha (परीक्षा)', xp: '50 XP' },
+  const stages = [
+    {
+      num: '01',
+      sanskrit: 'विद्या',
+      title: 'Vidya',
+      desc: 'Structured reading & foundational concept synthesis',
+      icon: BookOpen,
+      xp: '10 XP',
+    },
+    {
+      num: '02',
+      sanskrit: 'श्रवण',
+      title: 'Shravan',
+      desc: 'Immersive oral narration for auditory retention',
+      icon: Headphones,
+      xp: '5 XP',
+    },
+    {
+      num: '03',
+      sanskrit: 'मनन',
+      title: 'Manan',
+      desc: 'Deep contemplation & reflective concept assembly',
+      icon: Brain,
+      xp: '15 XP',
+    },
+    {
+      num: '04',
+      sanskrit: 'प्रश्न',
+      title: 'Prashna',
+      desc: 'Socratic inquiry & doubt resolution with Guru',
+      icon: MessageCircleQuestion,
+      xp: 'Optional',
+    },
+    {
+      num: '05',
+      sanskrit: 'परीक्षा',
+      title: 'Pariksha',
+      desc: 'Mastery validation & adaptive retention check',
+      icon: ClipboardCheck,
+      xp: '50 XP',
+    },
   ];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,87 +79,91 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
   };
 
   return (
-    <section id="home" className="pt-4 sm:pt-6 pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      {/* Bento Hero Container */}
+    <section id="home" className="pt-4 sm:pt-8 pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      {/* Minimalist Pavilion Hero */}
       <motion.div
-        initial={{ opacity: 0, y: 28 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="rounded-[32px] border p-6 sm:p-10 lg:p-12 shadow-xs transition-all relative overflow-hidden"
+        className="rounded-3xl border p-6 sm:p-10 lg:p-14 shadow-xs relative overflow-hidden"
         style={{
           backgroundColor: 'var(--bg-card)',
           borderColor: 'var(--border-warm)',
         }}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-          {/* Left Column: Hero Value Proposition */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-            className="lg:col-span-7 space-y-6"
-          >
-            {/* Pedagogical Label Badge */}
-            <div
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border shadow-2xs"
-              style={{
-                backgroundColor: 'var(--accent-saffron-light)',
-                borderColor: 'var(--border-warm)',
-                color: 'var(--accent-saffron-text)',
-              }}
-            >
-              <BookOpen className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-              <span>INDIAN PEDAGOGY • 5-STAGE PROGRESSION</span>
+        {/* Subtle Ancient Decorative Ring / Mandala Watermark */}
+        <div
+          className="absolute -right-24 -top-24 w-96 h-96 rounded-full border border-amber-600/10 dark:border-amber-400/5 pointer-events-none"
+          aria-hidden="true"
+        />
+        <div
+          className="absolute -right-12 -top-12 w-72 h-72 rounded-full border border-dashed border-amber-600/10 dark:border-amber-400/5 pointer-events-none"
+          aria-hidden="true"
+        />
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center relative z-10">
+          {/* Left Column: Hero Proposition */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Elegant Sanskrit Kicker (Unboxed text with subtle separator) */}
+            <div className="flex items-center gap-2 text-xs font-serif tracking-wider" style={{ color: 'var(--accent-saffron-text)' }}>
+              <span className="font-semibold text-sm">विद्या ददाति विनयं</span>
+              <span aria-hidden="true" className="opacity-40">·</span>
+              <span className="text-[12px] uppercase tracking-widest font-sans font-medium opacity-85">
+                Vedic Inquiry Meets Modern Learning
+              </span>
             </div>
 
-            {/* Main Headline */}
+            {/* Headline */}
             <h1
               id="hero-title"
-              className="text-4xl sm:text-5xl lg:text-[54px] font-bold tracking-tight leading-[1.12] font-serif-heading"
+              className="text-4xl sm:text-5xl lg:text-[52px] font-bold tracking-tight leading-[1.12] font-serif-heading"
               style={{ color: 'var(--text-primary)' }}
             >
               Transform Any Chapter Into a{' '}
-              <span className="text-yellow-500 dark:text-yellow-400">
-                5-Stage Quest
-              </span>
+              <span className="text-amber-600 dark:text-amber-400 font-serif">
+                5-Stage Journey
+              </span>{' '}
+              of Wisdom
             </h1>
 
-            {/* Concise Subtitle */}
+            {/* Description */}
             <p
               id="hero-subtitle"
-              className="text-base sm:text-lg leading-relaxed max-w-2xl text-[15px] sm:text-[16px]"
+              className="text-base sm:text-lg leading-relaxed max-w-2xl font-normal"
               style={{ color: 'var(--text-secondary)' }}
             >
-              Gyan Quest blends ancient Indian inquiry — <strong>Vidya (विद्या), Shravan (श्रवण), Manan (मनन), Prashna (प्रश्न)</strong>, and <strong>Pariksha (परीक्षा)</strong> — with modern CBSE standards. Study any chapter with guided notes, audio narration, deep reflection, doubt-clearing, and adaptive assessments.
+              Gyan Quest revives the time-tested Indian tradition of deep scholastic inquiry — structured notes, attentive narration, thoughtful reflection, Socratic dialogue, and adaptive mastery. Upload any textbook chapter or PDF to embark on your quest.
             </p>
 
-            {/* Primary Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3 pt-1">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3.5 pt-2">
               <button
                 id="hero-start-quest-btn"
+                type="button"
                 onClick={user ? onStartQuest : openAuthModal}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm shadow-xs transition-all hover:opacity-95 active:scale-98 cursor-pointer"
+                className="flex items-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm shadow-xs transition-all hover:opacity-95 active:scale-98 cursor-pointer"
                 style={{
                   backgroundColor: 'var(--accent-saffron)',
                   color: '#FFFFFF',
                 }}
               >
-                <span>Start Your First Quest</span>
+                <span>Begin Your Quest</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
               <button
                 id="hero-explore-pedagogy-btn"
+                type="button"
                 onClick={onExplore}
-                className="flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm border transition-all hover:bg-black/5 dark:hover:bg-white/5 active:scale-98 cursor-pointer"
+                className="flex items-center gap-2 px-5 py-3.5 rounded-xl font-semibold text-sm border transition-all hover:bg-black/5 dark:hover:bg-white/5 active:scale-98 cursor-pointer"
                 style={{
                   backgroundColor: 'transparent',
                   borderColor: 'var(--border-warm)',
-                  color: 'var(--accent-saffron-text)',
+                  color: 'var(--text-primary)',
                 }}
               >
-                <Compass className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                <span>Explore Pedagogy</span>
+                <Compass className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span>Explore the 5 Stages</span>
               </button>
 
               <input
@@ -140,159 +176,105 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
               />
             </div>
 
-            {/* Feature Highlights Grid */}
+            {/* Quiet, unboxed text metadata footer */}
             <div
-              className="pt-4 border-t flex flex-wrap gap-4 sm:gap-6 text-xs font-semibold"
+              className="pt-4 border-t flex flex-wrap items-center gap-4 text-xs font-medium"
               style={{
                 borderColor: 'var(--border-warm)',
                 color: 'var(--text-secondary)',
               }}
             >
               <div className="flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                <span>Custom PDF & Syllabus Aligned</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                <span>Custom PDF & Textbook Synthesis</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Compass className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                <span>Socratic AI Study Guidance</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                <span>Socratic Guru Mentorship</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                <span>80 XP Chapter Mastery</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                <span>80 XP Milestone Mastery</span>
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          {/* Right Column: Visual Architecture (Matching Screen.png) */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="lg:col-span-5"
-          >
+          {/* Right Column: Minimalist 5-Stage Stele */}
+          <div className="lg:col-span-5">
             <div
               id="hero-progression-card"
-              className="rounded-[24px] border p-5 sm:p-6 shadow-xs transition-all relative space-y-4"
+              className="rounded-2xl border p-5 sm:p-6 shadow-xs relative space-y-4"
               style={{
                 backgroundColor: 'var(--bg-main)',
                 borderColor: 'var(--border-warm)',
               }}
             >
-              {/* Header */}
-              <div className="flex items-center justify-between gap-2 pb-3 border-b" style={{ borderColor: 'var(--border-warm)' }}>
+              <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: 'var(--border-warm)' }}>
                 <div>
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wider block"
-                    style={{ color: 'var(--accent-saffron-text)' }}
-                  >
-                    CURRICULUM PROGRESSION ARCHITECTURE
-                  </span>
+                  <div className="text-[11px] font-serif uppercase tracking-widest text-amber-700 dark:text-amber-400 font-semibold">
+                    पञ्चपदी · The Fivefold Path
+                  </div>
                   <h3 className="text-base font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-                    The 5-Stage Mastery Journey
+                    Curriculum Progression
                   </h3>
                 </div>
-
-                <div
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold border"
-                  style={{
-                    backgroundColor: 'var(--bg-card)',
-                    borderColor: 'var(--border-warm)',
-                    color: 'var(--accent-saffron-text)',
-                  }}
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>80 Total XP</span>
+                <div className="text-xs font-mono font-semibold" style={{ color: 'var(--accent-saffron-text)' }}>
+                  80 Total XP
                 </div>
               </div>
 
-              {/* 5-Stage Chips Grid (Matching screenshot: 5 small bordered boxes) */}
-              <div className="grid grid-cols-5 gap-1.5">
-                {stagesList.map((stage) => (
-                  <div
-                    key={stage.step}
-                    className="p-1.5 sm:p-2 rounded-xl border text-center transition-all shadow-2xs"
-                    style={{
-                      backgroundColor: 'var(--bg-card)',
-                      borderColor: 'var(--border-warm)',
-                    }}
-                  >
+              {/* Sequential 5 Stages List */}
+              <div className="space-y-2">
+                {stages.map((st) => {
+                  const Icon = st.icon;
+                  return (
                     <div
-                      className="text-[9px] sm:text-[10px] font-semibold leading-tight truncate"
-                      style={{ color: 'var(--text-primary)' }}
+                      key={st.num}
+                      className="group flex items-center justify-between p-2.5 rounded-xl border transition-colors"
+                      style={{
+                        backgroundColor: 'var(--bg-card)',
+                        borderColor: 'var(--border-warm)',
+                      }}
                     >
-                      {stage.step} {stage.label.split(' ')[0]}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border"
+                          style={{
+                            backgroundColor: 'var(--bg-main)',
+                            borderColor: 'var(--border-warm)',
+                            color: 'var(--accent-saffron-text)',
+                          }}
+                        >
+                          <Icon className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                        </div>
+                        <div className="truncate">
+                          <div className="flex items-center gap-1.5 leading-tight">
+                            <span className="text-xs font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+                              {st.title}
+                            </span>
+                            <span className="text-[11px] font-serif opacity-75" style={{ color: 'var(--text-secondary)' }}>
+                              ({st.sanskrit})
+                            </span>
+                          </div>
+                          <div className="text-[11px] leading-tight truncate mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                            {st.desc}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-mono font-bold shrink-0 ml-2" style={{ color: 'var(--accent-saffron-text)' }}>
+                        {st.xp}
+                      </div>
                     </div>
-                    <div
-                      className="text-[8px] sm:text-[9px] opacity-75 font-normal truncate"
-                      style={{ color: 'var(--text-secondary)' }}
-                    >
-                      {stage.label.split(' ')[1] || ''}
-                    </div>
-                    <div
-                      className="text-[8px] font-bold mt-0.5 text-amber-700 dark:text-amber-400"
-                    >
-                      {stage.xp}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* 3 Key Educational Rows with Icons */}
-              <div className="space-y-3 pt-1">
-                <div className="flex items-start gap-2.5 text-xs">
-                  <BookOpen className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-bold text-[12px]" style={{ color: 'var(--text-primary)' }}>
-                      Custom PDF & Material Transformation
-                    </div>
-                    <div className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                      Any uploaded textbook chapter or PDF is automatically structured into bite-sized study notes and audio summaries.
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5 text-xs">
-                  <Brain className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-bold text-[12px]" style={{ color: 'var(--text-primary)' }}>
-                      Deep Contemplation & Socratic Inquiry
-                    </div>
-                    <div className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                      Students articulate ideas through reflective synthesis and explore questions with context-bound Socratic AI guidance.
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5 text-xs">
-                  <Award className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-bold text-[12px]" style={{ color: 'var(--text-primary)' }}>
-                      Mastery Validation & Gamified Streaks
-                    </div>
-                    <div className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                      Adaptive assessments verify retention, awarding up to 80 XP and fostering an unbroken daily learning habit.
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Row */}
-              <div className="pt-3 border-t flex items-center justify-between text-xs" style={{ borderColor: 'var(--border-warm)' }}>
-                <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                  Ready to begin learning?
-                </span>
-                <button
-                  type="button"
-                  onClick={user ? onStartQuest : openAuthModal}
-                  className="inline-flex items-center gap-1 font-bold text-[11px] hover:underline cursor-pointer"
-                  style={{ color: 'var(--accent-saffron-text)' }}
-                >
-                  <span>Start Chapter Quest</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
+              {/* Bottom invitation */}
+              <div className="pt-2 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
+                <span>Every chapter flows through this unbroken sequence.</span>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </motion.div>
     </section>

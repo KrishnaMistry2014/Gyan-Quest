@@ -22,13 +22,13 @@ import { useToast } from '../context/ToastContext';
 import { claimChapterStageReward } from '../lib/firebase';
 
 const EXTRACTION_STAGES = [
-  'Extracting textbook text and diagrams with Gemini Flash-Lite...',
+  'Extracting textbook text and diagrams...',
   'Analyzing diagrams, scientific schematics, and visual components...',
-  'Gemini 3.5 Flash-Lite is analyzing chapter content and naming the title...',
-  'Gemini 3.5 Flash-Lite is synthesizing deep academic concept breakdowns...',
-  'Detailing scientific laws, principles, and diagram explanations...',
+  'Analyzing chapter content and structuring learning steps...',
+  'Synthesizing deep academic concept breakdowns...',
+  'Detailing scientific laws, principles, and key explanations...',
   'Compiling exhaustive glossary and key definitions without omissions...',
-  'Finalizing detailed Vidya chapter summary...',
+  'Finalizing detailed chapter summary...',
 ];
 
 const sanitizeClientVidya = (raw: string, defaultTitle: string): string => {
@@ -232,7 +232,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
       setStageMessage(EXTRACTION_STAGES[stageIdx]);
     }, 4000);
 
-    // 120-second safety net timeout to allow deep Gemini 3.5 Flash-Lite chapter analysis
+    // 120-second safety net timeout for chapter analysis
     timeoutIdRef.current = setTimeout(() => {
       clearTimers();
       controller.abort();

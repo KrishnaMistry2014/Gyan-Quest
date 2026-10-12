@@ -16,7 +16,7 @@ import {
   CheckCircle2,
   RefreshCw
 } from 'lucide-react';
-import { SavedChapter, updateChapterAudio } from '../lib/chapters';
+import { SavedChapter, updateChapterAudio, generateUniqueChapterCode } from '../lib/chapters';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { claimChapterStageReward } from '../lib/firebase';
@@ -33,9 +33,49 @@ function resolveAudioSrc(src: string): string {
   if (src.startsWith('data:') || src.startsWith('blob:') || src.startsWith('http')) {
     return src;
   }
-  // Check if legacy RIFF (WAV) base64 or Edge TTS MP3 base64
+  // Check if RIFF (WAV) base64 or MP3 base64
   const mime = src.startsWith('UklGR') ? 'audio/wav' : 'audio/mpeg';
   return `data:${mime};base64,${src}`;
+}
+
+// Cleanly merge multiple 24kHz 16-bit mono WAV blobs into one single valid WAV file
+async function mergeWavBlobs(blobs: Blob[]): Promise<Blob> {
+  if (blobs.length === 0) return new Blob([], { type: 'audio/wav' });
+  if (blobs.length === 1) return blobs[0];
+
+  const arrayBuffers = await Promise.all(blobs.map((b) => b.arrayBuffer()));
+  let totalPcmBytes = 0;
+  const pcmParts: Uint8Array[] = [];
+
+  for (let i = 0; i < arrayBuffers.length; i++) {
+    const buf = arrayBuffers[i];
+    // WAV header is 44 bytes in standard Gemini output
+    if (buf.byteLength > 44) {
+      const pcm = new Uint8Array(buf, 44);
+      pcmParts.push(pcm);
+      totalPcmBytes += pcm.byteLength;
+    }
+  }
+
+  // Use the 44-byte header from the first buffer as template
+  const headerBuf = arrayBuffers[0].slice(0, 44);
+  const headerView = new DataView(headerBuf);
+
+  // Update RIFF chunk size: 36 + totalPcmBytes
+  headerView.setUint32(4, 36 + totalPcmBytes, true);
+  // Update data subchunk2 size: totalPcmBytes
+  headerView.setUint32(40, totalPcmBytes, true);
+
+  const merged = new Uint8Array(44 + totalPcmBytes);
+  merged.set(new Uint8Array(headerBuf), 0);
+
+  let offset = 44;
+  for (const part of pcmParts) {
+    merged.set(part, offset);
+    offset += part.byteLength;
+  }
+
+  return new Blob([merged], { type: 'audio/wav' });
 }
 
 // Helper to strip Markdown formatting so TTS narrates clean, natural spoken plain text
@@ -123,6 +163,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 }) => {
   const { user, refreshUser, updateProfileXp, isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
+  const [selectedVoice, setSelectedVoice] = useState<'Adinath' | 'Vidur' | 'Sumed'>('Adinath');
+  const [ttsMeta, setTtsMeta] = useState<{ voice?: string; fromCache?: boolean } | null>(null);
   const [audioBase64, setAudioBase64] = useState<string | null>(chapter.audioBase64 || null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>(chapter.audioBase64 ? 'ready' : 'loading');
@@ -149,12 +191,18 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   }, [isStreakActiveToday, recordStreakActivity]);
 
   const handleGoToManan = async () => {
+    let ch = { ...chapter };
+    if (!ch.uniqueCode || ch.uniqueCode.length !== 10) {
+      ch.uniqueCode = generateUniqueChapterCode();
+    }
+
+    // Award 5 XP when Go to Manan is clicked for the first time on this chapter
     try {
-      const reward = await claimChapterStageReward(chapter, 'manan', user);
+      const reward = await claimChapterStageReward(ch, 'manan', user);
       if (reward.awarded) {
         showToast({
           title: `+${reward.xpAdded} XP Added!`,
-          message: 'Manan stage unlocked (+5 XP)',
+          message: `Manan reflection unlocked • Total: ${reward.newTotal} XP`,
           type: 'xp',
           xpAmount: reward.xpAdded,
         });
@@ -162,16 +210,24 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
         refreshUser?.();
       }
     } catch (err) {
-      console.warn('Error claiming Manan XP:', err);
+      console.warn('Error claiming Manan XP upon entering:', err);
     }
+
     if (onNavigateManan) {
-      onNavigateManan(chapter);
+      onNavigateManan(ch);
     }
   };
 
-  const generateAudio = async () => {
-    // If audio already cached on chapter, use it immediately
-    if (chapter.audioBase64) {
+  const generateAudio = async (voiceToUse = selectedVoice) => {
+    const apiVoiceMap: Record<'Adinath' | 'Vidur' | 'Sumed', string> = {
+      Adinath: 'Puck',
+      Vidur: 'Charon',
+      Sumed: 'Fenrir',
+    };
+    const serverVoice = apiVoiceMap[voiceToUse] || 'Puck';
+
+    // If audio already cached on chapter and voice matches default, use it
+    if (chapter.audioBase64 && voiceToUse === 'Adinath') {
       setAudioBase64(chapter.audioBase64);
       setStatus('ready');
       setIsWakingUp(false);
@@ -200,165 +256,133 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 
     try {
       const plainText = stripMarkdownForSpeech(chapter.summary);
-      const chunks = chunkTextForTTS(plainText, 400);
+      const wordsCount = plainText.split(/\s+/).length;
+
+      // For standard summaries (under 750 words), synthesize in a single coherent request
+      if (wordsCount <= 750) {
+        setChunkProgress({ current: 1, total: 1 });
+        const response = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'audio/wav',
+          },
+          body: JSON.stringify({
+            text: plainText,
+            voice: serverVoice,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => null);
+          throw new Error(errData?.error || `TTS voice server returned HTTP ${response.status}`);
+        }
+
+        const voiceUsed = response.headers.get('X-TTS-Voice') || serverVoice;
+        const fromCache = response.headers.get('X-TTS-Cached') === 'true';
+        setTtsMeta({ voice: voiceUsed, fromCache });
+
+        const blob = await response.blob();
+        if (!blob || blob.size === 0) {
+          throw new Error('Received empty audio narration response.');
+        }
+
+        if (controller.signal.aborted) return;
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+          objectUrlRef.current = null;
+        }
+
+        const newAudioUrl = URL.createObjectURL(blob);
+        objectUrlRef.current = newAudioUrl;
+        setAudioUrl(newAudioUrl);
+        setStatus('ready');
+        setChunkProgress(null);
+        return;
+      }
+
+      // For extra-long summaries (> 750 words), divide into ~500 word sections
+      const chunks = chunkTextForTTS(plainText, 500);
       setChunkProgress({ current: 0, total: chunks.length });
 
-      // Step 1: Check if Render TTS service is booting / waking up or already active
-      // Using a quick 2.5s probe to /health. Render cold boot takes ~45-60s, returning no fast response.
-      let serviceAwake = false;
-      try {
-        const probeController = new AbortController();
-        const probeTimeout = setTimeout(() => probeController.abort(), 2500);
-        const probeRes = await fetch('https://gyanquest-edge-tts.onrender.com/health', {
-          method: 'GET',
-          signal: probeController.signal,
-        });
-        clearTimeout(probeTimeout);
-        if (probeRes.ok) {
-          serviceAwake = true;
-        }
-      } catch {
-        serviceAwake = false;
-      }
-
-      if (controller.signal.aborted) return;
-
-      if (!serviceAwake) {
-        setIsWakingUp(true);
-        // Wait up to 75 seconds for Render TTS service to finish waking up
-        const wakeStartTime = Date.now();
-        const WAKE_TIMEOUT_MS = 75000; // Strictly 75s timeout for waking up the service ONLY
-
-        while (!serviceAwake && Date.now() - wakeStartTime < WAKE_TIMEOUT_MS) {
-          if (controller.signal.aborted) return;
-          await new Promise((r) => setTimeout(r, 2000));
-          if (controller.signal.aborted) return;
-
-          try {
-            const checkController = new AbortController();
-            const checkTimeout = setTimeout(() => checkController.abort(), 4000);
-            const res = await fetch('https://gyanquest-edge-tts.onrender.com/health', {
-              method: 'GET',
-              signal: checkController.signal,
-            });
-            clearTimeout(checkTimeout);
-            if (res.ok) {
-              serviceAwake = true;
-              break;
-            }
-          } catch {
-            // Service still waking up, continue polling until 75s timeout
-          }
-        }
-
-        if (!serviceAwake && !controller.signal.aborted) {
-          setIsWakingUp(false);
-          throw new Error('TTS service wake-up timed out after 75 seconds. The voice server is taking longer than expected to start up. Please try again.');
-        }
-
-        setIsWakingUp(false);
-      }
-
-      if (controller.signal.aborted) return;
-
-      console.log(`[Shravan] Starting TTS synthesis for ${chunks.length} sections (${plainText.split(/\s+/).length} total words)...`);
       const audioBlobs: Blob[] = [];
 
       for (let i = 0; i < chunks.length; i++) {
         if (controller.signal.aborted) return;
         setChunkProgress({ current: i + 1, total: chunks.length });
 
-        let attempts = 0;
-        let success = false;
-        let lastErr: any = null;
+        const chunkController = new AbortController();
+        const onParentAbort = () => chunkController.abort();
+        controller.signal.addEventListener('abort', onParentAbort, { once: true });
+        const timeoutId = setTimeout(() => chunkController.abort(), 45000);
 
-        while (attempts < 2 && !success) {
-          attempts++;
-          try {
-            const chunkController = new AbortController();
-            const onParentAbort = () => chunkController.abort();
-            controller.signal.addEventListener('abort', onParentAbort, { once: true });
-            const timeoutId = setTimeout(() => chunkController.abort(), 40000);
+        try {
+          const response = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'audio/wav',
+            },
+            body: JSON.stringify({
+              text: chunks[i],
+              voice: serverVoice,
+            }),
+            signal: chunkController.signal,
+          });
 
-            try {
-              console.log(`[Shravan] Fetching section ${i + 1}/${chunks.length} (${chunks[i].split(/\s+/).length} words)...`);
-              const response = await fetch('https://gyanquest-edge-tts.onrender.com/tts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  text: chunks[i],
-                  voice: 'en-IN-NeerjaNeural',
-                  rate: '+25%',
-                }),
-                signal: chunkController.signal,
-              });
-
-              if (!response.ok) {
-                throw new Error(`Edge TTS returned HTTP ${response.status}`);
-              }
-
-              const blob = await response.blob();
-              if (!blob || blob.size === 0) {
-                throw new Error('Received empty audio section response.');
-              }
-
-              audioBlobs.push(blob);
-              success = true;
-            } finally {
-              clearTimeout(timeoutId);
-              controller.signal.removeEventListener('abort', onParentAbort);
-            }
-          } catch (chunkErr: any) {
-            if (controller.signal.aborted) return;
-            lastErr = chunkErr;
-            console.warn(`[Shravan] Section ${i + 1} attempt ${attempts} warning:`, chunkErr);
-            if (attempts < 2) {
-              await new Promise((r) => setTimeout(r, 1000));
-            }
+          if (!response.ok) {
+            const errData = await response.json().catch(() => null);
+            throw new Error(errData?.error || `TTS voice server returned HTTP ${response.status}`);
           }
-        }
 
-        if (!success) {
-          throw lastErr || new Error(`Failed to generate audio for section ${i + 1}`);
+          const voiceUsed = response.headers.get('X-TTS-Voice') || serverVoice;
+          const fromCache = response.headers.get('X-TTS-Cached') === 'true';
+          setTtsMeta({ voice: voiceUsed, fromCache });
+
+          const blob = await response.blob();
+          if (!blob || blob.size === 0) {
+            throw new Error('Received empty audio section response.');
+          }
+
+          audioBlobs.push(blob);
+        } finally {
+          clearTimeout(timeoutId);
+          controller.signal.removeEventListener('abort', onParentAbort);
         }
       }
 
       if (controller.signal.aborted) return;
 
-      // Combine all MP3 chunks into one unified seamless MP3 blob
-      const combinedBlob = new Blob(audioBlobs, { type: 'audio/mpeg' });
+      // Cleanly merge all WAV chunks
+      const combinedBlob = await mergeWavBlobs(audioBlobs);
 
-      // Revoke any prior object URL to avoid memory leaks
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
       }
 
-      // Create browser object URL for immediate playback (no base64 conversion or localStorage/Firestore persistence)
       const newAudioUrl = URL.createObjectURL(combinedBlob);
       objectUrlRef.current = newAudioUrl;
       setAudioUrl(newAudioUrl);
       setStatus('ready');
-      setIsWakingUp(false);
       setChunkProgress(null);
     } catch (err: any) {
       if (controller.signal.aborted) return;
       setChunkProgress(null);
       setIsWakingUp(false);
-      // Treat AbortError as intentional user cancellation rather than a voice-service error
       if (err?.name === 'AbortError' || controller.signal.aborted) {
-        console.log('[Shravan] Edge TTS request was intentionally cancelled.');
         return;
       }
-      console.error('[Shravan] Edge TTS error:', err);
+      console.error('[Shravan TTS error]:', err);
       setStatus('error');
       setErrorMessage(
-        err?.message || 'Unable to generate audio narration at this moment. The voice service may be waking up or temporarily unavailable. Please retry in a few moments.'
+        err?.message || 'Unable to generate audio narration at this moment. The voice service may be experiencing temporary rate limits. Please retry in a few moments.'
       );
     }
   };
 
-  // Generate audio or retrieve cached version on mount / chapter change
+  // Generate audio or retrieve cached version on mount / chapter change / voice selection change
   useEffect(() => {
     // Abort any in-flight request before initiating a new one
     if (abortControllerRef.current) {
@@ -370,11 +394,11 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       objectUrlRef.current = null;
     }
     setAudioUrl(null);
-    setAudioBase64(chapter.audioBase64 || null);
+    setAudioBase64(selectedVoice === 'Adinath' ? (chapter.audioBase64 || null) : null);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-    generateAudio();
+    generateAudio(selectedVoice);
 
     return () => {
       // Abort in-flight request when component unmounts
@@ -387,7 +411,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
         objectUrlRef.current = null;
       }
     };
-  }, [chapter.id]);
+  }, [chapter.id, selectedVoice]);
 
   const getTargetAudioSpeed = (): number => {
     try {
@@ -617,16 +641,68 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
           borderColor: 'var(--border-warm)',
         }}
       >
-        <div className="text-center space-y-2 max-w-2xl mx-auto">
+        <div className="text-center space-y-3 max-w-2xl mx-auto">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
             Shravan Audio Narration
           </h1>
           <p className="text-sm sm:text-base font-medium truncate" style={{ color: 'var(--accent-saffron-text)' }}>
             {chapter.title.replace(/^Vidya:\s*/i, '')}
           </p>
-          <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Powered by Edge TTS
-          </p>
+
+          {/* Teacher Voice Selector */}
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+            <span className="text-xs font-semibold mr-1" style={{ color: 'var(--text-secondary)' }}>
+              Teacher Voice Style:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedVoice('Adinath')}
+              className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                selectedVoice === 'Adinath'
+                  ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                  : 'bg-black/5 dark:bg-white/5 border-stone-300 dark:border-stone-700 hover:opacity-80'
+              }`}
+              style={{
+                color: selectedVoice === 'Adinath' ? '#FFFFFF' : 'var(--text-primary)',
+                backgroundColor: selectedVoice === 'Adinath' ? 'var(--accent-saffron)' : undefined,
+              }}
+              title="Guru Adinath: Warm, conversational, and encouraging Indian English teacher delivery"
+            >
+              Guru Adinath (Warm Teacher)
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedVoice('Vidur')}
+              className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                selectedVoice === 'Vidur'
+                  ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                  : 'bg-black/5 dark:bg-white/5 border-stone-300 dark:border-stone-700 hover:opacity-80'
+              }`}
+              style={{
+                color: selectedVoice === 'Vidur' ? '#FFFFFF' : 'var(--text-primary)',
+                backgroundColor: selectedVoice === 'Vidur' ? 'var(--accent-saffron)' : undefined,
+              }}
+              title="Guru Vidur: Grounded, patient, and calm Indian English teacher delivery"
+            >
+              Guru Vidur (Grounded)
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedVoice('Sumed')}
+              className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                selectedVoice === 'Sumed'
+                  ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                  : 'bg-black/5 dark:bg-white/5 border-stone-300 dark:border-stone-700 hover:opacity-80'
+              }`}
+              style={{
+                color: selectedVoice === 'Sumed' ? '#FFFFFF' : 'var(--text-primary)',
+                backgroundColor: selectedVoice === 'Sumed' ? 'var(--accent-saffron)' : undefined,
+              }}
+              title="Guru Sumed: Scholarly, focused, and earnest Indian English teacher delivery"
+            >
+              Guru Sumed (Scholarly)
+            </button>
+          </div>
         </div>
 
         {/* LOADING STATE */}
@@ -637,20 +713,16 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               style={{ borderTopColor: 'var(--accent-saffron)' }}
             />
             <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-              {isWakingUp
-                ? 'Service is Waking up'
-                : chunkProgress && chunkProgress.total > 1
+              {chunkProgress && chunkProgress.total > 1
                 ? `Generating Audio Section ${chunkProgress.current} of ${chunkProgress.total}...`
-                : 'Generating Shravan Audio...'}
+                : `Preparing Guru Narration with ${selectedVoice}...`}
             </h3>
             <p className="text-xs sm:text-sm max-w-md" style={{ color: 'var(--text-secondary)' }}>
-              {isWakingUp
-                ? 'The TTS narration service is starting up after inactivity. Please allow a short moment...'
-                : chunkProgress && chunkProgress.total > 1
-                ? `Synthesizing educational chapter summary in fast, smooth sections (${chunkProgress.current}/${chunkProgress.total}). Please hold on.`
-                : 'Connecting to Edge TTS voice service. Please wait a few moments...'}
+              {chunkProgress && chunkProgress.total > 1
+                ? `Synthesizing educational chapter summary in smooth sections (${chunkProgress.current}/${chunkProgress.total}). Please hold on.`
+                : 'Preparing natural teacher voice narration with custom delivery style. Please allow a few moments...'}
             </p>
-            {chunkProgress && chunkProgress.total > 1 && !isWakingUp && (
+            {chunkProgress && chunkProgress.total > 1 && (
               <div className="w-56 h-2 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden mt-2">
                 <div
                   className="h-full transition-all duration-300 rounded-full"
@@ -671,21 +743,21 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               <AlertCircle className="w-7 h-7" />
             </div>
             <h3 className="text-lg font-bold text-red-700 dark:text-red-300">
-              Audio Generation Notice
+              Audio Narration Notice
             </h3>
             <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              {errorMessage || 'Failed to generate audio narration with voice service.'}
+              {errorMessage || 'Failed to synthesize audio narration with the Indian Guru voice engine.'}
             </p>
             <button
               type="button"
               onClick={() => {
-                generateAudio();
+                generateAudio(selectedVoice);
               }}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition-all hover:opacity-90 cursor-pointer"
               style={{ backgroundColor: 'var(--accent-saffron)', color: '#FFFFFF' }}
             >
               <RefreshCw className="w-4 h-4" />
-              <span>Retry Generating Audio</span>
+              <span>Retry Narration</span>
             </button>
           </div>
         )}

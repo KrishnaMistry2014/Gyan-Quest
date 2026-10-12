@@ -425,23 +425,11 @@ const MainAppContent: React.FC = () => {
             <div className="space-y-4 sm:space-y-8">
               <Hero
                 onStartQuest={handleStartQuest}
-                onExplore={() => scrollToSection('journey')}
+                onExplore={() => scrollToSection('card-upload-textbooks')}
                 onPdfUpload={handlePdfUploaded}
               />
 
-              <LearningJourney />
-
-              <GamificationSection />
-
               <CustomMaterialSection onPdfUpload={handlePdfUploaded} />
-
-              <GuruSection />
-
-              <FocusModeSection />
-
-              <AboutSection />
-
-              <FinalCTA onStartQuest={handleStartQuest} />
             </div>
           )}
         </main>
