@@ -50,6 +50,9 @@ export default defineConfig(() => {
       },
     },
     server: {
+      host: '0.0.0.0',
+      port: 3000,
+      allowedHosts: true as const,
       // HMR is disabled in AI Studio preview to prevent websocket connection errors.
       hmr: false,
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
