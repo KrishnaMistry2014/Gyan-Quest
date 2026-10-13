@@ -9,7 +9,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { buildValidCrosswordLayout } from './src/lib/crosswordGenerator';
+import { buildValidCrosswordLayout } from './src/lib/crosswordGenerator.ts';
 
 dotenv.config();
 

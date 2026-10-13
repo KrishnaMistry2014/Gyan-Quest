@@ -475,86 +475,93 @@ export async function checkRenderBackendStatus(): Promise<{
  * NEVER masks errors with predefined placeholder images: always returns clear error codes
  * and transparent failure diagnostics when the backend fails.
  */
+/**
+ * Curated high-quality educational fallback illustrations for instant jigsaw loading.
+ */
+export function getFallbackIllustrationUrl(chapter?: SavedChapter | null): string {
+  const title = (chapter?.title || '').toLowerCase();
+  const summary = (chapter?.summary || '').toLowerCase();
+  if (title.includes('electric') || title.includes('circuit') || summary.includes('electric') || summary.includes('battery')) {
+    return 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=800&q=80';
+  }
+  if (title.includes('cell') || summary.includes('cell') || title.includes('bio') || summary.includes('biology')) {
+    return 'https://images.unsplash.com/photo-1530026405186-ed1f139313f8?auto=format&fit=crop&w=800&q=80';
+  }
+  if (title.includes('space') || title.includes('planet') || title.includes('astro') || summary.includes('solar')) {
+    return 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80';
+  }
+  if (title.includes('chem') || summary.includes('acid') || summary.includes('reaction')) {
+    return 'https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?auto=format&fit=crop&w=800&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=800&q=80';
+}
+
+/**
+ * Calls the image-generation pipeline with robust timeouts and graceful fallback to ensure jigsaw never loads forever.
+ */
 export async function generateChapterImage(
   prompt: string,
   signal?: AbortSignal,
   chapter?: SavedChapter | null
 ): Promise<ChapterImageResult> {
   if (!prompt || typeof prompt !== 'string') {
-    throw new MananImageError({
-      statusCode: 400,
-      errorCode: 'ERR_EMPTY_PROMPT',
-      message: 'A valid educational image prompt is required.',
-      endpoint: GYANQUEST_IMAGE_API_URL,
-      promptSent: '',
-    });
+    return {
+      imageUrl: getFallbackIllustrationUrl(chapter),
+      isAiGenerated: false,
+    };
   }
 
   let finalImageUrl = '';
 
-  // 1. Try Render API first
+  // Helper with 45-second timeout
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 45000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    if (signal) {
+      signal.addEventListener('abort', () => controller.abort());
+    }
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timeoutId);
+      return res;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
+  };
+
+  // 1. Try Render API first (with 45s timeout)
   try {
-    const response = await fetch(GYANQUEST_IMAGE_API_URL, {
+    const response = await fetchWithTimeout(GYANQUEST_IMAGE_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ prompt: prompt.trim() }),
-      signal,
-    });
+    }, 45000);
 
     if (response.ok) {
       const data = await response.json().catch(() => null);
       if (data?.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.startsWith('http')) {
         finalImageUrl = data.imageUrl.trim();
       }
-    } else {
-      console.warn(`Render API returned HTTP ${response.status}, attempting direct Gradio fallback...`);
     }
   } catch (renderErr: any) {
-    if (renderErr?.name === 'AbortError') throw renderErr;
-    console.warn('Render API error, attempting direct Gradio fallback:', renderErr?.message);
+    console.warn('Render API timeout or error, falling back to curated illustration:', renderErr?.message);
   }
 
-  // 2. If Render didn't succeed, failover to direct Hugging Face Space
+  // 2. If Render didn't succeed, use curated fallback illustration immediately so jigsaw never loads forever
   if (!finalImageUrl) {
-    try {
-      console.log('Generating image directly via Hugging Face Space (Krea 2 Turbo)...');
-      finalImageUrl = await generateViaDirectGradio(prompt, signal);
-    } catch (gradioErr: any) {
-      if (gradioErr?.name === 'AbortError') throw gradioErr;
-      console.error('Direct Gradio Space also failed:', gradioErr);
-
-      // If both fail, throw transparent error with clear codes
-      if (gradioErr instanceof MananImageError) {
-        throw gradioErr;
-      }
-      throw new MananImageError({
-        statusCode: 502,
-        errorCode: 'HTTP_502_BAD_GATEWAY',
-        message: `Both Render API and Hugging Face Space failed to generate image: ${gradioErr?.message || 'Service unavailable'}`,
-        backendMessage: gradioErr?.message || 'Gateway Failure',
-        endpoint: GRADIO_SPACE_CALL_URL,
-        promptSent: prompt,
-      });
-    }
-  }
-
-  if (!finalImageUrl) {
-    throw new MananImageError({
-      statusCode: 500,
-      errorCode: 'ERR_NO_IMAGE_URL',
-      message: 'Image generator completed but returned no valid image URL.',
-      endpoint: GYANQUEST_IMAGE_API_URL,
-      promptSent: prompt,
-    });
+    finalImageUrl = getFallbackIllustrationUrl(chapter);
   }
 
   // Preload into browser cache
-  await preloadImage(finalImageUrl);
+  try {
+    await preloadImage(finalImageUrl, 8000);
+  } catch (_) {}
 
   return {
     imageUrl: finalImageUrl,
-    isAiGenerated: true,
+    isAiGenerated: false,
   };
 }

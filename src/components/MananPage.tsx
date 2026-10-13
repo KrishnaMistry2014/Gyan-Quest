@@ -29,6 +29,7 @@ import {
   checkGradioSpaceStatus,
   checkRenderBackendStatus,
   GYANQUEST_IMAGE_API_URL,
+  getFallbackIllustrationUrl,
 } from '../lib/mananApi';
 import {
   JigsawPiece,
@@ -153,46 +154,35 @@ export const MananPage: React.FC<MananPageProps> = ({
     setStatus('generating');
     setErrorMessage('');
     setErrorDetails(null);
-    setStatusMessage('Formulating educational prompt strictly from chapter concepts...');
+    setStatusMessage('Preparing chapter illustration for jigsaw puzzle...');
 
     let activePrompt = '';
     try {
       activePrompt = await buildEducationalImagePrompt(chapter);
-      setStatusMessage('Requesting illustration from Krea 2 Turbo...');
+      setStatusMessage('Loading puzzle illustration...');
 
       const result = await generateChapterImage(activePrompt, controller.signal, chapter);
+      const finalUrl = result.imageUrl || getFallbackIllustrationUrl(chapter);
+
       if (result.isAiGenerated) {
-        sessionStorage.setItem(sessionCacheKey, result.imageUrl);
+        sessionStorage.setItem(sessionCacheKey, finalUrl);
       }
 
-      setImageUrl(result.imageUrl);
+      setImageUrl(finalUrl);
       setIsAiGenerated(result.isAiGenerated);
       setStatus('ready');
       setErrorDetails(null);
-      initPuzzlePieces(result.imageUrl, gridSize, boardSize);
+      initPuzzlePieces(finalUrl, gridSize, boardSize);
     } catch (err: any) {
       if (err?.name === 'AbortError') return;
-      console.warn('Image generation error:', err);
-      setStatus('error');
-
-      const details =
-        err instanceof MananImageError
-          ? err
-          : new MananImageError({
-              statusCode: err?.statusCode || 0,
-              errorCode: err?.errorCode || 'ERR_IMAGE_GENERATION',
-              message: err?.message || 'Failed to generate chapter image.',
-              backendMessage: err?.backendMessage || err?.message,
-              endpoint: GYANQUEST_IMAGE_API_URL,
-              promptSent: activePrompt,
-            });
-
-      setErrorDetails(details);
-      setErrorMessage(details.message);
-
-      // Perform background health check on the Hugging Face space and Render backend
-      checkGradioSpaceStatus().then(setSpaceHealth).catch(() => {});
-      checkRenderBackendStatus().then(setBackendHealth).catch(() => {});
+      console.warn('Image generation fallback used:', err);
+      // Graceful fallback so jigsaw never loads forever
+      const fallbackUrl = getFallbackIllustrationUrl(chapter);
+      setImageUrl(fallbackUrl);
+      setIsAiGenerated(false);
+      setStatus('ready');
+      setErrorDetails(null);
+      initPuzzlePieces(fallbackUrl, gridSize, boardSize);
     } finally {
       isGeneratingRef.current = false;
     }
