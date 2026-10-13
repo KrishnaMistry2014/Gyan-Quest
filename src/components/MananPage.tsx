@@ -29,7 +29,6 @@ import {
   checkGradioSpaceStatus,
   checkRenderBackendStatus,
   GYANQUEST_IMAGE_API_URL,
-  getFallbackIllustrationUrl,
 } from '../lib/mananApi';
 import {
   JigsawPiece,
@@ -121,12 +120,15 @@ export const MananPage: React.FC<MananPageProps> = ({
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
+  const isMountedRef = useRef<boolean>(true);
+
   // Initialize and load the puzzle image (reuses session cached image if present)
   const loadPuzzleImage = useCallback(async (forceNew = false) => {
+    // Prevent duplicate generation requests while one is already running
     if (isGeneratingRef.current) return;
 
     if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+      abortControllerRef.current.abort('superseded');
     }
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -145,6 +147,7 @@ export const MananPage: React.FC<MananPageProps> = ({
         setIsAiGenerated(true);
         setStatus('ready');
         setErrorMessage('');
+        setErrorDetails(null);
         initPuzzlePieces(cachedUrl, gridSize, boardSize);
         return;
       }
@@ -156,34 +159,96 @@ export const MananPage: React.FC<MananPageProps> = ({
     setErrorDetails(null);
     setStatusMessage('Preparing chapter illustration for jigsaw puzzle...');
 
+    // 45-second frontend request timeout
+    let timedOut = false;
+    const timeoutTimer = setTimeout(() => {
+      timedOut = true;
+      try {
+        controller.abort('timeout');
+      } catch (_) {
+        controller.abort();
+      }
+    }, 45000);
+
     let activePrompt = '';
     try {
-      activePrompt = await buildEducationalImagePrompt(chapter);
-      setStatusMessage('Loading puzzle illustration...');
+      activePrompt = await buildEducationalImagePrompt(chapter, controller.signal);
+
+      if (!isMountedRef.current) return;
+
+      setStatusMessage('Synthesizing puzzle illustration with AI...');
 
       const result = await generateChapterImage(activePrompt, controller.signal, chapter);
-      const finalUrl = result.imageUrl || getFallbackIllustrationUrl(chapter);
 
-      if (result.isAiGenerated) {
-        sessionStorage.setItem(sessionCacheKey, finalUrl);
+      if (!isMountedRef.current) return;
+
+      if (!result?.imageUrl) {
+        throw new MananImageError({
+          statusCode: 502,
+          errorCode: 'ERR_EMPTY_IMAGE_RESULT',
+          message: 'The image generation service did not return a valid image URL.',
+          endpoint: GYANQUEST_IMAGE_API_URL,
+          promptSent: activePrompt,
+        });
       }
 
-      setImageUrl(finalUrl);
+      if (result.isAiGenerated) {
+        sessionStorage.setItem(sessionCacheKey, result.imageUrl);
+      }
+
+      setImageUrl(result.imageUrl);
       setIsAiGenerated(result.isAiGenerated);
       setStatus('ready');
+      setErrorMessage('');
       setErrorDetails(null);
-      initPuzzlePieces(finalUrl, gridSize, boardSize);
+      initPuzzlePieces(result.imageUrl, gridSize, boardSize);
     } catch (err: any) {
-      if (err?.name === 'AbortError') return;
-      console.warn('Image generation fallback used:', err);
-      // Graceful fallback so jigsaw never loads forever
-      const fallbackUrl = getFallbackIllustrationUrl(chapter);
-      setImageUrl(fallbackUrl);
-      setIsAiGenerated(false);
-      setStatus('ready');
-      setErrorDetails(null);
-      initPuzzlePieces(fallbackUrl, gridSize, boardSize);
+      if (!isMountedRef.current) return;
+
+      const isTimeout =
+        timedOut ||
+        (err instanceof MananImageError && err.statusCode === 408) ||
+        controller.signal.reason === 'timeout';
+
+      const isUserCancelled =
+        !isTimeout &&
+        (err?.name === 'AbortError' || controller.signal.aborted) &&
+        controller.signal.reason !== 'timeout';
+
+      if (isUserCancelled) {
+        // Legitimate user cancellation (e.g. unmounted or user triggered new load)
+        return;
+      }
+
+      let errorObj: MananImageError;
+      if (err instanceof MananImageError) {
+        errorObj = err;
+      } else if (isTimeout) {
+        errorObj = new MananImageError({
+          statusCode: 408,
+          errorCode: 'ERR_REQUEST_TIMEOUT',
+          message: 'The image generation request timed out after 45 seconds. The upstream service took too long to respond.',
+          backendMessage: 'Frontend request timed out after 45000ms. The image backend is either waking up or experiencing high traffic. Please retry in a few moments.',
+          endpoint: GYANQUEST_IMAGE_API_URL,
+          promptSent: activePrompt,
+        });
+      } else {
+        errorObj = new MananImageError({
+          statusCode: err?.statusCode || 0,
+          errorCode: err?.errorCode || 'ERR_GENERATION_FAILED',
+          message: err?.message || 'An unexpected error occurred while generating the jigsaw puzzle image.',
+          backendMessage: err?.backendMessage || err?.message || 'Generation failed',
+          endpoint: GYANQUEST_IMAGE_API_URL,
+          promptSent: activePrompt,
+        });
+      }
+
+      console.error('Jigsaw image generation failed:', errorObj);
+      setStatus('error');
+      setErrorMessage(errorObj.message);
+      setErrorDetails(errorObj);
     } finally {
+      clearTimeout(timeoutTimer);
       isGeneratingRef.current = false;
     }
   }, [chapter, gridSize, boardSize]);
@@ -231,12 +296,14 @@ export const MananPage: React.FC<MananPageProps> = ({
     }
   }, [boardSize, gridSize]);
 
-  // Initial load on mount
+  // Initial load on mount & cleanup
   useEffect(() => {
+    isMountedRef.current = true;
     loadPuzzleImage(false);
     return () => {
+      isMountedRef.current = false;
       if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+        abortControllerRef.current.abort('unmount');
       }
     };
   }, []);

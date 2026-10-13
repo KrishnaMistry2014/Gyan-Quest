@@ -210,12 +210,21 @@ export function buildFallbackEducationalPrompt(chapter?: SavedChapter | null): s
  * Calls the server's Gemini prompt synthesizer first to extract exact domain nuance,
  * falling back gracefully to the domain-disambiguated local generator.
  */
-export async function buildEducationalImagePrompt(chapter?: SavedChapter | null): Promise<string> {
+export async function buildEducationalImagePrompt(
+  chapter?: SavedChapter | null,
+  signal?: AbortSignal
+): Promise<string> {
   if (!chapter) {
     return buildFallbackEducationalPrompt(null);
   }
 
   try {
+    const promptCtrl = new AbortController();
+    const promptTimer = setTimeout(() => promptCtrl.abort(), 5000);
+    if (signal) {
+      signal.addEventListener('abort', () => promptCtrl.abort(), { once: true });
+    }
+
     const res = await fetch('/api/generate-image-prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -224,10 +233,12 @@ export async function buildEducationalImagePrompt(chapter?: SavedChapter | null)
         summary: chapter.summary,
         fileName: chapter.fileName,
       }),
+      signal: promptCtrl.signal,
     });
+    clearTimeout(promptTimer);
 
     if (res.ok) {
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (data?.prompt && typeof data.prompt === 'string' && data.prompt.trim().length > 30) {
         return data.prompt.trim();
       }
@@ -497,71 +508,135 @@ export function getFallbackIllustrationUrl(chapter?: SavedChapter | null): strin
 }
 
 /**
- * Calls the image-generation pipeline with robust timeouts and graceful fallback to ensure jigsaw never loads forever.
+ * Calls the image-generation pipeline and preloads the resulting image.
+ * Uses Render API with seamless failover to direct Hugging Face Space.
+ * NEVER masks errors with predefined placeholder images: always returns clear error codes
+ * and transparent failure diagnostics when the backend fails.
  */
 export async function generateChapterImage(
   prompt: string,
   signal?: AbortSignal,
   chapter?: SavedChapter | null
 ): Promise<ChapterImageResult> {
-  if (!prompt || typeof prompt !== 'string') {
-    return {
-      imageUrl: getFallbackIllustrationUrl(chapter),
-      isAiGenerated: false,
-    };
+  if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+    throw new MananImageError({
+      statusCode: 400,
+      errorCode: 'ERR_EMPTY_PROMPT',
+      message: 'Chapter illustration prompt is empty or invalid.',
+      endpoint: GYANQUEST_IMAGE_API_URL,
+      promptSent: '',
+    });
   }
 
-  let finalImageUrl = '';
+  const cleanPrompt = prompt.trim();
+  let primaryError: MananImageError | null = null;
 
-  // Helper with 45-second timeout
-  const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs = 45000) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    if (signal) {
-      signal.addEventListener('abort', () => controller.abort());
-    }
-    try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(timeoutId);
-      return res;
-    } catch (err) {
-      clearTimeout(timeoutId);
-      throw err;
-    }
-  };
-
-  // 1. Try Render API first (with 45s timeout)
+  // 1. Attempt Primary: Render API (gyanquest-image-api)
   try {
-    const response = await fetchWithTimeout(GYANQUEST_IMAGE_API_URL, {
+    const res = await fetch(GYANQUEST_IMAGE_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Accept: 'application/json',
       },
-      body: JSON.stringify({ prompt: prompt.trim() }),
-    }, 45000);
+      body: JSON.stringify({ prompt: cleanPrompt }),
+      signal,
+    });
 
-    if (response.ok) {
-      const data = await response.json().catch(() => null);
-      if (data?.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.startsWith('http')) {
-        finalImageUrl = data.imageUrl.trim();
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.imageUrl && typeof data.imageUrl === 'string' && (data.imageUrl.startsWith('http') || data.imageUrl.startsWith('data:'))) {
+        const imageUrl = data.imageUrl.trim();
+        await preloadImage(imageUrl, 15000);
+        return {
+          imageUrl,
+          isAiGenerated: true,
+          message: 'Generated via Gyan Quest Image API',
+        };
+      } else {
+        primaryError = new MananImageError({
+          statusCode: res.status,
+          errorCode: 'ERR_INVALID_IMAGE_PAYLOAD',
+          message: 'Server returned HTTP 200 OK but response payload did not contain a valid image URL.',
+          backendMessage: JSON.stringify(data || 'Empty or invalid response body'),
+          endpoint: GYANQUEST_IMAGE_API_URL,
+          promptSent: cleanPrompt,
+        });
       }
+    } else {
+      let backendMsg = `HTTP ${res.status}: ${res.statusText}`;
+      try {
+        const errJson = await res.json();
+        backendMsg = errJson?.error || errJson?.message || errJson?.detail || backendMsg;
+      } catch (_) {
+        try {
+          const text = await res.text();
+          if (text) backendMsg = text.slice(0, 300);
+        } catch (_) {}
+      }
+
+      primaryError = new MananImageError({
+        statusCode: res.status,
+        errorCode: `HTTP_${res.status}_RENDER_FAILED`,
+        message: `Image generation server error (${res.status}): ${backendMsg}`,
+        backendMessage: backendMsg,
+        endpoint: GYANQUEST_IMAGE_API_URL,
+        promptSent: cleanPrompt,
+      });
     }
-  } catch (renderErr: any) {
-    console.warn('Render API timeout or error, falling back to curated illustration:', renderErr?.message);
+  } catch (err: any) {
+    if (signal?.aborted) {
+      throw err;
+    }
+    primaryError = new MananImageError({
+      statusCode: 0,
+      errorCode: 'ERR_RENDER_CONNECT_FAILED',
+      message: err?.message || 'Failed to connect to primary image generation service.',
+      backendMessage: err?.message || 'Connection failed',
+      endpoint: GYANQUEST_IMAGE_API_URL,
+      promptSent: cleanPrompt,
+    });
   }
 
-  // 2. If Render didn't succeed, use curated fallback illustration immediately so jigsaw never loads forever
-  if (!finalImageUrl) {
-    finalImageUrl = getFallbackIllustrationUrl(chapter);
+  // If signal was aborted during primary attempt, propagate immediately
+  if (signal?.aborted) {
+    throw primaryError || new Error('Request aborted');
   }
 
-  // Preload into browser cache
+  // 2. Attempt Failover: Hugging Face Gradio Space (krea-krea-2.hf.space - Krea 2 Turbo)
   try {
-    await preloadImage(finalImageUrl, 8000);
-  } catch (_) {}
+    const gradioUrl = await generateViaDirectGradio(cleanPrompt, signal);
+    if (gradioUrl && typeof gradioUrl === 'string' && (gradioUrl.startsWith('http') || gradioUrl.startsWith('data:'))) {
+      await preloadImage(gradioUrl, 15000);
+      return {
+        imageUrl: gradioUrl,
+        isAiGenerated: true,
+        message: 'Generated via Hugging Face Krea 2 Turbo',
+      };
+    } else {
+      throw new MananImageError({
+        statusCode: 502,
+        errorCode: 'ERR_GRADIO_INVALID_OUTPUT',
+        message: 'Hugging Face Space completed but did not return a valid image URL.',
+        endpoint: GRADIO_SPACE_CALL_URL,
+        promptSent: cleanPrompt,
+      });
+    }
+  } catch (gradioErr: any) {
+    if (signal?.aborted) {
+      throw gradioErr;
+    }
 
-  return {
-    imageUrl: finalImageUrl,
-    isAiGenerated: false,
-  };
+    const primaryDesc = primaryError?.backendMessage || primaryError?.message || 'Render API unreachable';
+    const gradioDesc = (gradioErr instanceof MananImageError ? gradioErr.backendMessage : gradioErr?.message) || 'Hugging Face Space error';
+
+    throw new MananImageError({
+      statusCode: primaryError?.statusCode || (gradioErr instanceof MananImageError ? gradioErr.statusCode : 502),
+      errorCode: primaryError?.errorCode || (gradioErr instanceof MananImageError ? gradioErr.errorCode : 'ERR_ALL_SERVICES_FAILED'),
+      message: `Failed to generate chapter illustration. Primary service and failover both encountered errors: ${primaryDesc}`,
+      backendMessage: `Render: ${primaryDesc} | Gradio: ${gradioDesc}`,
+      endpoint: GYANQUEST_IMAGE_API_URL,
+      promptSent: cleanPrompt,
+    });
+  }
 }
