@@ -19,7 +19,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           color: 'var(--text-secondary)',
         }}
       >
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Col 1: Brand & Philosophy */}
           <div className="md:col-span-2 space-y-3">
             <div className="flex items-center gap-2.5">
@@ -39,60 +39,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             <div className="text-xs font-semibold px-3 py-1 rounded-full border inline-block" style={{ backgroundColor: 'var(--accent-saffron-light)', borderColor: 'var(--border-warm)', color: 'var(--accent-saffron-text)' }}>
               विद्या • श्रवण • मनन • प्रश्न • परीक्षा
             </div>
-          </div>
-
-          {/* Col 2: Navigation */}
-          <div className="space-y-2.5">
-            <div className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
-              Platform Modules
-            </div>
-            <ul className="space-y-2 text-xs">
-              <li>
-                <button onClick={() => onNavigate('journey')} className="hover:text-orange-600 transition-colors text-left cursor-pointer">
-                  The 5-Stage Journey
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('gamification')} className="hover:text-orange-600 transition-colors text-left cursor-pointer">
-                  Quest & XP System
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('custom-material')} className="hover:text-orange-600 transition-colors text-left cursor-pointer">
-                  Study Your Material
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('guru')} className="hover:text-orange-600 transition-colors text-left cursor-pointer">
-                  Meet Guru AI
-                </button>
-              </li>
-              <li>
-                <button onClick={() => onNavigate('focus-mode')} className="hover:text-orange-600 transition-colors text-left cursor-pointer">
-                  Focus Mode & Digital Wellness
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          {/* Col 3: Architecture & Firebase */}
-          <div className="space-y-2.5">
-            <div className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
-              Technology & Cloud
-            </div>
-            <div className="p-4 rounded-2xl border text-xs space-y-1.5" style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-warm)' }}>
-              <div className="font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
-                <ShieldCheck className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                <span>Firebase Cloud Ready</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Copyright Bar */}
-        <div className="pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ borderColor: 'var(--border-warm)' }}>
-          <div>
-            © {new Date().getFullYear()} Gyan Quest. Built for meaningful education.
           </div>
         </div>
       </div>
