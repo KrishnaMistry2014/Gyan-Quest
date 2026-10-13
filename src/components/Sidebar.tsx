@@ -33,7 +33,8 @@ export type AppView =
   | 'manan'
   | 'bhagavad-gita'
   | 'focus-mode'
-  | 'store';
+  | 'store'
+  | 'gita-game';
 
 interface SidebarProps {
   currentView: AppView;
@@ -113,7 +114,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentView === 'shravan' ||
     currentView === 'manan';
 
-  const isGitaActive = currentView === 'bhagavad-gita';
+  const isGitaActive = currentView === 'bhagavad-gita' || currentView === 'gita-game';
   const isFocusActive = currentView === 'focus-mode';
   const isStoreActive = currentView === 'store';
   const isAboutActive = currentView === 'landing' && activeSection === 'about';

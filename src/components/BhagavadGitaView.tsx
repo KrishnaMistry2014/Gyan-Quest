@@ -8,14 +8,17 @@ import {
   CheckCircle2,
   BookMarked,
   Layers,
-  MessageSquare
+  MessageSquare,
+  Gamepad2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 interface BhagavadGitaViewProps {
   onOpenGuruChatWithPrompt?: (prompt: string) => void;
   onNavigateHome?: () => void;
   onNavigateMyBooks?: () => void;
+  onStartGitaGame?: () => void;
 }
 
 interface GitaChapterPreview {
@@ -28,46 +31,6 @@ interface GitaChapterPreview {
 }
 
 const GITA_CHAPTERS: GitaChapterPreview[] = [
-  {
-    number: 1,
-    sanskritName: 'Arjuna Vishada Yoga',
-    englishTitle: 'The Yoga of Despondency',
-    theme: 'Karma',
-    versesCount: 47,
-    summary: 'Arjuna beholds friends, teachers, and kin on the sacred field of Kurukshetra and experiences moral crisis and overwhelming doubt.',
-  },
-  {
-    number: 2,
-    sanskritName: 'Sankhya Yoga',
-    englishTitle: 'The Yoga of Analytic Knowledge',
-    theme: 'Jnana',
-    versesCount: 72,
-    summary: 'Lord Krishna reveals the eternal, indestructible nature of the soul (Atman) and introduces Karma Yoga: selfless action without attachment to fruits.',
-  },
-  {
-    number: 3,
-    sanskritName: 'Karma Yoga',
-    englishTitle: 'The Yoga of Action',
-    theme: 'Karma',
-    versesCount: 43,
-    summary: 'The science of work as sacrifice (Yajna). Performing ordained duties for the welfare of the world (Lokasamgraha) without selfish desire.',
-  },
-  {
-    number: 4,
-    sanskritName: 'Jnana Karma Sannyasa Yoga',
-    englishTitle: 'The Yoga of Knowledge & Renunciation',
-    theme: 'Jnana',
-    versesCount: 42,
-    summary: 'The ancient lineage of wisdom, the divine descent of Avatars to restore Dharma, and how the fire of true knowledge burns all karmic bondage.',
-  },
-  {
-    number: 5,
-    sanskritName: 'Karma Sannyasa Yoga',
-    englishTitle: 'The Yoga of Renunciation of Action',
-    theme: 'Karma',
-    versesCount: 29,
-    summary: 'Reconciling renunciation with active duty. The enlightened sage sees divine presence in all beings and remains tranquil in success or adversity.',
-  },
   {
     number: 6,
     sanskritName: 'Dhyana Yoga',
@@ -82,9 +45,24 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
   onOpenGuruChatWithPrompt,
   onNavigateHome,
   onNavigateMyBooks,
+  onStartGitaGame,
 }) => {
-  const { user } = useAuth();
-  const [selectedChapter, setSelectedChapter] = useState<GitaChapterPreview | null>(GITA_CHAPTERS[1]);
+  const { user, openAuthModal } = useAuth();
+  const { showToast } = useToast();
+  const [selectedChapter, setSelectedChapter] = useState<GitaChapterPreview | null>(GITA_CHAPTERS[0]);
+
+  const handleLearnClick = () => {
+    if (!user) {
+      showToast({
+        title: 'Sign In Required',
+        message: 'Please sign in to play the Bhagavad Gita Chapter 6 Word Quest and save your learning progress.',
+        type: 'info',
+      });
+      openAuthModal();
+    } else {
+      onStartGitaGame?.();
+    }
+  };
 
   return (
     <div id="bhagavad-gita-view" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8 animate-in fade-in duration-300">
@@ -115,30 +93,11 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
             The Bhagavad Gita is a 700-verse dialogue between Arjuna and Krishna on the battlefield of Kurukshetra. It forms the ultimate philosophical guide on duty, moral clarity, emotion mastery, and selfless action in the face of life’s deepest dilemmas.
           </p>
 
-          {/* Key Verse Highlight */}
-          <div
-            className="p-5 rounded-2xl border space-y-2 mt-4"
-            style={{
-              backgroundColor: 'var(--bg-card-subtle)',
-              borderColor: 'var(--border-warm)',
-            }}
-          >
-            <span className="text-xs font-bold uppercase tracking-wider block" style={{ color: 'var(--accent-saffron)' }}>
-              Featured Shloka • Chapter 2, Verse 47
-            </span>
-            <p className="font-serif italic text-base sm:text-lg leading-relaxed font-semibold" style={{ color: 'var(--text-primary)' }}>
-              "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन। मा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि॥"
-            </p>
-            <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              "You have a right only to perform your prescribed duty, but never to claim its fruits. Never let the fruits of action be your motive, nor let your attachment be to inaction."
-            </p>
-          </div>
-
           <div className="flex flex-wrap items-center gap-3 pt-2">
             {onOpenGuruChatWithPrompt && (
               <button
                 type="button"
-                onClick={() => onOpenGuruChatWithPrompt('Explain the core teaching of Bhagavad Gita Chapter 2 Verse 47 for students.')}
+                onClick={() => onOpenGuruChatWithPrompt('Teach me the core concepts of Bhagavad Gita Chapter 6 Dhyana Yoga with practical student examples.')}
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer"
                 style={{
                   backgroundColor: 'var(--accent-saffron)',
@@ -146,7 +105,7 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
                 }}
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Discuss Verse with Guru AI</span>
+                <span>Ask Guru AI about Chapter 6</span>
               </button>
             )}
 
@@ -169,20 +128,20 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
         </div>
       </div>
 
-      {/* Chapters Preview Grid */}
+      {/* Chapters Preview */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-              Curated Chapter Explorer
+              Chapter Explorer
             </h2>
             <p className="text-xs sm:text-sm" style={{ color: 'var(--text-muted)' }}>
-              Comprehensive 18-chapter interactive syllabus currently being compiled with shloka audio & word breakdowns.
+              Interactive Dhyana Yoga study with shloka breakdown, wisdom reflections, and Word Quest gameplay.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {GITA_CHAPTERS.map((ch) => {
             const isSelected = selectedChapter?.number === ch.number;
             return (
@@ -226,10 +185,18 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
 
                 <div className="pt-4 mt-3 border-t flex items-center justify-between text-xs font-bold" style={{ borderColor: 'var(--border-warm)' }}>
                   <span style={{ color: 'var(--text-muted)' }}>
-                    Status: <span className="text-amber-600 dark:text-amber-400">Curating</span>
+                    Status:{' '}
+                    {ch.number === 6 ? (
+                      <span className="text-emerald-700 dark:text-emerald-400 font-bold inline-flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-500" />
+                        <span>Game Ready</span>
+                      </span>
+                    ) : (
+                      <span className="text-amber-600 dark:text-amber-400">Curating</span>
+                    )}
                   </span>
                   <span className="flex items-center gap-1" style={{ color: 'var(--accent-saffron-text)' }}>
-                    <span>Details</span>
+                    <span>{ch.number === 6 ? 'Play Quest' : 'Details'}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
@@ -273,7 +240,7 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
           </p>
 
           <div
-            className="p-4 rounded-2xl border text-xs leading-relaxed flex items-center justify-between gap-4"
+            className="p-4 rounded-2xl border text-xs leading-relaxed flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
             style={{
               backgroundColor: 'var(--bg-main)',
               borderColor: 'var(--border-warm)',
@@ -288,21 +255,79 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
               </span>
             </div>
 
-            {onOpenGuruChatWithPrompt && (
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
+              {onOpenGuruChatWithPrompt && (
+                <button
+                  type="button"
+                  id="btn-ask-guru-ai"
+                  onClick={() => onOpenGuruChatWithPrompt(`Teach me the key concepts of Bhagavad Gita Chapter ${selectedChapter.number} (${selectedChapter.sanskritName}) with real-life student examples.`)}
+                  className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all hover:scale-102 active:scale-98 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron)',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Ask Guru AI</span>
+                </button>
+              )}
+
+              {/* In CH-6 under / alongside Ask Guru AI: Option of Learn */}
+              {selectedChapter.number === 6 && (
+                <button
+                  type="button"
+                  id="btn-learn-ch6-game"
+                  onClick={handleLearnClick}
+                  className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all hover:scale-102 active:scale-98 cursor-pointer shadow-xs"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron-light)',
+                    borderColor: 'var(--accent-saffron)',
+                    color: 'var(--accent-saffron-text)',
+                  }}
+                  title="Learn Dhyana Yoga through the Interactive Word Quest Game"
+                >
+                  <Gamepad2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                  <span>Learn</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Dedicated Chapter 6 Interactive Game Showcase Banner */}
+          {selectedChapter.number === 6 && (
+            <div
+              className="p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in"
+              style={{
+                backgroundColor: 'var(--bg-card-subtle)',
+                borderColor: 'var(--accent-saffron)',
+              }}
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="font-bold text-xs sm:text-sm text-amber-900 dark:text-amber-300">
+                    Interactive Word Quest Game • Chapter 6 Verse 6.17
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  Practice moderation, sleep habits, and mental discipline from Dhyana Yoga. Guess the 5-letter sacred keywords (YUKTA, DHYAN, SLEEP, HABIT, FOCUS) in 6 attempts!
+                </p>
+              </div>
+
               <button
                 type="button"
-                onClick={() => onOpenGuruChatWithPrompt(`Teach me the key concepts of Bhagavad Gita Chapter ${selectedChapter.number} (${selectedChapter.sanskritName}) with real-life student examples.`)}
-                className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all hover:scale-102 active:scale-98 cursor-pointer"
+                id="btn-start-game-ch6-banner"
+                onClick={handleLearnClick}
+                className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer text-white"
                 style={{
                   backgroundColor: 'var(--accent-saffron)',
-                  color: '#FFFFFF',
                 }}
               >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>Ask Guru AI</span>
+                <Gamepad2 className="w-4 h-4" />
+                <span>Start Word Quest</span>
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -27,6 +27,7 @@ import { MananPage } from './components/MananPage';
 import { BhagavadGitaView } from './components/BhagavadGitaView';
 import { StoreView } from './components/StoreView';
 import { FocusModeView } from './components/FocusModeView';
+import { GitaWordGame } from './components/GitaWordGame/GitaWordGame';
 import { SavedChapter } from './lib/chapters';
 import { Menu, BookOpenText, Sun, Moon, Flame, Zap } from 'lucide-react';
 
@@ -378,6 +379,10 @@ const MainAppContent: React.FC = () => {
               onOpenGuruChatWithPrompt={(prompt) => {
                 setIsGuruModalOpen(true);
               }}
+              onStartGitaGame={() => {
+                setCurrentView('gita-game');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               onNavigateHome={() => {
                 if (user) {
                   setCurrentView('dashboard');
@@ -392,6 +397,14 @@ const MainAppContent: React.FC = () => {
                 } else {
                   openAuthModal();
                 }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          ) : currentView === 'gita-game' ? (
+            /* Bhagavad Gita Interactive Word Quest Game */
+            <GitaWordGame
+              onBackToGita={() => {
+                setCurrentView('bhagavad-gita');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
@@ -441,8 +454,8 @@ const MainAppContent: React.FC = () => {
           )}
         </main>
 
-        {/* Footer (hidden on blank page view so workspace is blank below navbar) */}
-        {currentView !== 'blank' && (
+        {/* Footer (hidden on blank and game views) */}
+        {currentView !== 'blank' && currentView !== 'gita-game' && (
           <Footer onNavigate={(id) => {
             setCurrentView('landing');
             setTimeout(() => scrollToSection(id), 50);
