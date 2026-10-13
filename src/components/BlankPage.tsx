@@ -120,6 +120,7 @@ interface BlankPageProps {
   onNavigateDashboard?: () => void;
   onNavigateMyChapters?: () => void;
   onNavigateShravan?: (chapter: SavedChapter) => void;
+  onNavigateManan?: (chapter: SavedChapter) => void;
   onPdfUpload?: (file: File) => void;
   onClearUploadedPdf?: () => void;
 }
@@ -131,6 +132,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
   onNavigateDashboard,
   onNavigateMyChapters,
   onNavigateShravan,
+  onNavigateManan,
   onPdfUpload,
   onClearUploadedPdf,
 }) => {
@@ -867,33 +869,73 @@ export const BlankPage: React.FC<BlankPageProps> = ({
 
           {/* Bottom Navigation & Progression Link */}
           <div
-            className="p-6 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4"
+            className="p-6 sm:p-7 rounded-3xl border flex flex-col sm:flex-row items-center justify-between gap-5 transition-all shadow-sm"
             style={{
               backgroundColor: 'var(--bg-card)',
               borderColor: 'var(--border-warm)',
             }}
           >
-            <div className="text-center sm:text-left">
-              <h4 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-                Completed Vidya Reading?
-              </h4>
-              <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Advance to Shravan for concise audio explanation and conceptual synthesis.
+            <div className="text-center sm:text-left space-y-1">
+              <div className="flex items-center justify-center sm:justify-start gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <h4 className="text-base sm:text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+                  Completed Vidya Reading?
+                </h4>
+              </div>
+              <p className="text-xs sm:text-sm max-w-xl" style={{ color: 'var(--text-secondary)' }}>
+                Advance to Shravan for audio narration, or skip directly to Manan for interactive reflection games and crosswords.
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 w-full sm:w-auto">
               {onNavigateDashboard && (
                 <button
                   type="button"
                   onClick={onNavigateDashboard}
-                  className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-colors hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all hover:bg-stone-100 dark:hover:bg-stone-800 active:scale-95 cursor-pointer"
                   style={{
+                    backgroundColor: 'var(--bg-main)',
                     borderColor: 'var(--border-warm)',
                     color: 'var(--text-primary)',
                   }}
                 >
                   Back to Dashboard
+                </button>
+              )}
+
+              {onNavigateManan && (
+                <button
+                  type="button"
+                  id="btn-skip-to-manan"
+                  data-testid="btn-skip-to-manan"
+                  onClick={async () => {
+                    let ch: SavedChapter = currentChapter || selectedChapter || {
+                      id: activeFile ? `${activeFile.name}-${activeFile.size}` : `ch_${Date.now()}`,
+                      uniqueCode: generateUniqueChapterCode(),
+                      fileName: activeFile?.name || 'Chapter.pdf',
+                      title: docTitle || 'Chapter Summary',
+                      summary: summary,
+                      createdAt: new Date().toISOString(),
+                    };
+
+                    if (!ch.uniqueCode || ch.uniqueCode.length !== 10) {
+                      ch = { ...ch, uniqueCode: generateUniqueChapterCode() };
+                      setCurrentChapter(ch);
+                    }
+
+                    onNavigateManan(ch);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all hover:bg-amber-500/10 hover:border-amber-500/40 hover:shadow-xs active:scale-95 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
+                  title="Skip Shravan audio and go straight to Manan reflection and games"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>Skip to Manan</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-amber-500" />
                 </button>
               )}
 

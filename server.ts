@@ -9,6 +9,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { buildValidCrosswordLayout } from './src/lib/crosswordGenerator';
 
 dotenv.config();
 
@@ -213,11 +214,11 @@ Perform two essential tasks across all pages:
      * Describe all visual elements (components, labeled parts, arrows, directions, states of matter, apparatus).
      * Explain the scientific mechanism, process, or conceptual principle depicted in the visual and what it demonstrates.`;
 
-        // Try gemini-3.5-flash-lite for multimodal OCR
+        // Try gemini-3.8-flash for multimodal OCR
         try {
           console.log(`[Vidya Step 1C] Extracting text & diagram meanings with Gemini 3.5 Flash-Lite...`);
           const ocrPromise = ai.models.generateContent({
-            model: 'gemini-3.5-flash-lite',
+            model: 'gemini-3.8-flash',
             contents: [
               {
                 inlineData: {
@@ -351,7 +352,7 @@ CRITICAL REQUIREMENTS:
     try {
       console.log(`[Vidya Step 2] Generating 5-minute chapter summary with Gemini 3.5 Flash-Lite...`);
       const lite35Promise = ai.models.generateContent({
-        model: 'gemini-3.5-flash-lite',
+        model: 'gemini-3.8-flash',
         contents: [summarizerPrompt],
         config: {
           maxOutputTokens: 2048,
@@ -895,7 +896,7 @@ SAFEGUARDS & CORE BEHAVIOR RULES:
     // Primary: Gemini 3.5 Flash-Lite
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash-lite',
+        model: 'gemini-3.8-flash',
         contents,
         config: {
           systemInstruction,
@@ -983,7 +984,7 @@ Output format: Return ONLY a valid JSON object:
     try {
       const response = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-3.5-flash-lite',
+          model: 'gemini-3.8-flash',
           contents: promptInstruction,
           config: {
             responseMimeType: 'application/json',
@@ -1143,7 +1144,7 @@ Return JSON in this exact structure:
     try {
       const geminiRes = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-3.5-flash-lite',
+          model: 'gemini-3.8-flash',
           contents: promptText,
           config: {
             responseMimeType: 'application/json',
@@ -1176,6 +1177,20 @@ Return JSON in this exact structure:
     }
 
     if (parsedCrossword && Array.isArray(parsedCrossword.words) && parsedCrossword.words.length > 0) {
+      // Re-layout words using deterministic engine to eliminate any letter collisions
+      const rawWords = parsedCrossword.words.map((w: any) => ({
+        answer: String(w.answer || ''),
+        clue: String(w.clue || 'Concept from document'),
+      }));
+      const cleanPuzzle = buildValidCrosswordLayout(rawWords, {
+        title: parsedCrossword.title || topic || 'Chapter Crossword',
+        theme: parsedCrossword.theme || 'Key Concepts',
+        summary: parsedCrossword.summary || 'Interactive chapter crossword puzzle with guaranteed intersecting clues.',
+        glossary: parsedCrossword.glossary || [],
+      });
+      if (cleanPuzzle.words.length >= 4) {
+        return res.json(cleanPuzzle);
+      }
       return res.json(parsedCrossword);
     }
   } catch (geminiErr: any) {
@@ -1222,7 +1237,7 @@ Return JSON in this exact structure:
     try {
       const response = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-3.5-flash-lite',
+          model: 'gemini-3.8-flash',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',

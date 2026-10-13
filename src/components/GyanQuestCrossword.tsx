@@ -20,6 +20,7 @@ import {
 import { CrosswordData, CrosswordWord, CrosswordDifficulty } from '../types';
 import { SAMPLE_CROSSWORDS } from '../lib/sampleCrosswords';
 import { SavedChapter } from '../lib/chapters';
+import { buildValidCrosswordLayout, hasNoLetterCollisions } from '../lib/crosswordGenerator';
 
 interface GyanQuestCrosswordProps {
   initialChapter?: SavedChapter;
@@ -95,14 +96,14 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
     }
   }, [initialChapter]);
 
-  // Load and sanitize a crossword puzzle
+  // Load and sanitize a crossword puzzle with guaranteed collision-free intersecting layout
   const initGame = (rawPuzzle: CrosswordData) => {
     try {
       if (!rawPuzzle || typeof rawPuzzle !== 'object') {
         throw new Error('Received invalid puzzle format');
       }
 
-      const validWords: CrosswordWord[] = (Array.isArray(rawPuzzle.words) ? rawPuzzle.words : [])
+      let validWords: CrosswordWord[] = (Array.isArray(rawPuzzle.words) ? rawPuzzle.words : [])
         .filter((w) => w && typeof w.answer === 'string' && w.answer.length >= 2)
         .map((w, idx) => ({
           id: String(w.id || `${w.number || idx + 1}_${w.direction || 'across'}`),
@@ -118,6 +119,23 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
         initGame(samples[0]);
         showToast('Created puzzle using foundational knowledge template', 'info');
         return;
+      }
+
+      // Guarantee 100% letter consistency and collision-free intersecting coordinates
+      if (!hasNoLetterCollisions(validWords) || validWords.some((w) => w.row === undefined || w.col === undefined)) {
+        console.warn('[Crossword Layout] Detected collision or missing coordinates in raw puzzle. Generating guaranteed collision-free layout...');
+        const cleanLayout = buildValidCrosswordLayout(
+          validWords.map((w) => ({ answer: w.answer, clue: w.clue })),
+          {
+            id: rawPuzzle.id,
+            title: rawPuzzle.title,
+            theme: rawPuzzle.theme,
+            summary: rawPuzzle.summary,
+            glossary: rawPuzzle.glossary,
+          }
+        );
+        validWords = cleanLayout.words;
+        rawPuzzle.gridSize = cleanLayout.gridSize;
       }
 
       let maxCoord = 11;
@@ -222,7 +240,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
     if (!term.trim() && !summaryText) return;
 
     setIsLoading(true);
-    setLoadingMessage(`Generating crossword from ${term || "uploaded chapter"}...`);
+    setLoadingMessage(`Generating crossword from ${term || 'uploaded chapter'}...`);
 
     try {
       const res = await fetch('/api/generate-crossword', {
@@ -325,7 +343,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
     for (const w of puzzle.words) {
       for (let i = 0; i < w.answer.length; i++) {
         const r = w.direction === 'across' ? w.row : w.row + i;
-        const c = w.direction === 'across' ? w.col + i : w.col;
+        const c = w.direction === 'across' ? w.col + i : wordCol(w, i);
         const key = cellKey(r, c);
         const letter = userLetters[key];
         if (!letter || letter !== w.answer[i]) {
@@ -348,6 +366,8 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
       } catch (_) {}
     }
   };
+
+  const wordCol = (w: CrosswordWord, idx: number) => (w.direction === 'across' ? w.col + idx : w.col);
 
   // Keyboard controls
   useEffect(() => {
@@ -509,7 +529,14 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
   };
 
   return (
-    <div className="w-full bg-slate-950 text-slate-100 flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white relative rounded-3xl overflow-hidden border border-slate-800 shadow-2xl">
+    <div
+      className="w-full flex flex-col font-sans antialiased relative rounded-3xl overflow-hidden border shadow-sm transition-colors"
+      style={{
+        backgroundColor: 'var(--bg-main)',
+        borderColor: 'var(--border-warm)',
+        color: 'var(--text-primary)',
+      }}
+    >
       {/* Toast Notification */}
       <AnimatePresence>
         {toast && (
@@ -519,10 +546,10 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
             exit={{ opacity: 0, y: -20 }}
             className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-2xl shadow-xl border text-sm flex items-center gap-3 backdrop-blur-md ${
               toast.type === 'error'
-                ? 'bg-red-950/90 border-red-500/40 text-red-200'
+                ? 'bg-rose-900/90 border-rose-500/40 text-rose-100'
                 : toast.type === 'success'
-                ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200'
-                : 'bg-indigo-950/90 border-indigo-500/40 text-indigo-200'
+                ? 'bg-emerald-900/90 border-emerald-500/40 text-emerald-100'
+                : 'bg-amber-900/90 border-amber-500/40 text-amber-100'
             }`}
           >
             <span>{toast.message}</span>
@@ -537,41 +564,67 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
       </AnimatePresence>
 
       {/* Top Header */}
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 px-6 py-4 flex items-center justify-between">
+      <header
+        className="border-b px-5 sm:px-7 py-4 flex items-center justify-between transition-colors sticky top-0 z-30"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: 'var(--border-warm)',
+        }}
+      >
         <div
           className={`flex items-center gap-3 ${initialChapter ? '' : 'cursor-pointer'}`}
           onClick={() => {
             if (!initialChapter) setView('welcome');
           }}
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <LayoutGrid className="w-6 h-6 text-white" />
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shadow-xs"
+            style={{
+              backgroundColor: 'var(--accent-saffron)',
+              color: '#FFFFFF',
+            }}
+          >
+            <LayoutGrid className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <h1 className="text-lg sm:text-xl font-bold font-serif-heading tracking-tight flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               Gyan Quest Crossword{' '}
-              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-medium border border-indigo-500/30">
+              <span
+                className="text-[11px] px-2.5 py-0.5 rounded-full font-bold border"
+                style={{
+                  backgroundColor: 'var(--accent-saffron-light)',
+                  color: 'var(--accent-saffron-text)',
+                  borderColor: 'var(--border-warm)',
+                }}
+              >
                 AI Powered
               </span>
             </h1>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs truncate max-w-sm sm:max-w-md" style={{ color: 'var(--text-muted)' }}>
               {initialChapter
                 ? `Generated strictly for: ${initialChapter.title}`
-                : 'Transform any PDF or notes into an interactive crossword puzzle'}
+                : 'Transform any chapter or PDF notes into an interactive crossword'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {view === 'playing' && puzzle && (
-            <div className="hidden md:flex items-center gap-6 bg-slate-950/60 border border-slate-800 px-4 py-2 rounded-xl text-sm">
-              <div className="flex items-center gap-2 text-slate-300">
-                <Clock className="w-4 h-4 text-indigo-400" />
-                <span className="font-mono font-medium">{formatTimer(timerSeconds)}</span>
+            <div
+              className="hidden md:flex items-center gap-4 px-3.5 py-1.5 rounded-xl border text-xs font-semibold"
+              style={{
+                backgroundColor: 'var(--bg-main)',
+                borderColor: 'var(--border-warm)',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" style={{ color: 'var(--accent-saffron)' }} />
+                <span className="font-mono">{formatTimer(timerSeconds)}</span>
               </div>
-              <div className="h-4 w-[1px] bg-slate-800" />
-              <div className="flex items-center gap-2 text-slate-300">
-                <Lightbulb className="w-4 h-4 text-amber-400" />
+              <div className="h-3 w-[1px]" style={{ backgroundColor: 'var(--border-warm)' }} />
+              <div className="flex items-center gap-1.5">
+                <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
                 <span>Hints: {hintCount}</span>
               </div>
             </div>
@@ -586,26 +639,35 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                 setView('welcome');
               }
             }}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium rounded-xl transition shadow-xs border border-slate-700/50 cursor-pointer"
+            className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
+            style={{
+              backgroundColor: 'var(--bg-main)',
+              borderColor: 'var(--border-warm)',
+              color: 'var(--text-primary)',
+            }}
           >
-            {initialChapter ? 'Regenerate Crossword' : (view === 'playing' ? 'Choose Another PDF' : 'Home')}
+            {initialChapter ? 'Regenerate' : (view === 'playing' ? 'Choose Another PDF' : 'Home')}
           </button>
 
           {onExit && (
             <button
               type="button"
               onClick={onExit}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              className="p-2 rounded-xl border transition-colors hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
+              style={{
+                borderColor: 'var(--border-warm)',
+                color: 'var(--text-muted)',
+              }}
               title="Close Crossword"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col p-4 sm:p-6">
+      <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8">
         {/* Loading Overlay */}
         <AnimatePresence>
           {isLoading && (
@@ -613,24 +675,37 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6"
+              className="fixed inset-0 z-50 backdrop-blur-md flex flex-col items-center justify-center p-6"
+              style={{ backgroundColor: 'rgba(20, 18, 16, 0.75)' }}
             >
               <div className="w-20 h-20 relative flex items-center justify-center">
-                <div className="absolute inset-0 rounded-2xl bg-indigo-500/20 animate-ping" />
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-xl shadow-indigo-500/30 animate-pulse">
-                  <Sparkles className="w-8 h-8 text-white" />
+                <div
+                  className="absolute inset-0 rounded-2xl animate-ping opacity-25"
+                  style={{ backgroundColor: 'var(--accent-saffron)' }}
+                />
+                <div
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron)',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  <Sparkles className="w-8 h-8" />
                 </div>
               </div>
-              <h2 className="text-xl font-semibold mt-6 text-white text-center">
+              <h2 className="text-xl font-bold font-serif-heading mt-6 text-white text-center">
                 Guru AI is crafting your puzzle
               </h2>
-              <p className="text-sm text-slate-400 mt-2 max-w-md text-center">
+              <p className="text-sm text-stone-300 mt-2 max-w-md text-center">
                 {loadingMessage}
               </p>
-              <div className="w-48 h-1.5 bg-slate-800 rounded-full mt-6 overflow-hidden">
+              <div className="w-48 h-1.5 bg-stone-700 rounded-full mt-6 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 animate-pulse"
-                  style={{ width: '60%' }}
+                  className="h-full animate-pulse"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron-bright)',
+                    width: '65%',
+                  }}
                 />
               </div>
             </motion.div>
@@ -639,35 +714,42 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
 
         {view === 'welcome' ? (
           /* Welcome & Generator View */
-          <div className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 flex flex-col justify-center">
-            <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
+          <div className="flex-1 max-w-5xl mx-auto w-full px-2 sm:px-4 py-6 sm:py-10 flex flex-col justify-center">
+            <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12">
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 0.4 }}
               >
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold mb-6">
+                <div
+                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold mb-4 border"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron-light)',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--accent-saffron-text)',
+                  }}
+                >
                   <Sparkles className="w-3.5 h-3.5" />
-                  AI-Powered Study & Gaming Companion
+                  Vedic Interactive Learning & Recall
                 </div>
-                <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-6 leading-tight">
-                  Turn Any{' '}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-                    PDF Document
-                  </span>{' '}
-                  Into An Interactive Crossword
+                <h2 className="text-2xl sm:text-4xl font-extrabold font-serif-heading tracking-tight mb-4" style={{ color: 'var(--text-primary)' }}>
+                  Transform Any Textbook Chapter Into An Interactive Crossword
                 </h2>
-                <p className="text-base sm:text-lg text-slate-300 leading-relaxed mb-8">
-                  Upload lecture notes, research papers, textbooks, or articles. Guru AI instantly analyzes the text, extracts key definitions, and constructs a challenging crossword puzzle for active learning.
+                <p className="text-sm sm:text-base leading-relaxed mb-6" style={{ color: 'var(--text-secondary)' }}>
+                  Guru AI analyzes the text, extracts key definitions, and constructs a guaranteed intersecting crossword puzzle for active recall and deep internalization.
                 </p>
               </motion.div>
 
               {/* PDF Dropzone */}
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-                className="bg-slate-900/60 border-2 border-dashed border-slate-700 hover:border-indigo-500/50 rounded-3xl p-8 text-center transition group cursor-pointer relative overflow-hidden shadow-2xl"
+                transition={{ duration: 0.4, delay: 0.1 }}
+                className="border-2 border-dashed rounded-3xl p-8 text-center transition group cursor-pointer relative overflow-hidden shadow-xs hover:border-amber-500"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-warm)',
+                }}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <input
@@ -677,16 +759,25 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                   accept=".pdf"
                   className="hidden"
                 />
-                <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition duration-300">
-                  <UploadCloud className="w-8 h-8 text-indigo-400" />
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-2xs group-hover:scale-105 transition"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron-light)',
+                    color: 'var(--accent-saffron)',
+                  }}
+                >
+                  <UploadCloud className="w-7 h-7" />
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-1">
-                  Click to upload PDF or drag & drop
+                <h3 className="text-base sm:text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+                  Click to upload chapter PDF or drag & drop
                 </h3>
-                <p className="text-sm text-slate-400 mb-6">
-                  PDF textbooks, study guides, research papers up to 50MB
+                <p className="text-xs sm:text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
+                  Textbook chapters, lecture notes, or study guides up to 35MB
                 </p>
-                <div className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl shadow-lg shadow-indigo-600/30 transition">
+                <div
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold text-white rounded-xl shadow-xs transition hover:opacity-95"
+                  style={{ backgroundColor: 'var(--accent-saffron)' }}
+                >
                   <span>Select PDF File</span>
                   <ArrowRight className="w-4 h-4" />
                 </div>
@@ -694,91 +785,89 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
 
               {/* Topic Input Bar */}
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="mt-6 flex flex-col sm:flex-row gap-3 max-w-xl mx-auto"
+                transition={{ duration: 0.4, delay: 0.2 }}
+                className="mt-6 flex flex-col sm:flex-row gap-2.5 max-w-xl mx-auto"
               >
                 <input
                   type="text"
                   value={topicInput}
                   onChange={(e) => setTopicInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleGenerateTopic()}
-                  placeholder="Or enter any topic e.g. Quantum Physics, Roman Empire..."
-                  className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-hidden focus:border-indigo-500 transition"
+                  placeholder="Or enter any chapter topic e.g. Nervous System, Dhyana Yoga..."
+                  className="flex-1 rounded-xl px-4 py-2.5 text-sm border focus:outline-none focus:ring-2 focus:ring-amber-500 transition"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
                 />
                 <button
                   type="button"
                   onClick={() => handleGenerateTopic()}
                   disabled={!topicInput.trim()}
-                  className="px-6 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-medium rounded-xl text-sm transition shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:cursor-not-allowed"
+                  className="px-5 py-2.5 text-white font-bold rounded-xl text-xs sm:text-sm transition shadow-xs flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-95"
+                  style={{ backgroundColor: 'var(--accent-saffron)' }}
                 >
                   <Sparkles className="w-4 h-4" />
                   Generate
                 </button>
               </motion.div>
-
-              {/* Current Chapter Quick Launch Card */}
-              {initialChapter && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.25 }}
-                  className="mt-6 max-w-xl mx-auto p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-4 text-left shadow-lg"
-                >
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 block">
-                      Active Chapter Crossword
-                    </span>
-                    <h4 className="text-sm font-bold text-white">
-                      {initialChapter.title}
-                    </h4>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleGenerateTopic(initialChapter.title)}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer"
-                  >
-                    <Play className="w-3.5 h-3.5" />
-                    <span>Play Chapter</span>
-                  </button>
-                </motion.div>
-              )}
             </div>
 
             {/* Instant Sample Crosswords */}
-            <div className="max-w-4xl mx-auto w-full pb-16">
-              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-6 text-center">
-                Or try instant sample crosswords
+            <div className="max-w-4xl mx-auto w-full pb-10">
+              <h3 className="text-xs font-bold uppercase tracking-wider mb-4 text-center" style={{ color: 'var(--text-muted)' }}>
+                Or explore foundational sample crosswords
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {(samples || []).map((s, idx) => (
                   <motion.div
                     key={s.id || idx}
-                    initial={{ opacity: 0, scale: 0.95 }}
+                    initial={{ opacity: 0, scale: 0.98 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: idx * 0.1 }}
+                    transition={{ delay: idx * 0.08 }}
                     onClick={() => handleSelectSample(s)}
-                    className="bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/40 rounded-2xl p-6 cursor-pointer transition group flex flex-col justify-between shadow-lg"
+                    className="border rounded-2xl p-5 cursor-pointer transition flex flex-col justify-between shadow-2xs hover:shadow-xs group"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-warm)',
+                    }}
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-400 font-medium border border-indigo-500/20">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <span
+                          className="text-xs px-2.5 py-0.5 rounded-full font-bold border"
+                          style={{
+                            backgroundColor: 'var(--accent-saffron-light)',
+                            color: 'var(--accent-saffron-text)',
+                            borderColor: 'var(--border-warm)',
+                          }}
+                        >
                           {(s.words || []).length} Words
                         </span>
-                        <div className="w-8 h-8 rounded-full bg-slate-800 group-hover:bg-indigo-600 flex items-center justify-center transition">
-                          <Play className="w-4 h-4 text-slate-300 group-hover:text-white" />
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center transition group-hover:scale-110 shadow-2xs"
+                          style={{
+                            backgroundColor: 'var(--accent-saffron)',
+                            color: '#FFFFFF',
+                          }}
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                         </div>
                       </div>
-                      <h4 className="text-lg font-bold text-white group-hover:text-indigo-300 transition mb-2">
+                      <h4 className="text-base font-bold font-serif-heading mb-1.5" style={{ color: 'var(--text-primary)' }}>
                         {s.title}
                       </h4>
-                      <p className="text-sm text-slate-400 line-clamp-2">{s.theme}</p>
+                      <p className="text-xs line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                        {s.theme}
+                      </p>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                      <span>Grid: {s.gridSize}x{s.gridSize}</span>
-                      <span className="text-indigo-400 font-medium flex items-center gap-1 group-hover:translate-x-1 transition">
+                    <div className="mt-4 pt-3 border-t flex items-center justify-between text-xs" style={{ borderColor: 'var(--border-warm)', color: 'var(--text-muted)' }}>
+                      <span>Grid: {s.gridSize}×{s.gridSize}</span>
+                      <span className="font-semibold flex items-center gap-1 group-hover:translate-x-1 transition" style={{ color: 'var(--accent-saffron)' }}>
                         Play Now <ArrowRight className="w-3.5 h-3.5" />
                       </span>
                     </div>
@@ -789,57 +878,85 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
           </div>
         ) : puzzle ? (
           /* Active Crossword Solving View */
-          <div className="flex-1 max-w-7xl mx-auto w-full px-2 sm:px-4 py-4 sm:py-6 flex flex-col">
+          <div className="flex-1 max-w-7xl mx-auto w-full px-1 sm:px-3 py-2 sm:py-4 flex flex-col">
             {/* Top Bar with Title & Solve Controls */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-slate-900/70 border border-slate-800 p-5 rounded-2xl">
+            <div
+              className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 p-5 sm:p-6 rounded-2xl border shadow-xs"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-warm)',
+              }}
+            >
               <div>
                 <div className="flex items-center gap-3 mb-1 flex-wrap">
-                  <h2 className="text-xl sm:text-2xl font-bold text-white">{puzzle.title}</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+                    {puzzle.title}
+                  </h2>
                   {gameStatus === 'won' && (
-                    <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold rounded-full flex items-center gap-1.5">
+                    <span className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs font-bold rounded-full flex items-center gap-1.5">
                       <Trophy className="w-3.5 h-3.5" /> Puzzle Completed!
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-4 text-xs text-slate-400 mt-1 flex-wrap">
+                <div className="flex items-center gap-3 text-xs mt-1 flex-wrap" style={{ color: 'var(--text-muted)' }}>
                   <span>{puzzle.theme}</span>
-                  <span className="text-slate-600">•</span>
-                  <span className="text-indigo-400 font-medium">
+                  <span>•</span>
+                  <span className="font-semibold" style={{ color: 'var(--accent-saffron)' }}>
                     Solved {solvedWordsCount} of {totalWordsCount} words ({progressPercent}%)
                   </span>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={handleCheckAnswers}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium rounded-xl transition border border-slate-700 flex items-center gap-2 cursor-pointer"
+                  className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center gap-1.5 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--bg-main)',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
                 >
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>Check Answers</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleRevealLetter}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium rounded-xl transition border border-slate-700 flex items-center gap-2 cursor-pointer"
+                  className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center gap-1.5 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--bg-main)',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
                 >
-                  <Lightbulb className="w-4 h-4 text-amber-400" />
+                  <Lightbulb className="w-4 h-4 text-amber-500" />
                   <span>Reveal Letter</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleRevealWord}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-medium rounded-xl transition border border-slate-700 flex items-center gap-2 cursor-pointer"
+                  className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center gap-1.5 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--bg-main)',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
                 >
-                  <Eye className="w-4 h-4 text-indigo-400" />
+                  <Eye className="w-4 h-4" style={{ color: 'var(--accent-saffron)' }} />
                   <span>Reveal Word</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleSolveAll}
-                  className="px-3.5 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs sm:text-sm font-medium rounded-xl transition border border-red-500/20 cursor-pointer"
+                  className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all hover:bg-red-500/10 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--bg-main)',
+                    borderColor: 'var(--border-warm)',
+                    color: '#DC2626',
+                  }}
                 >
                   Solve All
                 </button>
@@ -847,15 +964,19 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-2 border-b border-slate-800 mb-6">
+            <div className="flex items-center gap-4 border-b mb-6" style={{ borderColor: 'var(--border-warm)' }}>
               <button
                 type="button"
                 onClick={() => setActiveTab('game')}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition flex items-center gap-2 cursor-pointer ${
+                className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition flex items-center gap-2 cursor-pointer ${
                   activeTab === 'game'
-                    ? 'border-indigo-500 text-indigo-400'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                    ? 'border-amber-600 text-amber-700 dark:text-amber-400'
+                    : 'border-transparent hover:opacity-80'
                 }`}
+                style={{
+                  color: activeTab === 'game' ? 'var(--accent-saffron)' : 'var(--text-muted)',
+                  borderBottomColor: activeTab === 'game' ? 'var(--accent-saffron)' : 'transparent',
+                }}
               >
                 <LayoutGrid className="w-4 h-4" />
                 <span>Crossword Grid</span>
@@ -863,23 +984,31 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab('summary')}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition flex items-center gap-2 cursor-pointer ${
+                className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition flex items-center gap-2 cursor-pointer ${
                   activeTab === 'summary'
-                    ? 'border-indigo-500 text-indigo-400'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                    ? 'border-amber-600 text-amber-700 dark:text-amber-400'
+                    : 'border-transparent hover:opacity-80'
                 }`}
+                style={{
+                  color: activeTab === 'summary' ? 'var(--accent-saffron)' : 'var(--text-muted)',
+                  borderBottomColor: activeTab === 'summary' ? 'var(--accent-saffron)' : 'transparent',
+                }}
               >
                 <FileText className="w-4 h-4" />
-                <span>Document Summary</span>
+                <span>Chapter Summary</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab('glossary')}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition flex items-center gap-2 cursor-pointer ${
+                className={`pb-3 text-xs sm:text-sm font-bold border-b-2 transition flex items-center gap-2 cursor-pointer ${
                   activeTab === 'glossary'
-                    ? 'border-indigo-500 text-indigo-400'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                    ? 'border-amber-600 text-amber-700 dark:text-amber-400'
+                    : 'border-transparent hover:opacity-80'
                 }`}
+                style={{
+                  color: activeTab === 'glossary' ? 'var(--accent-saffron)' : 'var(--text-muted)',
+                  borderBottomColor: activeTab === 'glossary' ? 'var(--accent-saffron)' : 'transparent',
+                }}
               >
                 <BookMarked className="w-4 h-4" />
                 <span>Key Terms Glossary ({(puzzle.glossary || []).length})</span>
@@ -888,33 +1017,63 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
 
             {/* Tab Views */}
             {activeTab === 'summary' ? (
-              <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 sm:p-8 max-w-4xl mx-auto w-full">
-                <h3 className="text-xl font-bold text-white mb-4">Executive Summary</h3>
-                <p className="text-slate-300 leading-relaxed text-base mb-6">{puzzle.summary}</p>
-                <h4 className="text-sm font-semibold text-indigo-400 uppercase tracking-wider mb-2">
-                  Puzzle Theme
+              <div
+                className="rounded-3xl p-6 sm:p-8 max-w-4xl mx-auto w-full border shadow-xs"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-warm)',
+                }}
+              >
+                <h3 className="text-xl font-bold font-serif-heading mb-3" style={{ color: 'var(--text-primary)' }}>
+                  Chapter Concept Synthesis
+                </h3>
+                <p className="leading-relaxed text-sm sm:text-base mb-6" style={{ color: 'var(--text-secondary)' }}>
+                  {puzzle.summary}
+                </p>
+                <h4 className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--accent-saffron-text)' }}>
+                  Crossword Theme
                 </h4>
-                <p className="text-slate-400">{puzzle.theme}</p>
+                <p className="text-xs sm:text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {puzzle.theme}
+                </p>
               </div>
             ) : activeTab === 'glossary' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-5xl mx-auto w-full">
                 {(puzzle.glossary || []).map((item, idx) => (
-                  <div key={idx} className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6">
-                    <h4 className="text-lg font-bold text-white mb-2 text-indigo-300">{item.term}</h4>
-                    <p className="text-sm text-slate-300">{item.definition}</p>
+                  <div
+                    key={idx}
+                    className="rounded-2xl p-5 border shadow-2xs"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-warm)',
+                    }}
+                  >
+                    <h4 className="text-base font-bold font-serif-heading mb-1.5" style={{ color: 'var(--accent-saffron)' }}>
+                      {item.term}
+                    </h4>
+                    <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      {item.definition}
+                    </p>
                   </div>
                 ))}
               </div>
             ) : (
               /* Crossword Grid & Clues View */
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-7 items-start">
                 {/* Left Column: Grid & Active Clue */}
-                <div className="lg:col-span-7 flex flex-col items-center justify-center bg-slate-900/40 border border-slate-800 p-4 sm:p-6 rounded-3xl overflow-auto shadow-xl">
+                <div
+                  className="lg:col-span-7 flex flex-col items-center justify-center p-4 sm:p-6 rounded-3xl border shadow-xs overflow-auto"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-warm)',
+                  }}
+                >
                   {/* The Interactive NxN Grid */}
                   <div
-                    className="grid gap-[1px] bg-slate-800 p-[1px] rounded-lg shadow-inner max-w-full overflow-auto"
+                    className="grid gap-[2px] p-2 rounded-2xl shadow-inner max-w-full overflow-auto"
                     style={{
                       gridTemplateColumns: `repeat(${puzzle.gridSize || 11}, minmax(0, 1fr))`,
+                      backgroundColor: 'var(--border-warm)',
                     }}
                   >
                     {Array.from({ length: puzzle.gridSize || 11 }).map((_, r) =>
@@ -940,25 +1099,51 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                           <div
                             key={key}
                             onClick={() => handleCellClick(r, c)}
-                            className={`w-7 h-7 sm:w-10 sm:h-10 relative flex items-center justify-center font-bold text-xs sm:text-base cursor-pointer transition select-none rounded-xs ${
+                            className={`w-7 h-7 sm:w-10 sm:h-10 relative flex items-center justify-center font-bold text-xs sm:text-base cursor-pointer transition select-none rounded-sm border ${
                               isSelected
-                                ? 'bg-indigo-600 text-white ring-2 ring-indigo-400 z-10'
+                                ? 'shadow-md ring-2 ring-amber-400 dark:ring-amber-300 z-10 scale-105'
                                 : isInActiveWord
-                                ? 'bg-indigo-950/80 text-white'
-                                : 'bg-slate-900 hover:bg-slate-800 text-slate-100'
-                            } ${hasError ? 'bg-red-950 text-red-200 border border-red-500' : ''}`}
+                                ? 'shadow-2xs'
+                                : 'hover:opacity-90 shadow-2xs'
+                            }`}
+                            style={{
+                              backgroundColor: isSelected
+                                ? 'var(--accent-saffron)'
+                                : isInActiveWord
+                                ? 'var(--accent-saffron-light)'
+                                : 'var(--bg-main)',
+                              borderColor: isSelected
+                                ? 'var(--accent-saffron)'
+                                : isInActiveWord
+                                ? 'var(--accent-saffron)'
+                                : 'var(--border-warm)',
+                              color: isSelected
+                                ? '#FFFFFF'
+                                : isInActiveWord
+                                ? 'var(--accent-saffron-text)'
+                                : 'var(--text-primary)',
+                            }}
                           >
                             {num && (
-                              <span className="absolute top-0.5 left-0.5 text-[8px] sm:text-[10px] font-normal text-slate-400 leading-none">
+                              <span
+                                className="absolute top-0.5 left-0.5 text-[8px] sm:text-[10px] font-bold leading-none select-none"
+                                style={{
+                                  color: isSelected ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)',
+                                }}
+                              >
                                 {num}
                               </span>
                             )}
-                            <span>{letter}</span>
+                            <span className={hasError ? 'text-red-600 dark:text-red-400' : ''}>{letter}</span>
                           </div>
                         ) : (
                           <div
                             key={key}
-                            className="w-7 h-7 sm:w-10 sm:h-10 bg-slate-950 rounded-xs"
+                            className="w-7 h-7 sm:w-10 sm:h-10 rounded-sm"
+                            style={{
+                              backgroundColor: 'var(--bg-card-subtle)',
+                              opacity: 0.6,
+                            }}
                           />
                         );
                       })
@@ -967,19 +1152,29 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
 
                   {/* Active Clue Banner below grid */}
                   {activeWord && (
-                    <div className="mt-6 w-full bg-slate-900 border border-slate-800 p-4 rounded-2xl flex items-center justify-between gap-3">
+                    <div
+                      className="mt-6 w-full p-4 rounded-2xl border flex items-center justify-between gap-3 shadow-2xs"
+                      style={{
+                        backgroundColor: 'var(--bg-card-subtle)',
+                        borderColor: 'var(--border-warm)',
+                      }}
+                    >
                       <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                          <span className="text-xs font-bold text-indigo-400">
-                            {activeWord.number}
-                            {activeWord.direction === 'across' ? 'A' : 'D'}
-                          </span>
+                        <div
+                          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs shadow-2xs"
+                          style={{
+                            backgroundColor: 'var(--accent-saffron)',
+                            color: '#FFFFFF',
+                          }}
+                        >
+                          {activeWord.number}
+                          {activeWord.direction === 'across' ? 'A' : 'D'}
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                          <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--accent-saffron-text)' }}>
                             {activeWord.direction.toUpperCase()} ({activeWord.answer.length} letters)
                           </p>
-                          <p className="text-xs sm:text-sm font-medium text-white mt-0.5">
+                          <p className="text-xs sm:text-sm font-semibold mt-0.5" style={{ color: 'var(--text-primary)' }}>
                             {activeWord.clue}
                           </p>
                         </div>
@@ -988,10 +1183,15 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                       <button
                         type="button"
                         onClick={() => setDirection((prev) => (prev === 'across' ? 'down' : 'across'))}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-indigo-300 rounded-xl border border-slate-700 shrink-0 transition flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 text-xs font-semibold rounded-xl border shrink-0 transition flex items-center gap-1.5 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800"
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          borderColor: 'var(--border-warm)',
+                          color: 'var(--accent-saffron-text)',
+                        }}
                         title="Click to toggle typing direction"
                       >
-                        <Repeat className="w-3.5 h-3.5 text-indigo-400" />
+                        <Repeat className="w-3.5 h-3.5" />
                         <span>{direction === 'across' ? 'Across (→)' : 'Down (↓)'}</span>
                       </button>
                     </div>
@@ -1001,10 +1201,29 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                 {/* Right Column: Clue Lists */}
                 <div className="lg:col-span-5 flex flex-col gap-6">
                   {/* Across Clues */}
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 sm:p-6 flex flex-col max-h-[360px] overflow-hidden shadow-xl">
-                    <h3 className="text-sm sm:text-base font-bold text-white mb-3 flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div
+                    className="rounded-3xl p-5 sm:p-6 flex flex-col max-h-[380px] overflow-hidden border shadow-xs"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-warm)',
+                    }}
+                  >
+                    <h3
+                      className="text-sm sm:text-base font-bold font-serif-heading mb-3 flex items-center justify-between border-b pb-3"
+                      style={{
+                        borderColor: 'var(--border-warm)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
                       <span>Across Clues</span>
-                      <span className="text-xs text-indigo-400 font-normal">
+                      <span
+                        className="text-xs px-2.5 py-0.5 rounded-full font-bold border"
+                        style={{
+                          backgroundColor: 'var(--accent-saffron-light)',
+                          color: 'var(--accent-saffron-text)',
+                          borderColor: 'var(--border-warm)',
+                        }}
+                      >
                         {(puzzle.words || []).filter((w) => w.direction === 'across').length} words
                       </span>
                     </h3>
@@ -1023,31 +1242,51 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                               }}
                               className={`p-3 rounded-xl cursor-pointer transition border text-sm flex items-start gap-3 ${
                                 isCurrent
-                                  ? 'bg-indigo-600/20 border-indigo-500/50 text-white'
+                                  ? 'shadow-xs ring-1 ring-amber-400'
                                   : isSolved
-                                  ? 'bg-emerald-950/20 border-emerald-900/30 text-slate-300'
-                                  : 'bg-slate-950/40 border-slate-800/80 hover:bg-slate-800/50 text-slate-300'
+                                  ? 'opacity-85'
+                                  : 'hover:border-amber-400/60'
                               }`}
+                              style={{
+                                backgroundColor: isCurrent
+                                  ? 'var(--accent-saffron-light)'
+                                  : isSolved
+                                  ? 'rgba(16, 185, 129, 0.08)'
+                                  : 'var(--bg-main)',
+                                borderColor: isCurrent
+                                  ? 'var(--accent-saffron)'
+                                  : isSolved
+                                  ? 'rgba(16, 185, 129, 0.3)'
+                                  : 'var(--border-warm)',
+                                color: isCurrent
+                                  ? 'var(--accent-saffron-text)'
+                                  : 'var(--text-primary)',
+                              }}
                             >
                               <span
-                                className={`font-bold shrink-0 w-6 ${
-                                  isSolved ? 'text-emerald-400' : 'text-indigo-400'
-                                }`}
+                                className="font-bold shrink-0 w-6"
+                                style={{
+                                  color: isSolved
+                                    ? '#059669'
+                                    : isCurrent
+                                    ? 'var(--accent-saffron-text)'
+                                    : 'var(--accent-saffron)',
+                                }}
                               >
                                 {w.number}.
                               </span>
                               <div className="flex-1">
                                 <div className="flex items-start justify-between gap-2">
-                                  <p className={isSolved ? 'line-through text-slate-400' : ''}>
+                                  <p className={isSolved ? 'line-through text-stone-500' : 'font-medium'}>
                                     {w.clue}
                                   </p>
                                   {isSolved && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30 shrink-0">
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30 shrink-0">
                                       ✓ Solved
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[11px] text-slate-500 mt-1 font-mono">
+                                <p className="text-[11px] mt-1 font-mono" style={{ color: 'var(--text-muted)' }}>
                                   ({w.answer.length} letters)
                                 </p>
                               </div>
@@ -1058,10 +1297,29 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                   </div>
 
                   {/* Down Clues */}
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 sm:p-6 flex flex-col max-h-[360px] overflow-hidden shadow-xl">
-                    <h3 className="text-sm sm:text-base font-bold text-white mb-3 flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div
+                    className="rounded-3xl p-5 sm:p-6 flex flex-col max-h-[380px] overflow-hidden border shadow-xs"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-warm)',
+                    }}
+                  >
+                    <h3
+                      className="text-sm sm:text-base font-bold font-serif-heading mb-3 flex items-center justify-between border-b pb-3"
+                      style={{
+                        borderColor: 'var(--border-warm)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
                       <span>Down Clues</span>
-                      <span className="text-xs text-indigo-400 font-normal">
+                      <span
+                        className="text-xs px-2.5 py-0.5 rounded-full font-bold border"
+                        style={{
+                          backgroundColor: 'var(--accent-saffron-light)',
+                          color: 'var(--accent-saffron-text)',
+                          borderColor: 'var(--border-warm)',
+                        }}
+                      >
                         {(puzzle.words || []).filter((w) => w.direction === 'down').length} words
                       </span>
                     </h3>
@@ -1080,31 +1338,51 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                               }}
                               className={`p-3 rounded-xl cursor-pointer transition border text-sm flex items-start gap-3 ${
                                 isCurrent
-                                  ? 'bg-indigo-600/20 border-indigo-500/50 text-white'
+                                  ? 'shadow-xs ring-1 ring-amber-400'
                                   : isSolved
-                                  ? 'bg-emerald-950/20 border-emerald-900/30 text-slate-300'
-                                  : 'bg-slate-950/40 border-slate-800/80 hover:bg-slate-800/50 text-slate-300'
+                                  ? 'opacity-85'
+                                  : 'hover:border-amber-400/60'
                               }`}
+                              style={{
+                                backgroundColor: isCurrent
+                                  ? 'var(--accent-saffron-light)'
+                                  : isSolved
+                                  ? 'rgba(16, 185, 129, 0.08)'
+                                  : 'var(--bg-main)',
+                                borderColor: isCurrent
+                                  ? 'var(--accent-saffron)'
+                                  : isSolved
+                                  ? 'rgba(16, 185, 129, 0.3)'
+                                  : 'var(--border-warm)',
+                                color: isCurrent
+                                  ? 'var(--accent-saffron-text)'
+                                  : 'var(--text-primary)',
+                              }}
                             >
                               <span
-                                className={`font-bold shrink-0 w-6 ${
-                                  isSolved ? 'text-emerald-400' : 'text-indigo-400'
-                                }`}
+                                className="font-bold shrink-0 w-6"
+                                style={{
+                                  color: isSolved
+                                    ? '#059669'
+                                    : isCurrent
+                                    ? 'var(--accent-saffron-text)'
+                                    : 'var(--accent-saffron)',
+                                }}
                               >
                                 {w.number}.
                               </span>
                               <div className="flex-1">
                                 <div className="flex items-start justify-between gap-2">
-                                  <p className={isSolved ? 'line-through text-slate-400' : ''}>
+                                  <p className={isSolved ? 'line-through text-stone-500' : 'font-medium'}>
                                     {w.clue}
                                   </p>
                                   {isSolved && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30 shrink-0">
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30 shrink-0">
                                       ✓ Solved
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[11px] text-slate-500 mt-1 font-mono">
+                                <p className="text-[11px] mt-1 font-mono" style={{ color: 'var(--text-muted)' }}>
                                   ({w.answer.length} letters)
                                 </p>
                               </div>
@@ -1119,7 +1397,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <p className="text-slate-400 mb-4">
+            <p className="mb-4" style={{ color: 'var(--text-muted)' }}>
               {isLoading
                 ? `Crafting crossword from uploaded document "${initialChapter?.title || 'Chapter'}"...`
                 : 'No puzzle loaded yet.'}
@@ -1128,7 +1406,8 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
               <button
                 type="button"
                 onClick={() => handleGenerateTopic(initialChapter.title, initialChapter.summary)}
-                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white font-medium text-sm transition cursor-pointer"
+                className="px-6 py-2.5 text-white font-bold rounded-xl text-xs sm:text-sm transition cursor-pointer shadow-xs hover:opacity-95"
+                style={{ backgroundColor: 'var(--accent-saffron)' }}
               >
                 Generate Chapter Crossword
               </button>
@@ -1136,7 +1415,8 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
               <button
                 type="button"
                 onClick={() => setView('welcome')}
-                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white font-medium text-sm transition cursor-pointer"
+                className="px-6 py-2.5 text-white font-bold rounded-xl text-xs sm:text-sm transition cursor-pointer shadow-xs hover:opacity-95"
+                style={{ backgroundColor: 'var(--accent-saffron)' }}
               >
                 Choose a PDF
               </button>
@@ -1151,33 +1431,51 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-6"
+              className="fixed inset-0 z-50 backdrop-blur-md flex items-center justify-center p-6"
+              style={{ backgroundColor: 'rgba(20, 18, 16, 0.75)' }}
             >
               <motion.div
                 initial={{ scale: 0.9, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
-                className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl relative overflow-hidden"
+                className="rounded-3xl p-8 max-w-md w-full text-center shadow-2xl relative overflow-hidden border"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-warm)',
+                }}
               >
-                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-                <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/10">
-                  <Trophy className="w-10 h-10 text-emerald-400" />
+                <div
+                  className="w-18 h-18 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xs"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron-light)',
+                    color: 'var(--accent-saffron)',
+                  }}
+                >
+                  <Trophy className="w-9 h-9" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-2">Fantastic Job!</h3>
-                <p className="text-sm text-slate-400 mb-6">
+                <h3 className="text-2xl font-bold font-serif-heading mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Fantastic Job!
+                </h3>
+                <p className="text-xs sm:text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
                   {initialChapter
                     ? `You successfully solved the crossword for "${initialChapter.title}".`
                     : 'You successfully solved the crossword puzzle derived from your document.'}
                 </p>
-                <div className="grid grid-cols-2 gap-4 mb-8 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                <div
+                  className="grid grid-cols-2 gap-4 mb-6 p-4 rounded-2xl border"
+                  style={{
+                    backgroundColor: 'var(--bg-main)',
+                    borderColor: 'var(--border-warm)',
+                  }}
+                >
                   <div>
-                    <p className="text-xs text-slate-400">Time Taken</p>
-                    <p className="text-lg font-mono font-bold text-white mt-0.5">
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Time Taken</p>
+                    <p className="text-lg font-mono font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>
                       {formatTimer(timerSeconds)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-slate-400">Hints Used</p>
-                    <p className="text-lg font-mono font-bold text-amber-400 mt-0.5">
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Hints Used</p>
+                    <p className="text-lg font-mono font-bold mt-0.5 text-amber-600 dark:text-amber-400">
                       {hintCount}
                     </p>
                   </div>
@@ -1192,14 +1490,20 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                         setView('welcome');
                       }
                     }}
-                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-xl transition text-sm border border-slate-700 cursor-pointer"
+                    className="flex-1 py-3 font-semibold rounded-xl transition text-xs sm:text-sm border cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800"
+                    style={{
+                      backgroundColor: 'var(--bg-main)',
+                      borderColor: 'var(--border-warm)',
+                      color: 'var(--text-primary)',
+                    }}
                   >
-                    {initialChapter ? 'Regenerate Chapter Crossword' : 'New Puzzle'}
+                    {initialChapter ? 'Regenerate' : 'New Puzzle'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setGameStatus('playing')}
-                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl transition text-sm shadow-lg shadow-indigo-600/30 cursor-pointer"
+                    className="flex-1 py-3 text-white font-bold rounded-xl transition text-xs sm:text-sm shadow-xs cursor-pointer hover:opacity-95"
+                    style={{ backgroundColor: 'var(--accent-saffron)' }}
                   >
                     Review Grid
                   </button>

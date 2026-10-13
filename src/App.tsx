@@ -294,6 +294,13 @@ const MainAppContent: React.FC = () => {
                 setCurrentView('shravan');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
+              onNavigateManan={(ch) => {
+                setSelectedChapter(ch);
+                setActiveShravanChapter(ch);
+                setActiveMananChapter(ch);
+                setCurrentView('manan');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               onPdfUpload={handlePdfUploaded}
               onClearUploadedPdf={() => setUploadedPdf(null)}
             />
