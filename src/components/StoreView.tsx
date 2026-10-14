@@ -9,7 +9,8 @@ import {
   Volume2,
   Lock,
   ArrowRight,
-  BookOpen
+  BookOpen,
+  ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -92,6 +93,10 @@ export const StoreView: React.FC<StoreViewProps> = ({
 
   const currentXp = profile?.xp || 0;
 
+  const handleOpenNewStore = () => {
+    window.open('https://gyanquest-pariksha-store.ai.studio', '_blank');
+  };
+
   const handleAttemptRedeem = (item: StoreItem) => {
     if (!user) {
       openAuthModal();
@@ -108,10 +113,13 @@ export const StoreView: React.FC<StoreViewProps> = ({
     }
 
     showToast({
-      title: 'Store Catalog Preview',
-      message: `${item.name} is part of the upcoming XP rewards catalog. Redemption will open in the next release!`,
-      type: 'info',
+      title: 'Redirecting to New Store',
+      message: `Opening gyanquest-pariksha-store.ai.studio to redeem ${item.name} with your ${currentXp} XP!`,
+      type: 'success',
     });
+    setTimeout(() => {
+      window.open('https://gyanquest-pariksha-store.ai.studio', '_blank');
+    }, 800);
   };
 
   const filteredItems = filter === 'All'
@@ -120,7 +128,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
 
   return (
     <div id="gyan-store-view" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8 animate-in fade-in duration-300">
-      {/* Hero Store Card */}
+      {/* Hero Store Card - Upgraded to gyanquest-pariksha-store.ai.studio */}
       <div
         className="rounded-3xl border p-6 sm:p-10 relative overflow-hidden shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6"
         style={{
@@ -130,23 +138,38 @@ export const StoreView: React.FC<StoreViewProps> = ({
       >
         <div className="space-y-3 max-w-xl">
           <div
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold"
+            className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-bold"
             style={{
               backgroundColor: 'var(--accent-saffron-light)',
               color: 'var(--accent-saffron-text)',
             }}
           >
             <ShoppingBag className="w-3.5 h-3.5" />
-            <span>Scholar XP Rewards • Catalog Preview</span>
+            <span>Official Pariksha Store • gyanquest-pariksha-store.ai.studio</span>
           </div>
 
           <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-            Gyan Quest Store
+            Gyan Quest Pariksha Store
           </h1>
 
           <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            Turn your study milestones into rewards. Earn XP by completing chapter readings (Vidya), listening to recitations (Shravan), and solving reflection puzzles (Manan).
+            Welcome to the newly upgraded dedicated store portal at <strong className="font-mono text-amber-600 dark:text-amber-400">gyanquest-pariksha-store.ai.studio</strong>. Redeem your Vidya XP for exclusive perks, Vedic audio, avatars, and exam prep bundles.
           </p>
+
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handleOpenNewStore}
+              className="px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold shadow-sm transition-all hover:scale-102 active:scale-98 cursor-pointer flex items-center gap-2"
+              style={{
+                backgroundColor: 'var(--accent-saffron)',
+                color: '#FFFFFF',
+              }}
+            >
+              <span>Launch gyanquest-pariksha-store.ai.studio</span>
+              <ExternalLink className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Live User XP Display Card */}
@@ -159,7 +182,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
         >
           <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>
             <Zap className="w-4 h-4 text-amber-500 fill-current" />
-            <span>Your Balance</span>
+            <span>Scholar Balance</span>
           </div>
           <div className="text-3xl font-extrabold font-mono tabular-nums" style={{ color: 'var(--accent-saffron-text)' }}>
             {currentXp} <span className="text-base font-bold">XP</span>
@@ -167,6 +190,15 @@ export const StoreView: React.FC<StoreViewProps> = ({
           <span className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
             {user ? 'Authenticated Scholar' : 'Guest Learner'}
           </span>
+          <a
+            href="https://gyanquest-pariksha-store.ai.studio"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1"
+          >
+            <span>Visit Pariksha Store</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
       </div>
 
@@ -261,23 +293,20 @@ export const StoreView: React.FC<StoreViewProps> = ({
 
               <div className="pt-4 mt-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--border-warm)' }}>
                 <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                  {canAfford ? 'Eligible to unlock' : `Need ${item.costXp - currentXp} more XP`}
+                  {canAfford ? 'Ready in Pariksha Store' : `Need ${item.costXp - currentXp} more XP`}
                 </span>
 
                 <button
                   type="button"
                   onClick={() => handleAttemptRedeem(item)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
-                    canAfford ? 'hover:scale-103 active:scale-98' : 'opacity-80'
-                  }`}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:scale-103 active:scale-98 shadow-xs"
                   style={{
-                    backgroundColor: canAfford ? 'var(--accent-saffron)' : 'var(--bg-card-subtle)',
-                    color: canAfford ? '#FFFFFF' : 'var(--text-muted)',
-                    border: canAfford ? 'none' : '1px solid var(--border-warm)',
+                    backgroundColor: 'var(--accent-saffron)',
+                    color: '#FFFFFF',
                   }}
                 >
-                  <Lock className="w-3 h-3" />
-                  <span>Preview</span>
+                  <span>Redeem</span>
+                  <ExternalLink className="w-3 h-3" />
                 </button>
               </div>
             </div>
@@ -295,27 +324,25 @@ export const StoreView: React.FC<StoreViewProps> = ({
       >
         <div className="space-y-1 text-center sm:text-left">
           <h4 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-            Want to boost your Vidya XP?
+            Explore Full Catalog at gyanquest-pariksha-store.ai.studio
           </h4>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Each completed Vidya reading grants +50 XP. Listening in Shravan mode grants +75 XP!
+            Redeem rewards, sync your student profile, and unlock premium pariksha materials instantly.
           </p>
         </div>
 
-        {onNavigateMyBooks && (
-          <button
-            type="button"
-            onClick={onNavigateMyBooks}
-            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer flex items-center gap-2"
-            style={{
-              backgroundColor: 'var(--accent-saffron)',
-              color: '#FFFFFF',
-            }}
-          >
-            <BookOpen className="w-4 h-4" />
-            <span>Open Chapters to Earn XP</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleOpenNewStore}
+          className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer flex items-center gap-2"
+          style={{
+            backgroundColor: 'var(--accent-saffron)',
+            color: '#FFFFFF',
+          }}
+        >
+          <ExternalLink className="w-4 h-4" />
+          <span>Open Pariksha Store</span>
+        </button>
       </div>
     </div>
   );
