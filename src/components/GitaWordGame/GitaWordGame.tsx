@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Volume2, VolumeX, BookOpen, HelpCircle, ArrowLeft } from 'lucide-react';
+import { Volume2, VolumeX, BookOpen, HelpCircle, ArrowLeft, Sun, Moon, Radio, Puzzle } from 'lucide-react';
 import { GITA_WORDS, GitaWordItem } from '../../data/gitaQuestData';
 import { ProgressBar } from './ProgressBar';
 import { VerseClueCard } from './VerseClueCard';
@@ -10,6 +10,7 @@ import { StudentWisdomModal } from './StudentWisdomModal';
 import { HowToPlayModal } from './HowToPlayModal';
 import { QuestCompletedModal } from './QuestCompletedModal';
 import { vedicAudio } from '../../utils/gitaAudio';
+import { useTheme } from '../../context/ThemeContext';
 
 import heroDiyaImg from '../../assets/images/gyanquest_hero_diya_1791870559877.jpg';
 import krishnaChariotImg from '../../assets/images/gyanquest_krishna_chariot_1791870561061.jpg';
@@ -29,9 +30,13 @@ interface PersistedGameState {
 
 interface GitaWordGameProps {
   onBackToGita: () => void;
+  onOpenReader?: () => void;
+  onOpenJigsaw?: () => void;
 }
 
-export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
+export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita, onOpenReader, onOpenJigsaw }) => {
+  const { isDark, toggleTheme } = useTheme();
+
   // Load state from localStorage or use defaults
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [guesses, setGuesses] = useState<string[]>([]);
@@ -46,6 +51,11 @@ export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
   const [isQuestCompletedOpen, setIsQuestCompletedOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Align sound synthesizer theme with Surya / Chandra
+  useEffect(() => {
+    vedicAudio.setTheme(isDark ? 'chandra' : 'surya');
+  }, [isDark]);
 
   // Load from localStorage on initial mount
   useEffect(() => {
@@ -120,7 +130,7 @@ export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
     [isRoundOver, currentGuess]
   );
 
-  // Handle backspace
+  // Handle Backspace
   const handleBackspace = useCallback(() => {
     if (isRoundOver) return;
     if (currentGuess.length > 0) {
@@ -129,11 +139,12 @@ export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
     }
   }, [isRoundOver, currentGuess]);
 
-  // Handle submit attempt
+  // Handle Enter / Submit Guess
   const handleSubmit = useCallback(() => {
     if (isRoundOver) return;
+
     if (currentGuess.length < WORD_LENGTH) {
-      showToast('Word must be 5 letters');
+      showToast('Need 5 letters for the Vedic keyword');
       return;
     }
 
@@ -141,27 +152,38 @@ export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
     setGuesses(newGuesses);
     setCurrentGuess('');
 
-    if (currentGuess === targetWord) {
-      // Correct!
-      const points = (MAX_ATTEMPTS - guesses.length) * 20; // up to 120 points
-      setScore((prev) => prev + points);
-      setCompletedWords((prev) => (prev.includes(currentItem.id) ? prev : [...prev, currentItem.id]));
+    const wonThisTurn = currentGuess === targetWord;
+    const reachedMaxAttempts = newGuesses.length >= MAX_ATTEMPTS;
+
+    if (wonThisTurn) {
+      const attemptPoints = Math.max(10, (MAX_ATTEMPTS - newGuesses.length + 1) * 20);
+      setScore((prev) => prev + attemptPoints);
+      if (!completedWords.includes(currentIndex)) {
+        setCompletedWords((prev) => [...prev, currentIndex]);
+      }
       vedicAudio.playVictoryChime();
-    } else if (newGuesses.length >= MAX_ATTEMPTS) {
-      // Failed attempts exhausted
+    } else if (reachedMaxAttempts) {
       vedicAudio.playWordReveal();
     } else {
-      // Partial attempt
       vedicAudio.playSubmitAttempt();
     }
-  }, [isRoundOver, currentGuess, guesses, targetWord, currentItem.id]);
+  }, [isRoundOver, currentGuess, guesses, targetWord, currentIndex, completedWords]);
 
-  // Physical keyboard support
+  // Physical Keyboard listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      // Ignore if any modal is active or focused inside inputs
+      if (
+        isWisdomOpen ||
+        isHowToPlayOpen ||
+        isQuestCompletedOpen ||
+        isResetConfirmOpen ||
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
+
       if (e.key === 'Enter') {
         e.preventDefault();
         handleSubmit();
@@ -173,37 +195,46 @@ export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
         handleChar(e.key);
       }
     };
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSubmit, handleBackspace, handleChar]);
+  }, [handleSubmit, handleBackspace, handleChar, isWisdomOpen, isHowToPlayOpen, isQuestCompletedOpen, isResetConfirmOpen]);
 
-  // Proceed to next word
+  // Progress to next word
   const handleNextWord = () => {
     if (currentIndex < GITA_WORDS.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       setGuesses([]);
       setCurrentGuess('');
+      vedicAudio.playTempleBell();
     } else {
+      // Completed all words
       setIsQuestCompletedOpen(true);
+      vedicAudio.playVictoryChime();
     }
   };
 
-  // Reset entire quest
-  const handleOpenResetDialog = () => {
-    setIsResetConfirmOpen(true);
-  };
-
+  // Reset progress
   const handleConfirmReset = () => {
     setCurrentIndex(0);
     setGuesses([]);
     setCurrentGuess('');
     setScore(0);
     setCompletedWords([]);
-    localStorage.removeItem(STORAGE_KEY);
     setIsResetConfirmOpen(false);
+    setIsQuestCompletedOpen(false);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Ignore
+    }
+    vedicAudio.playTempleBell();
   };
 
-  // Toggle audio
+  const handleOpenResetDialog = () => {
+    setIsResetConfirmOpen(true);
+  };
+
   const handleToggleSound = () => {
     setIsMuted((prev) => {
       const next = !prev;
@@ -212,17 +243,42 @@ export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
     });
   };
 
+  const handleOpenLesson = () => {
+    if (onOpenReader) {
+      onOpenReader();
+    } else {
+      setIsWisdomOpen(true);
+    }
+  };
+
   return (
-    <div className="w-full min-h-screen flex flex-col bg-[#FAF5ED] text-[#29221C] antialiased selection:bg-amber-200 selection:text-amber-900 pb-12 animate-in fade-in duration-300">
+    <div
+      className="w-full min-h-screen flex flex-col antialiased pb-12 animate-in fade-in duration-300 transition-colors"
+      style={{
+        backgroundColor: 'var(--bg-main)',
+        color: 'var(--text-primary)',
+      }}
+    >
       {/* Game Header */}
-      <header className="w-full max-w-5xl mx-auto flex items-center justify-between gap-3 py-4 px-4 sm:px-6 border-b border-[#E7DECF] bg-[#FFFDF9]/90 backdrop-blur-sm sticky top-0 z-20 shadow-xs">
+      <header
+        className="w-full max-w-5xl mx-auto flex items-center justify-between gap-3 py-3.5 px-4 sm:px-6 border-b backdrop-blur-sm sticky top-0 z-20 shadow-xs transition-colors"
+        style={{
+          backgroundColor: 'var(--bg-nav)',
+          borderColor: 'var(--border-warm)',
+        }}
+      >
         {/* Back to Gita View & Wordmark */}
         <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={onBackToGita}
-            className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl border border-[#E7DECF] bg-[#FAF5ED] text-xs font-bold text-[#78350F] hover:bg-[#EFE7DA] transition-all cursor-pointer shadow-2xs"
-            title="Return to Bhagavad Gita Chapters"
+            className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs hover:scale-102"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-warm)',
+              color: 'var(--accent-saffron-text)',
+            }}
+            title="Return to Chapter Explorer"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Back to Gita</span>
@@ -231,47 +287,108 @@ export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
           <div className="flex items-center gap-2">
             <span className="text-xl select-none" role="img" aria-label="Sacred Lamp">🪔</span>
             <div className="flex flex-col">
-              <span className="font-serif-heading text-base sm:text-lg font-bold tracking-tight text-[#C2410C] whitespace-nowrap leading-none">
+              <span className="font-serif-heading text-base sm:text-lg font-bold tracking-tight whitespace-nowrap leading-none" style={{ color: 'var(--accent-saffron-bright)' }}>
                 GyanQuest
               </span>
-              <span className="text-[10px] font-semibold text-[#78350F] hidden sm:inline mt-0.5">
-                Bhagavad Gita Word Journey
+              <span className="text-[10px] font-semibold hidden sm:inline mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Bhagavad Gita Word Quest
               </span>
             </div>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        {/* Action Controls & Surya/Chandra Indicator */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Surya / Chandra Theme & Audio Alignment Toggle */}
           <button
             type="button"
-            onClick={() => setIsWisdomOpen(true)}
-            className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold text-[#574D43] hover:text-[#C2410C] hover:bg-[#FEF3C7] transition-colors whitespace-nowrap cursor-pointer"
-            title="Explore Chapter 6.17 Student Wisdom"
+            onClick={toggleTheme}
+            className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl border text-xs font-bold transition-all hover:scale-102 cursor-pointer shadow-2xs"
+            style={{
+              backgroundColor: isDark ? '#2C231B' : '#FEF3C7',
+              borderColor: isDark ? '#D97706' : '#FDE68A',
+              color: isDark ? '#FBBF24' : '#92400E',
+            }}
+            title={isDark ? 'Chandra Night Mode (tranquil audio frequencies active)' : 'Surya Day Mode (solar radiant audio frequencies active)'}
           >
-            <BookOpen className="w-3.5 h-3.5 text-[#B45309]" />
-            <span className="hidden md:inline">Student Wisdom (Ch 6.17)</span>
-            <span className="md:hidden">Wisdom</span>
+            {isDark ? (
+              <>
+                <Moon className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                <span className="hidden sm:inline">Chandra</span>
+              </>
+            ) : (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-600 fill-current" />
+                <span className="hidden sm:inline">Surya</span>
+              </>
+            )}
+          </button>
+
+          {/* Harmony Puzzle Button */}
+          {onOpenJigsaw && (
+            <button
+              type="button"
+              id="btn-switch-to-jigsaw"
+              onClick={onOpenJigsaw}
+              className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl text-xs font-bold border transition-all whitespace-nowrap cursor-pointer hover:scale-102 shadow-2xs"
+              style={{
+                backgroundColor: 'var(--accent-saffron-light)',
+                borderColor: 'var(--accent-saffron)',
+                color: 'var(--accent-saffron-text)',
+              }}
+              title="Play 12-Piece Harmony of Life Jigsaw Puzzle"
+            >
+              <Puzzle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span className="hidden md:inline">Harmony Puzzle</span>
+              <span className="md:hidden">Puzzle</span>
+            </button>
+          )}
+
+          {/* Gita Voice Reader Button */}
+          <button
+            type="button"
+            onClick={handleOpenLesson}
+            className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl text-xs font-semibold border transition-all whitespace-nowrap cursor-pointer hover:scale-102"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-warm)',
+              color: 'var(--text-secondary)',
+            }}
+            title="Read Chapter 6.17 Student Lesson & Voice Reader"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span className="hidden md:inline">Voice Reader</span>
+            <span className="md:hidden">Reader</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsHowToPlayOpen(true)}
-            className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold text-[#574D43] hover:text-[#C2410C] hover:bg-[#FEF3C7] transition-colors whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl border text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-warm)',
+              color: 'var(--text-secondary)',
+            }}
             title="Game Rules & Instructions"
           >
-            <HelpCircle className="w-3.5 h-3.5 text-[#B45309]" />
+            <HelpCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             <span>Rules</span>
           </button>
 
           <button
             type="button"
             onClick={handleToggleSound}
-            className="p-2 rounded-lg border border-[#E7DECF] bg-[#FAF6F0] text-[#574D43] hover:text-[#C2410C] hover:border-[#D4AF37] transition-colors cursor-pointer"
+            className="p-2 rounded-xl border transition-colors cursor-pointer"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-warm)',
+              color: 'var(--text-secondary)',
+            }}
             title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
             aria-label={isMuted ? 'Unmute Sound' : 'Mute Sound'}
           >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            {isMuted ? <VolumeX className="w-4 h-4 text-stone-400" /> : <Volume2 className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
           </button>
         </div>
       </header>
@@ -279,8 +396,14 @@ export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
       {/* Main Game Arena */}
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 flex flex-col items-center">
         {/* Vedic Hero Banner Strip */}
-        <div className="w-full bg-[#FFFDF9] border border-[#E7DECF] rounded-2xl p-4 sm:p-5 shadow-xs mb-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shrink-0 border border-[#D4AF37] shadow-xs">
+        <div
+          className="w-full border rounded-2xl p-4 sm:p-5 shadow-xs mb-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 transition-colors"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderColor: 'var(--border-warm)',
+          }}
+        >
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden shrink-0 border border-amber-600/40 shadow-xs">
             <img
               src={heroDiyaImg}
               alt="Gita Manuscript & Diya"
@@ -290,21 +413,26 @@ export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
           </div>
 
           <div className="text-center sm:text-left flex-1">
-            <span className="text-[11px] font-bold text-[#B45309] uppercase tracking-wider block">
+            <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: 'var(--accent-saffron-bright)' }}>
               Timeless Vedic Wisdom • Chapter 6 Verse 6.17
             </span>
-            <h1 className="font-serif-heading text-xl sm:text-2xl font-bold text-[#C2410C]">
-              GyanQuest WordGame
+            <h1 className="font-serif-heading text-xl sm:text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              Bhagavad Gita Word Quest
             </h1>
-            <p className="text-xs text-[#574D43] mt-0.5 font-medium leading-relaxed">
+            <p className="text-xs mt-0.5 font-medium leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               Unravel key 5-letter words from the sacred Bhagavad Gita text. 6 chances per verse.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() => setIsWisdomOpen(true)}
-            className="px-3.5 py-1.5 text-xs font-semibold text-[#78350F] bg-[#FEF3C7] border border-[#FDE68A] hover:bg-[#FDE68A] rounded-lg transition-colors whitespace-nowrap self-stretch sm:self-auto text-center cursor-pointer"
+            onClick={handleOpenLesson}
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border transition-all whitespace-nowrap self-stretch sm:self-auto text-center cursor-pointer hover:scale-102"
+            style={{
+              backgroundColor: 'var(--accent-saffron-light)',
+              borderColor: 'var(--accent-saffron)',
+              color: 'var(--accent-saffron-text)',
+            }}
           >
             Read Student Lesson →
           </button>
@@ -390,25 +518,40 @@ export const GitaWordGame: React.FC<GitaWordGameProps> = ({ onBackToGita }) => {
       {/* In-App Reset Confirmation Dialog */}
       {isResetConfirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-sm bg-[#FFFDF9] border border-[#E7DECF] rounded-2xl shadow-xl p-6 text-center text-[#29221C]">
-            <h3 className="font-serif-heading text-lg font-bold text-[#C2410C] mb-2">
+          <div
+            className="w-full max-w-sm border rounded-2xl shadow-xl p-6 text-center"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              borderColor: 'var(--border-warm)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <h3 className="font-serif-heading text-lg font-bold mb-2" style={{ color: 'var(--accent-saffron-bright)' }}>
               Restart GyanQuest?
             </h3>
-            <p className="text-xs text-[#574D43] mb-5 leading-relaxed">
+            <p className="text-xs mb-5 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               Are you sure you want to restart your journey from Word 1? Your solved progress and current score will be cleared.
             </p>
             <div className="flex gap-2 justify-center">
               <button
                 type="button"
                 onClick={() => setIsResetConfirmOpen(false)}
-                className="px-4 py-2 text-xs font-semibold rounded-lg border border-[#E7DECF] bg-[#FAF5ED] text-[#78350F] hover:bg-[#EFE7DA] cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold rounded-lg border cursor-pointer hover:opacity-90"
+                style={{
+                  backgroundColor: 'var(--bg-main)',
+                  borderColor: 'var(--border-warm)',
+                  color: 'var(--text-primary)',
+                }}
               >
                 Continue Quest
               </button>
               <button
                 type="button"
                 onClick={handleConfirmReset}
-                className="px-4 py-2 text-xs font-semibold rounded-lg bg-[#C2410C] text-white hover:bg-[#9A3412] cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold rounded-lg text-white cursor-pointer hover:opacity-90"
+                style={{
+                  backgroundColor: 'var(--accent-saffron)',
+                }}
               >
                 Yes, Reset
               </button>

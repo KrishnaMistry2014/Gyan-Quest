@@ -21,32 +21,32 @@ export const ResultBanner: React.FC<ResultBannerProps> = ({
     <div
       className={`w-full rounded-2xl p-5 sm:p-6 border shadow-md animate-in fade-in mt-6 transition-all ${
         isWon
-          ? 'bg-gradient-to-b from-[#F0FDF4] to-[#DCFCE7] border-[#86EFAC]'
-          : 'bg-gradient-to-b from-[#FFFBEB] to-[#FEF3C7] border-[#FDE68A]'
+          ? 'bg-gradient-to-b from-[#F0FDF4] to-[#DCFCE7] dark:from-[#052E16]/70 dark:to-[#064E3B]/60 border-[#86EFAC] dark:border-[#047857]'
+          : 'bg-gradient-to-b from-[#FFFBEB] to-[#FEF3C7] dark:from-[#451A03]/60 dark:to-[#291404]/70 border-[#FDE68A] dark:border-[#B45309]'
       }`}
     >
       {/* Banner Title */}
       <div className="flex items-center gap-2.5 mb-3">
         {isWon ? (
           <>
-            <CheckCircle2 className="w-6 h-6 text-[#15803D] shrink-0" />
+            <CheckCircle2 className="w-6 h-6 text-[#15803D] dark:text-[#4ADE80] shrink-0" />
             <div>
-              <h3 className="font-serif-heading text-lg sm:text-xl font-bold text-[#14532D]">
+              <h3 className="font-serif-heading text-lg sm:text-xl font-bold text-[#14532D] dark:text-[#86EFAC]">
                 Shubham! Wisdom Unlocked!
               </h3>
-              <p className="text-xs text-[#166534]">
+              <p className="text-xs text-[#166534] dark:text-[#A7F3D0]">
                 Mastered in {attemptsUsed} {attemptsUsed === 1 ? 'attempt' : 'attempts'} • Chapter {item.chapter}:{item.verse}
               </p>
             </div>
           </>
         ) : (
           <>
-            <AlertCircle className="w-6 h-6 text-[#B45309] shrink-0" />
+            <AlertCircle className="w-6 h-6 text-[#B45309] dark:text-[#FBBF24] shrink-0" />
             <div>
-              <h3 className="font-serif-heading text-lg sm:text-xl font-bold text-[#78350F]">
+              <h3 className="font-serif-heading text-lg sm:text-xl font-bold text-[#78350F] dark:text-[#FDE68A]">
                 The Sacred Word is Revealed
               </h3>
-              <p className="text-xs text-[#92400E]">
+              <p className="text-xs text-[#92400E] dark:text-[#FCD34D]">
                 All 6 attempts explored • Learn the lesson and proceed
               </p>
             </div>
@@ -55,39 +55,65 @@ export const ResultBanner: React.FC<ResultBannerProps> = ({
       </div>
 
       {/* Target Word Callout */}
-      <div className="bg-white/80 rounded-xl p-4 border border-[#E5E7EB] mb-4 text-center">
-        <span className="text-xs uppercase tracking-widest text-[#78350F] font-semibold">
+      <div
+        className="rounded-xl p-4 border mb-4 text-center"
+        style={{
+          backgroundColor: 'var(--bg-main)',
+          borderColor: 'var(--border-warm)',
+        }}
+      >
+        <span className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'var(--accent-saffron-text)' }}>
           Target 5-Letter Word:
         </span>
-        <div className="font-serif-heading text-2xl sm:text-3xl font-extrabold text-[#C2410C] tracking-widest my-1">
+        <div className="font-serif-heading text-2xl sm:text-3xl font-extrabold tracking-widest my-1" style={{ color: 'var(--accent-saffron-bright)' }}>
           {item.word}
         </div>
-        <p className="text-xs text-[#574D43] italic">
+        <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
           {item.wordMeaning}
         </p>
       </div>
 
       {/* Verse Translation & Shloka */}
-      <div className="bg-[#FAF5ED] rounded-xl p-4 border border-[#E7DECF] mb-4">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-[#B45309] mb-1">
+      <div
+        className="rounded-xl p-4 border mb-4"
+        style={{
+          backgroundColor: 'var(--bg-card-subtle)',
+          borderColor: 'var(--border-warm)',
+        }}
+      >
+        <div className="flex items-center gap-1.5 text-xs font-bold mb-1" style={{ color: 'var(--accent-saffron-bright)' }}>
           <BookOpen className="w-3.5 h-3.5" />
           <span>Verse {item.verse} ({item.chapterName}):</span>
         </div>
-        <p className="font-serif italic text-base sm:text-lg text-[#2C2117] font-semibold leading-relaxed mb-2">
+        <p className="font-serif italic text-base sm:text-lg font-semibold leading-relaxed mb-2" style={{ color: 'var(--text-primary)' }}>
           "{item.translation}"
         </p>
-        <div className="text-xs text-[#78350F] font-mono whitespace-pre-line bg-[#FFFDF9] p-2 rounded border border-[#F3E8D2]">
+        <div
+          className="text-xs font-mono whitespace-pre-line p-2 rounded border"
+          style={{
+            backgroundColor: 'var(--bg-main)',
+            borderColor: 'var(--border-warm)',
+            color: 'var(--accent-saffron-text)',
+            fontFamily: "'Noto Serif Devanagari', 'Rozha One', serif",
+          }}
+        >
           {item.sanskritShloka}
         </div>
       </div>
 
       {/* Student Life Takeaway */}
-      <div className="bg-white/90 rounded-xl p-4 border border-[#E5E7EB] mb-5">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-[#9A3412] mb-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-[#EA580C]" />
+      <div
+        className="rounded-xl p-4 border mb-5"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: 'var(--border-warm)',
+        }}
+      >
+        <div className="flex items-center gap-1.5 text-xs font-bold mb-1.5" style={{ color: 'var(--accent-saffron-bright)' }}>
+          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
           <span>Student Wisdom & Success Takeaway:</span>
         </div>
-        <p className="text-xs sm:text-sm text-[#451A03] leading-relaxed">
+        <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
           {item.studentWisdom}
         </p>
       </div>
@@ -97,9 +123,12 @@ export const ResultBanner: React.FC<ResultBannerProps> = ({
         <button
           type="button"
           onClick={onNextWord}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-[#EA580C] to-[#C2410C] hover:from-[#C2410C] hover:to-[#9A3412] shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
+          className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm text-white shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer"
+          style={{
+            backgroundColor: 'var(--accent-saffron)',
+          }}
         >
-          <span>{isLastWord ? 'View Final Quest Summary' : 'Proceed to Next Word'}</span>
+          <span>{isLastWord ? 'Complete Quest' : 'Next Sacred Word'}</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>

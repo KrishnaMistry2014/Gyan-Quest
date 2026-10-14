@@ -48,13 +48,16 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
             const isSpecial = key === 'ENTER' || key === 'BACKSPACE';
             const status = keyStatuses[key];
 
-            let buttonClass = 'bg-[#EDE4D5] text-[#29221C] border-[#D6CBB8] hover:bg-[#E3D9C7] active:bg-[#D8CCB7]';
+            let buttonClass =
+              'bg-[#EDE4D5] dark:bg-[#2A231C] text-[#29221C] dark:text-[#F8EFEA] border-[#D6CBB8] dark:border-[#42372D] hover:bg-[#E3D9C7] dark:hover:bg-[#382E25] active:bg-[#D8CCB7]';
+
             if (status === 'correct') {
-              buttonClass = 'bg-[#15803D] text-white border-[#15803D] hover:bg-[#166534]';
+              buttonClass = 'bg-[#15803D] dark:bg-[#166534] text-white border-[#15803D] hover:bg-[#166534]';
             } else if (status === 'present') {
-              buttonClass = 'bg-[#D97706] text-white border-[#D97706] hover:bg-[#B45309]';
+              buttonClass = 'bg-[#D97706] dark:bg-[#B45309] text-white border-[#D97706] hover:bg-[#B45309]';
             } else if (status === 'absent') {
-              buttonClass = 'bg-[#A8A29E] text-white border-[#A8A29E] opacity-75';
+              buttonClass =
+                'bg-[#A8A29E] dark:bg-[#44403C] text-white dark:text-stone-300 border-[#A8A29E] dark:border-[#44403C] opacity-75';
             }
 
             const handleClick = () => {
@@ -73,7 +76,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                 aria-label={key === 'BACKSPACE' ? 'Backspace' : key === 'ENTER' ? 'Submit' : key}
                 className={`h-11 sm:h-12 border font-semibold text-xs sm:text-sm rounded-lg transition-colors flex items-center justify-center select-none shadow-xs disabled:opacity-50 disabled:cursor-not-allowed ${
                   isSpecial
-                    ? 'px-2 sm:px-3 min-w-[48px] sm:min-w-[64px] bg-[#E2D4BF] text-[#451A03]'
+                    ? 'px-2 sm:px-3 min-w-[48px] sm:min-w-[64px] bg-[#E2D4BF] dark:bg-[#3A2D21] text-[#451A03] dark:text-[#FDE68A] border-[#D1C1AA] dark:border-[#524130]'
                     : 'w-8 sm:w-10 min-w-[30px] sm:min-w-[38px]'
                 } ${buttonClass}`}
               >

@@ -15,7 +15,13 @@ export const VerseClueCard: React.FC<VerseClueCardProps> = ({ item, imageHero })
   const parts = item.sentence.split('_____');
 
   return (
-    <div className="w-full bg-[#FFFDF9] border border-[#E7DECF] rounded-2xl p-5 sm:p-6 shadow-xs mb-6 relative overflow-hidden">
+    <div
+      className="w-full rounded-2xl p-5 sm:p-6 shadow-xs mb-6 relative overflow-hidden border transition-colors"
+      style={{
+        backgroundColor: 'var(--bg-card)',
+        borderColor: 'var(--border-warm)',
+      }}
+    >
       {/* Subtle Vedic watermark motif */}
       <div className="absolute top-0 right-0 w-32 h-32 opacity-15 pointer-events-none">
         <img
@@ -28,37 +34,56 @@ export const VerseClueCard: React.FC<VerseClueCardProps> = ({ item, imageHero })
 
       {/* Header Meta */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-[#B45309]">
-          <BookMarked className="w-4 h-4 text-[#EA580C]" />
+        <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: 'var(--accent-saffron-bright)' }}>
+          <BookMarked className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           <span>Chapter {item.chapter} • Verse {item.verse}</span>
-          <span className="text-[#D6D3D1]">|</span>
-          <span className="text-[#78350F] italic">{item.chapterName}</span>
+          <span style={{ color: 'var(--border-warm)' }}>|</span>
+          <span className="italic" style={{ color: 'var(--accent-saffron-text)' }}>{item.chapterName}</span>
         </div>
 
         <div className="flex items-center gap-2 z-10">
           <button
             type="button"
             onClick={() => setShowSanskrit(!showSanskrit)}
-            className="text-[11px] font-medium text-[#78350F] hover:text-[#C2410C] hover:underline transition-colors cursor-pointer"
+            className="text-[11px] font-medium hover:underline transition-colors cursor-pointer"
+            style={{ color: 'var(--accent-saffron-text)' }}
           >
             {showSanskrit ? 'Hide Sanskrit' : 'View Shloka'}
           </button>
           <button
             type="button"
             onClick={() => setShowHint(!showHint)}
-            className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded bg-[#FEF3C7] text-[#92400E] hover:bg-[#FDE68A] transition-colors cursor-pointer"
+            className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded transition-colors cursor-pointer border"
+            style={{
+              backgroundColor: 'var(--accent-saffron-light)',
+              borderColor: 'var(--border-warm)',
+              color: 'var(--accent-saffron-text)',
+            }}
           >
-            <Lightbulb className="w-3 h-3 text-[#D97706]" />
+            <Lightbulb className="w-3 h-3 text-amber-500" />
             <span>{showHint ? 'Hide Hint' : 'Hint'}</span>
           </button>
         </div>
       </div>
 
       {/* The Central Clue Sentence */}
-      <div className="bg-[#FAF5ED] rounded-xl p-4 sm:p-5 border border-[#EBE2D4] my-2 text-center">
-        <p className="font-serif italic text-xl sm:text-2xl font-semibold leading-relaxed text-[#2C2117]">
+      <div
+        className="rounded-xl p-4 sm:p-5 border my-2 text-center"
+        style={{
+          backgroundColor: 'var(--bg-main)',
+          borderColor: 'var(--border-warm)',
+        }}
+      >
+        <p className="font-serif italic text-xl sm:text-2xl font-semibold leading-relaxed" style={{ color: 'var(--text-primary)' }}>
           {parts[0]}
-          <span className="inline-block px-3 py-0.5 mx-1.5 border-b-2 border-[#EA580C] bg-[#FFEDD5] text-[#C2410C] font-serif-heading font-bold tracking-widest text-lg sm:text-xl rounded-t">
+          <span
+            className="inline-block px-3 py-0.5 mx-1.5 border-b-2 font-serif-heading font-bold tracking-widest text-lg sm:text-xl rounded-t"
+            style={{
+              backgroundColor: 'var(--accent-saffron-light)',
+              borderColor: 'var(--accent-saffron)',
+              color: 'var(--accent-saffron-bright)',
+            }}
+          >
             _ _ _ _ _
           </span>
           {parts[1] || ''}
@@ -67,11 +92,23 @@ export const VerseClueCard: React.FC<VerseClueCardProps> = ({ item, imageHero })
 
       {/* Optional Sanskrit Shloka Expansion */}
       {showSanskrit && (
-        <div className="mt-3 p-3 bg-[#FDF8EE] rounded-lg border border-[#F3E8D2] text-center animate-in fade-in">
-          <div className="text-sm sm:text-base font-serif font-bold text-[#78350F] whitespace-pre-line leading-relaxed">
+        <div
+          className="mt-3 p-3 rounded-lg border text-center animate-in fade-in"
+          style={{
+            backgroundColor: 'var(--bg-card-subtle)',
+            borderColor: 'var(--border-warm)',
+          }}
+        >
+          <div
+            className="text-base sm:text-lg font-serif font-bold whitespace-pre-line leading-relaxed"
+            style={{
+              fontFamily: "'Noto Serif Devanagari', 'Rozha One', serif",
+              color: 'var(--accent-saffron-text)',
+            }}
+          >
             {item.sanskritShloka}
           </div>
-          <p className="text-xs text-[#574D43] mt-1.5 italic">
+          <p className="text-xs mt-1.5 italic" style={{ color: 'var(--text-muted)' }}>
             "{item.translation}"
           </p>
         </div>
@@ -79,8 +116,15 @@ export const VerseClueCard: React.FC<VerseClueCardProps> = ({ item, imageHero })
 
       {/* Optional Hint Expansion */}
       {showHint && (
-        <div className="mt-3 p-3 bg-[#FFFBEB] rounded-lg border border-[#FDE68A] flex items-start gap-2.5 text-xs text-[#92400E] animate-in fade-in">
-          <Sparkles className="w-4 h-4 text-[#D97706] shrink-0 mt-0.5" />
+        <div
+          className="mt-3 p-3 rounded-lg border flex items-start gap-2.5 text-xs animate-in fade-in"
+          style={{
+            backgroundColor: 'var(--accent-saffron-light)',
+            borderColor: 'var(--accent-saffron)',
+            color: 'var(--accent-saffron-text)',
+          }}
+        >
+          <Sparkles className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
           <div>
             <span className="font-bold">Clue Insight: </span>
             {item.hint}

@@ -20,7 +20,7 @@ import {
   X,
   Sliders,
   Volume2,
-  ClipboardCheck
+  Puzzle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -32,11 +32,12 @@ export type AppView =
   | 'my-chapters'
   | 'shravan'
   | 'manan'
-  | 'pariksha'
   | 'bhagavad-gita'
   | 'focus-mode'
   | 'store'
-  | 'gita-game';
+  | 'gita-game'
+  | 'gita-reader'
+  | 'harmony-puzzle';
 
 interface SidebarProps {
   currentView: AppView;
@@ -116,9 +117,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentView === 'shravan' ||
     currentView === 'manan';
 
-  const isGitaActive = currentView === 'bhagavad-gita' || currentView === 'gita-game';
+  const isGitaActive = currentView === 'bhagavad-gita' || currentView === 'gita-game' || currentView === 'gita-reader';
+  const isPuzzleActive = currentView === 'harmony-puzzle';
   const isFocusActive = currentView === 'focus-mode';
-  const isParikshaActive = currentView === 'pariksha';
   const isStoreActive = currentView === 'store';
   const isAboutActive = currentView === 'landing' && activeSection === 'about';
   const isStreakActive = isStreakModalOpen;
@@ -150,11 +151,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
         break;
 
-      case 'pariksha':
-        onNavigateView('pariksha');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        break;
-
       case 'bhagavad-gita':
         onNavigateView('bhagavad-gita');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -162,6 +158,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       case 'guru-ai':
         onOpenGuruModal();
+        break;
+
+      case 'harmony-puzzle':
+        onNavigateView('harmony-puzzle');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
 
       case 'focus-mode':
@@ -430,6 +431,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {renderNavItem('focus-mode', 'Focus Mode', Clock, isFocusActive)}
           {renderNavItem(
+            'harmony-puzzle',
+            'Harmony Puzzle',
+            Puzzle,
+            isPuzzleActive,
+            <span
+              className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+              style={{
+                backgroundColor: 'var(--accent-saffron)',
+                color: '#FFFFFF',
+              }}
+            >
+              12P
+            </span>
+          )}
+          {renderNavItem(
             'streaks',
             'Streaks',
             Flame,
@@ -443,21 +459,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <Flame className="w-3 h-3 text-amber-500 fill-current" />
               <span>{streak}d</span>
-            </span>
-          )}
-          {renderNavItem(
-            'pariksha',
-            'Pariksha (Exam)',
-            ClipboardCheck,
-            isParikshaActive,
-            <span
-              className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
-              style={{
-                backgroundColor: 'var(--accent-saffron)',
-                color: '#FFFFFF',
-              }}
-            >
-              Stage 05
             </span>
           )}
         </div>

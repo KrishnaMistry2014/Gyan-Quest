@@ -64,15 +64,19 @@ export const WordGrid: React.FC<WordGridProps> = ({
               const letter = rowWord[colIndex] || '';
               const status = isPastRow ? tileStatuses[colIndex] : letter ? 'typing' : 'empty';
 
-              let tileStyle = 'border-2 border-[#E2D7C5] bg-[#FFFDF8] text-[#29221C]';
+              let tileStyle =
+                'border-2 border-[#D8C7B0] dark:border-[#3E342B] bg-[#FFFDF8] dark:bg-[#1E1914] text-[#1C1917] dark:text-[#F8EFEA]';
+
               if (status === 'typing') {
-                tileStyle = 'border-2 border-[#B45309] bg-[#FFFDF8] text-[#29221C] scale-105 shadow-xs';
+                tileStyle =
+                  'border-2 border-[#B45309] dark:border-[#F59E0B] bg-[#FFFDF8] dark:bg-[#251F19] text-[#1C1917] dark:text-[#F8EFEA] scale-105 shadow-xs';
               } else if (status === 'correct') {
-                tileStyle = 'border-2 border-[#15803D] bg-[#15803D] text-white shadow-xs';
+                tileStyle = 'border-2 border-[#15803D] dark:border-[#166534] bg-[#15803D] text-white shadow-xs';
               } else if (status === 'present') {
-                tileStyle = 'border-2 border-[#D97706] bg-[#D97706] text-white shadow-xs';
+                tileStyle = 'border-2 border-[#D97706] dark:border-[#B45309] bg-[#D97706] text-white shadow-xs';
               } else if (status === 'absent') {
-                tileStyle = 'border-2 border-[#78716C] bg-[#78716C] text-white';
+                tileStyle =
+                  'border-2 border-[#78716C] dark:border-[#44403C] bg-[#78716C] dark:bg-[#38332E] text-white';
               }
 
               return (

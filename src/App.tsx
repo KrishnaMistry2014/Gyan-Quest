@@ -29,6 +29,8 @@ import { BhagavadGitaView } from './components/BhagavadGitaView';
 import { StoreView } from './components/StoreView';
 import { FocusModeView } from './components/FocusModeView';
 import { GitaWordGame } from './components/GitaWordGame/GitaWordGame';
+import { GitaVoiceReader } from './components/GitaVoiceReader';
+import { HarmonyPuzzleGame } from './components/HarmonyPuzzle/HarmonyPuzzleGame';
 import { SavedChapter } from './lib/chapters';
 import { Menu, BookOpenText, Sun, Moon, Flame, Zap } from 'lucide-react';
 
@@ -435,8 +437,16 @@ const MainAppContent: React.FC = () => {
               onOpenGuruChatWithPrompt={(prompt) => {
                 setIsGuruModalOpen(true);
               }}
+              onNavigateReader={() => {
+                setCurrentView('gita-reader');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               onStartGitaGame={() => {
                 setCurrentView('gita-game');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onStartHarmonyPuzzle={() => {
+                setCurrentView('harmony-puzzle');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onNavigateHome={() => {
@@ -456,11 +466,55 @@ const MainAppContent: React.FC = () => {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
+          ) : currentView === 'gita-reader' ? (
+            /* Bhagavad Gita for Students Voice Reader & Lesson */
+            <GitaVoiceReader
+              onBack={() => {
+                setCurrentView('bhagavad-gita');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onPlayQuest={() => {
+                setCurrentView('gita-game');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onPlayJigsaw={() => {
+                setCurrentView('harmony-puzzle');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
           ) : currentView === 'gita-game' ? (
             /* Bhagavad Gita Interactive Word Quest Game */
             <GitaWordGame
               onBackToGita={() => {
-                setCurrentView('bhagavad-gita');
+                setCurrentView('gita-reader');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenReader={() => {
+                setCurrentView('gita-reader');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenJigsaw={() => {
+                setCurrentView('harmony-puzzle');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          ) : currentView === 'harmony-puzzle' ? (
+            /* Harmony of Life Interactive Jigsaw Puzzle Game */
+            <HarmonyPuzzleGame
+              onHome={() => {
+                if (user) {
+                  setCurrentView('dashboard');
+                } else {
+                  setCurrentView('landing');
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenReader={() => {
+                setCurrentView('gita-reader');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateGitaGame={() => {
+                setCurrentView('gita-game');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />

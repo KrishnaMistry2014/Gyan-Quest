@@ -9,7 +9,8 @@ import {
   BookMarked,
   Layers,
   MessageSquare,
-  Gamepad2
+  Gamepad2,
+  Puzzle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -19,6 +20,8 @@ interface BhagavadGitaViewProps {
   onNavigateHome?: () => void;
   onNavigateMyBooks?: () => void;
   onStartGitaGame?: () => void;
+  onNavigateReader?: () => void;
+  onStartHarmonyPuzzle?: () => void;
 }
 
 interface GitaChapterPreview {
@@ -46,6 +49,8 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
   onNavigateHome,
   onNavigateMyBooks,
   onStartGitaGame,
+  onNavigateReader,
+  onStartHarmonyPuzzle,
 }) => {
   const { user, openAuthModal } = useAuth();
   const { showToast } = useToast();
@@ -55,12 +60,16 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
     if (!user) {
       showToast({
         title: 'Sign In Required',
-        message: 'Please sign in to play the Bhagavad Gita Chapter 6 Word Quest and save your learning progress.',
+        message: 'Please sign in to access the Bhagavad Gita Chapter 6 lesson and Play Quest.',
         type: 'info',
       });
       openAuthModal();
     } else {
-      onStartGitaGame?.();
+      if (onNavigateReader) {
+        onNavigateReader();
+      } else {
+        onStartGitaGame?.();
+      }
     }
   };
 
@@ -195,10 +204,21 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
                       <span className="text-amber-600 dark:text-amber-400">Curating</span>
                     )}
                   </span>
-                  <span className="flex items-center gap-1" style={{ color: 'var(--accent-saffron-text)' }}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedChapter(ch);
+                      if (ch.number === 6) {
+                        handleLearnClick();
+                      }
+                    }}
+                    className="flex items-center gap-1 cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                    style={{ color: 'var(--accent-saffron-text)' }}
+                  >
                     <span>{ch.number === 6 ? 'Play Quest' : 'Details'}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
+                  </button>
                 </div>
               </div>
             );
@@ -314,18 +334,37 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
                 </p>
               </div>
 
-              <button
-                type="button"
-                id="btn-start-game-ch6-banner"
-                onClick={handleLearnClick}
-                className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer text-white"
-                style={{
-                  backgroundColor: 'var(--accent-saffron)',
-                }}
-              >
-                <Gamepad2 className="w-4 h-4" />
-                <span>Start Word Quest</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                {onStartHarmonyPuzzle && (
+                  <button
+                    type="button"
+                    id="btn-start-jigsaw-ch6"
+                    onClick={onStartHarmonyPuzzle}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all hover:scale-102 active:scale-98 cursor-pointer shadow-2xs"
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--accent-saffron)',
+                      color: 'var(--accent-saffron-text)',
+                    }}
+                  >
+                    <Puzzle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <span>Harmony Jigsaw</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  id="btn-start-game-ch6-banner"
+                  onClick={handleLearnClick}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer text-white"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron)',
+                  }}
+                >
+                  <Gamepad2 className="w-4 h-4" />
+                  <span>Start Word Quest</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
