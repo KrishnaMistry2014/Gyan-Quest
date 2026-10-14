@@ -1,14 +1,15 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { BookOpen, Zap, Flame, UploadCloud, CheckCircle2, ArrowRight, AlertCircle, X } from 'lucide-react';
+import { BookOpen, Zap, Flame, UploadCloud, CheckCircle2, ArrowRight, AlertCircle, X, Trophy } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface DashboardProps {
   onResumeLearning?: () => void;
   onStartLearning?: () => void;
   onPdfUpload?: (file: File) => void;
+  onNavigatePariksha?: () => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartLearning, onPdfUpload }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartLearning, onPdfUpload, onNavigatePariksha }) => {
   const { streak, isStreakActiveToday, openStreakModal, profile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
@@ -297,6 +298,54 @@ export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartL
           </div>
         </div>
       </div>
+
+      {/* Quick Launch Pariksha Exam Banner */}
+      {onNavigatePariksha && (
+        <div
+          onClick={onNavigatePariksha}
+          className="w-full rounded-2xl border p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer transition-all hover:border-orange-400 group shadow-2xs"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderColor: 'var(--border-warm)',
+          }}
+        >
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center border shrink-0 transition-transform group-hover:scale-105"
+              style={{
+                backgroundColor: 'var(--accent-saffron-light)',
+                borderColor: 'var(--border-warm)',
+                color: 'var(--accent-saffron)',
+              }}
+            >
+              <Trophy className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  Stage 05 • Pariksha (परीक्षा)
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border border-amber-600/30 text-amber-700 dark:text-amber-300">
+                  25 Questions • 50 XP
+                </span>
+              </div>
+              <h4 className="text-sm sm:text-base font-bold font-serif-heading truncate" style={{ color: 'var(--text-primary)' }}>
+                Test Your Chapter Mastery with Adaptive Pariksha
+              </h4>
+            </div>
+          </div>
+          <div
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all group-hover:translate-x-1"
+            style={{
+              backgroundColor: 'var(--accent-saffron)',
+              color: '#FFFFFF',
+            }}
+          >
+            <span>Launch Exam</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </div>
+        </div>
+      )}
 
       {/* Large rounded rectangle spanning their combined width for Upload Textbooks */}
       {/* In portrait mode, becomes a rounded square (portrait:aspect-square) */}

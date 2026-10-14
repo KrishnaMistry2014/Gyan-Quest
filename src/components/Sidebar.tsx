@@ -19,7 +19,8 @@ import {
   Zap,
   X,
   Sliders,
-  Volume2
+  Volume2,
+  ClipboardCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -31,6 +32,7 @@ export type AppView =
   | 'my-chapters'
   | 'shravan'
   | 'manan'
+  | 'pariksha'
   | 'bhagavad-gita'
   | 'focus-mode'
   | 'store'
@@ -116,6 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isGitaActive = currentView === 'bhagavad-gita' || currentView === 'gita-game';
   const isFocusActive = currentView === 'focus-mode';
+  const isParikshaActive = currentView === 'pariksha';
   const isStoreActive = currentView === 'store';
   const isAboutActive = currentView === 'landing' && activeSection === 'about';
   const isStreakActive = isStreakModalOpen;
@@ -126,11 +129,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleItemClick = (id: string) => {
     // Automatically close mobile drawer
     setIsMobileOpen(false);
-
-    if (!user && id !== 'home') {
-      openAuthModal();
-      return;
-    }
 
     switch (id) {
       case 'home':
@@ -150,6 +148,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onNavigateView('my-chapters');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+        break;
+
+      case 'pariksha':
+        onNavigateView('pariksha');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
 
       case 'bhagavad-gita':
@@ -192,7 +195,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
         break;
 
-      case 'settings':
+      case 'theme-narration':
         openSettingsModal();
         break;
 
@@ -442,6 +445,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>{streak}d</span>
             </span>
           )}
+          {renderNavItem(
+            'pariksha',
+            'Pariksha (Exam)',
+            ClipboardCheck,
+            isParikshaActive,
+            <span
+              className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+              style={{
+                backgroundColor: 'var(--accent-saffron)',
+                color: '#FFFFFF',
+              }}
+            >
+              Stage 05
+            </span>
+          )}
         </div>
 
         {/* GROUP 3: EXPLORE AND ACCOUNT */}
@@ -461,8 +479,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {renderNavItem('profile', 'Profile', UserIcon, isProfileActive)}
           {renderNavItem('about', 'About GyanQuest', Info, isAboutActive)}
           {renderNavItem(
-            'settings',
-            'Settings',
+            'theme-narration',
+            'Theme and Narration',
             isDark ? Moon : Sun,
             isThemeActive,
             undefined,

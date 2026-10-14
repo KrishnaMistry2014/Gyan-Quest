@@ -8,7 +8,7 @@ import { PDFParse } from 'pdf-parse';
 import fs from 'fs';
 import crypto from 'crypto';
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { buildValidCrosswordLayout } from './src/lib/crosswordGenerator.ts';
 
 dotenv.config();
@@ -24,20 +24,47 @@ const serverFirebaseConfig = {
 const sApp = !getApps().length ? initializeApp(serverFirebaseConfig) : getApp();
 const serverDb = getFirestore(sApp);
 
-// One-time startup cleanup: remove dailyQuotaStatus document in Firestore so models are never blocked
-async function removeFirestoreDailyQuotaDoc() {
+async function getServerExceededModels(): Promise<string[]> {
   try {
-    const ref = doc(serverDb, 'systemStatus', 'dailyQuotaStatus');
-    const snap = await getDoc(ref);
+    const today = new Date().toISOString().split('T')[0];
+    const snap = await getDoc(doc(serverDb, 'systemStatus', 'dailyQuotaStatus'));
     if (snap.exists()) {
-      await deleteDoc(ref);
-      console.log('[Server Quota Cleanup] Removed obsolete dailyQuotaStatus document from Firestore.');
+      const data = snap.data();
+      if (data.date === today && Array.isArray(data.exceededModels)) {
+        return data.exceededModels;
+      }
     }
   } catch (err) {
-    console.debug('[Server Quota Cleanup] Notice checking dailyQuotaStatus in Firestore:', err);
+    console.warn('[Server Quota] Error reading daily quota from Firestore:', err);
+  }
+  return [];
+}
+
+async function recordServerExceededModel(model: string) {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const ref = doc(serverDb, 'systemStatus', 'dailyQuotaStatus');
+    const snap = await getDoc(ref);
+    if (!snap.exists() || snap.data()?.date !== today) {
+      await setDoc(ref, {
+        date: today,
+        exceededModels: [model],
+        updatedAt: Date.now(),
+      });
+    } else {
+      const current = snap.data()?.exceededModels || [];
+      if (!current.includes(model)) {
+        await updateDoc(ref, {
+          exceededModels: arrayUnion(model),
+          updatedAt: Date.now(),
+        });
+      }
+    }
+    console.log(`[Server Quota] Recorded model ${model} as exceeded for today (${today}).`);
+  } catch (err) {
+    console.warn('[Server Quota] Error recording exceeded model to Firestore:', err);
   }
 }
-removeFirestoreDailyQuotaDoc().catch(() => {});
 
 if (process.env.VITE_FIREBASE_API_KEY && !process.env.VITE_FIREBASE_API_KEY.startsWith('AIza')) {
   process.env.VITE_FIREBASE_API_KEY = 'AIzaSyDkCU1DHUqnRjuWvCiMi3m4Q8G2uJ6ECZU';
@@ -562,13 +589,19 @@ async function synthesizeGuruSpeech(
     }
   }
 
-  // 2. Iterate through 4-model manual fallback chain in exact order
+  // 2. Iterate through 4-model fallback chain in exact order
   const errors: { model: string; error: string }[] = [];
+  const now = Date.now();
+  const dbExceededModels = await getServerExceededModels();
 
   for (let i = 0; i < TTS_FALLBACK_MODELS.length; i++) {
     const model = TTS_FALLBACK_MODELS[i];
 
-    console.log(`[Shravan TTS] Attempting synthesis with fallback level ${i + 1}/${TTS_FALLBACK_MODELS.length}: ${model} (Voice: ${voice})...`);
+    if (dbExceededModels.includes(model)) {
+      console.warn(`[Shravan TTS] Skipping ${model} (exceeded quota for today per Firestore database)`);
+      errors.push({ model, error: 'Exceeded quota for today in Firestore' });
+      continue;
+    }
 
     const status = modelTracker.get(model) || {
       cooldownUntil: 0,
@@ -576,6 +609,16 @@ async function synthesizeGuruSpeech(
       totalCalls: 0,
       totalFailures: 0,
     };
+
+    // If model is in cooldown due to recent 429/quota exhaustion, check if cooldown expired
+    if (status.cooldownUntil > now) {
+      const remainingSec = Math.ceil((status.cooldownUntil - now) / 1000);
+      console.warn(`[Shravan TTS] Skipping ${model} (in cooldown for another ${remainingSec}s due to quota)`);
+      errors.push({ model, error: `In cooldown (${remainingSec}s remaining): ${status.lastError}` });
+      continue;
+    }
+
+    console.log(`[Shravan TTS] Attempting synthesis with fallback level ${i + 1}/${TTS_FALLBACK_MODELS.length}: ${model} (Voice: ${voice})...`);
     status.totalCalls++;
 
     try {
@@ -617,7 +660,6 @@ async function synthesizeGuruSpeech(
 
       // Reset failure state on success
       status.quotaExhausted = false;
-      status.cooldownUntil = 0;
       modelTracker.set(model, status);
 
       // Save to disk cache for repeat plays and other students
@@ -653,7 +695,22 @@ async function synthesizeGuruSpeech(
       const errMsg = err?.message || String(err);
       console.warn(`[Shravan TTS Fallback Notice] Model ${model} failed: ${errMsg}`);
 
-      status.lastError = errMsg;
+      const isQuota =
+        errMsg.includes('429') ||
+        errMsg.includes('RESOURCE_EXHAUSTED') ||
+        errMsg.includes('quota') ||
+        errMsg.includes('Quota exceeded');
+
+      if (isQuota) {
+        status.quotaExhausted = true;
+        // 60-second cooldown on quota exhaustion
+        status.cooldownUntil = Date.now() + 60000;
+        status.lastError = 'Rate limit / quota exhausted';
+        await recordServerExceededModel(model);
+        console.warn(`[Shravan TTS Quota] Model ${model} marked in cooldown for 60 seconds and recorded in Firestore.`);
+      } else {
+        status.lastError = errMsg;
+      }
       modelTracker.set(model, status);
 
       errors.push({ model, error: errMsg });
@@ -663,7 +720,7 @@ async function synthesizeGuruSpeech(
         throw new Error(`Authentication error on Gemini API: ${errMsg}. Please verify your API key.`);
       }
 
-      // Continue to next model in the four-model manual fallback chain
+      // Continue to next model in the four-model chain
     }
   }
 
@@ -1292,6 +1349,175 @@ Return JSON in this exact structure:
   }
 
   return res.json({ questions: fallbackQuestions });
+});
+
+// Endpoint for Pariksha 25-Question Comprehensive Examination generation
+app.post('/api/generate-pariksha', async (req, res) => {
+  const { fileName, chapterSummary, pdfBase64, difficulty } = req.body;
+  const sourceText = (chapterSummary && typeof chapterSummary === 'string' && chapterSummary.trim().length > 0)
+    ? chapterSummary
+    : (fileName || 'Ancient wisdom, philosophy, and mindful reflection');
+
+  const title = (fileName || 'Chapter').replace(/\.pdf$/i, '').replace(/^Vidya:\s*/i, '');
+  console.log(`[Pariksha API] Generating 25-question exam for: "${title}" (${sourceText.length} chars)`);
+
+  const prompt = `You are the master assessment architect for GyanQuest Pariksha (Stage 05).
+Generate a comprehensive, rigorous 25-Question adaptive examination strictly based on this chapter text:
+"${sourceText.slice(0, 10000)}"
+
+Structure:
+- Stage 1 (Q1 to Q5): Foundation Warmup (Key definitions, direct terms, foundational facts). 100 points each.
+- Stage 2 (Q6 to Q10): Conceptual Depth (Mechanisms, principles, explanations). 150 points each.
+- Stage 3 (Q11 to Q15): Analytical Arena (Cause and effect, comparing concepts, distinctions). 200 points each.
+- Stage 4 (Q16 to Q20): Mastery Crucible (Challenging scenarios, counter-intuitive nuances, applications). 250 points each.
+- Stage 5 (Q21 to Q25): Grand Boss Round (Capstone synthesis, multi-concept integration). 350 points each.
+
+Rules:
+1. Exactly 25 questions in the array.
+2. Each question MUST have exactly 4 plausible options, with correctIndex (0, 1, 2, or 3).
+3. Each question must include a helpful 1-sentence hint (for the hint lifeline) and a clear, factual explanation grounded in the text.
+4. Also generate 3 high-yield summaryFlashcards ({ concept, takeaway }).
+5. Topics covered: 3-5 major topic tags.
+
+Return JSON in this exact structure:
+{
+  "testTitle": "${title} Pariksha",
+  "sourceFileName": "${fileName || title}",
+  "topicsCovered": ["Topic 1", "Topic 2", "Topic 3"],
+  "questions": [
+    {
+      "id": "1",
+      "stage": 1,
+      "stageName": "Foundation Warmup",
+      "question": "Question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 0,
+      "points": 100,
+      "hint": "Clue for the student.",
+      "explanation": "Detailed explanation of why Option A is correct according to the chapter.",
+      "topic": "Core Definition",
+      "difficulty": "easy"
+    }
+  ],
+  "summaryFlashcards": [
+    {
+      "concept": "Core Principle",
+      "takeaway": "Essential high-yield insight."
+    }
+  ]
+}`;
+
+  try {
+    let parsedData: any = null;
+    try {
+      const response = await callWithTimeout(
+        ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            temperature: 0.25,
+          },
+        }),
+        30000,
+        'Gemini 3.5 Flash-Lite Pariksha Exam Generation'
+      );
+      parsedData = JSON.parse(response.text || '{}');
+    } catch (gErr: any) {
+      console.warn('[Pariksha API] Gemini 3.5 Flash-Lite notice, retrying with Gemini 3.1 Flash-Lite:', gErr?.message || gErr);
+      try {
+        const fbResponse = await callWithTimeout(
+          ai.models.generateContent({
+            model: 'gemini-3.1-flash-lite',
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              temperature: 0.25,
+            },
+          }),
+          30000,
+          'Gemini 3.1 Flash-Lite Pariksha Exam Generation'
+        );
+        parsedData = JSON.parse(fbResponse.text || '{}');
+      } catch (fbErr: any) {
+        console.warn('[Pariksha API] Gemini 3.1 Flash-Lite notice:', fbErr?.message || fbErr);
+      }
+    }
+
+    if (parsedData && Array.isArray(parsedData.questions) && parsedData.questions.length >= 10) {
+      return res.json(parsedData);
+    }
+  } catch (err: any) {
+    console.warn('[Pariksha API] Gemini exam generation failed, generating synthesized local exam:', err?.message);
+  }
+
+  // Synthesized fallback exam based on chapter text
+  const rawLines = sourceText
+    .split('\n')
+    .map((l: string) => l.replace(/^[*#\-•\s]+/, '').trim())
+    .filter((l: string) => l.length > 25 && l.length < 240);
+
+  const stageNames: Record<number, string> = {
+    1: 'Foundation Warmup',
+    2: 'Conceptual Depth',
+    3: 'Analytical Arena',
+    4: 'Mastery Crucible',
+    5: 'Grand Boss Round',
+  };
+  const stagePoints: Record<number, number> = {
+    1: 100, 2: 150, 3: 200, 4: 250, 5: 350,
+  };
+  const stageDiff: Record<number, 'easy' | 'medium' | 'hard' | 'boss'> = {
+    1: 'easy', 2: 'medium', 3: 'medium', 4: 'hard', 5: 'boss',
+  };
+
+  const questions: any[] = [];
+  for (let i = 0; i < 25; i++) {
+    const stage = Math.min(5, Math.floor(i / 5) + 1);
+    const fact = rawLines[i % (rawLines.length || 1)] || `${title} provides verified foundational concepts and guidelines.`;
+
+    const qText = stage === 1
+      ? `According to the chapter notes on ${title}, which statement is verified?`
+      : stage === 2
+      ? `What conceptual mechanism is affirmed by: "${fact.slice(0, 50)}..."?`
+      : stage === 3
+      ? `Analyzing cause and effect in ${title}, which relationship holds true?`
+      : stage === 4
+      ? `In the advanced mastery crucible, which principle distinguishes this phenomenon?`
+      : `[Capstone Grand Boss] Integrating all core tenets of ${title}, which conclusion is scientifically sound?`;
+
+    questions.push({
+      id: String(i + 1),
+      stage,
+      stageName: stageNames[stage],
+      question: qText,
+      options: [
+        fact,
+        'This parameter operates unconditionally without energy exchange',
+        'The state remains unchanged and produces no observable consequence',
+        'This reaction is strictly prohibited under standard conditions'
+      ],
+      correctIndex: 0,
+      points: stagePoints[stage],
+      hint: `Recall the foundational chapter notes for ${title}.`,
+      explanation: `As detailed in the chapter text: "${fact}".`,
+      topic: `${title} — Unit ${stage}`,
+      difficulty: stageDiff[stage],
+    });
+  }
+
+  return res.json({
+    testTitle: `${title} Pariksha`,
+    sourceFileName: fileName || title,
+    createdAt: new Date().toISOString(),
+    topicsCovered: [title, 'Foundational Concepts', 'Analytical Applications', 'Capstone Synthesis'],
+    questions,
+    summaryFlashcards: [
+      { concept: `${title} Core Principle`, takeaway: rawLines[0] || 'Foundational principles.' },
+      { concept: 'Key Governing Process', takeaway: rawLines[1] || 'Primary governing process.' },
+      { concept: 'Theoretical Synthesis', takeaway: rawLines[2] || 'Governing relationships and formulas.' },
+    ],
+  });
 });
 
 // Global Express error handler to guarantee all middleware errors return JSON, never HTML

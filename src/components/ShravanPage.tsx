@@ -163,9 +163,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 }) => {
   const { user, refreshUser, updateProfileXp, isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
-  const [selectedVoice, setSelectedVoice] = useState<'Adinath' | 'Vidur' | 'Sumed' | 'Device'>('Adinath');
-  const [deviceSpeechActive, setDeviceSpeechActive] = useState<boolean>(false);
-  const [deviceSpeechPlaying, setDeviceSpeechPlaying] = useState<boolean>(false);
+  const [selectedVoice, setSelectedVoice] = useState<'Adinath' | 'Vidur' | 'Sumed'>('Adinath');
   const [ttsMeta, setTtsMeta] = useState<{ voice?: string; fromCache?: boolean } | null>(null);
   const [audioBase64, setAudioBase64] = useState<string | null>(chapter.audioBase64 || null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -220,115 +218,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     }
   };
 
-  const stopDeviceSpeech = () => {
-    try {
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
-    } catch (_) {}
-    setDeviceSpeechPlaying(false);
-    setDeviceSpeechActive(false);
-  };
-
-  const startDeviceSpeechNarration = () => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      showToast({
-        title: 'Device Speech Unavailable',
-        message: 'Your browser environment does not support Web Speech synthesis.',
-        type: 'error',
-      });
-      return;
-    }
-
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    }
-    try {
-      window.speechSynthesis.cancel();
-    } catch (_) {}
-
-    const plainText = stripMarkdownForSpeech(chapter.summary || '');
-    if (!plainText.trim()) {
-      setStatus('error');
-      setErrorMessage('No chapter summary available to narrate. Please open or generate a chapter summary first.');
-      return;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(plainText);
-    const speed = getTargetAudioSpeed();
-    utterance.rate = Math.min(2, Math.max(0.5, speed));
-
-    try {
-      const voices = window.speechSynthesis.getVoices();
-      const preferred =
-        voices.find((v) => v.lang === 'en-IN') ||
-        voices.find((v) => v.lang.startsWith('en')) ||
-        voices[0];
-      if (preferred) {
-        utterance.voice = preferred;
-      }
-    } catch (_) {}
-
-    utterance.onstart = () => {
-      setDeviceSpeechActive(true);
-      setDeviceSpeechPlaying(true);
-      setStatus('ready');
-      setErrorMessage('');
-    };
-
-    utterance.onend = () => {
-      setDeviceSpeechPlaying(false);
-      setHasPlayedFullAudio(true);
-      showToast({
-        title: 'Shravan Completed! (+10 XP)',
-        message: 'You completed listening to this chapter lesson.',
-        type: 'xp',
-        xpAmount: 10,
-      });
-    };
-
-    utterance.onerror = (e) => {
-      if (e.error !== 'canceled' && e.error !== 'interrupted') {
-        console.warn('Device speech synthesis notice:', e);
-      }
-      setDeviceSpeechPlaying(false);
-    };
-
-    window.speechSynthesis.speak(utterance);
-    setDeviceSpeechActive(true);
-    setDeviceSpeechPlaying(true);
-    setStatus('ready');
-    setErrorMessage('');
-  };
-
-  const toggleDeviceSpeechPlay = () => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    if (deviceSpeechPlaying) {
-      window.speechSynthesis.pause();
-      setDeviceSpeechPlaying(false);
-    } else {
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-        setDeviceSpeechPlaying(true);
-      } else {
-        startDeviceSpeechNarration();
-      }
-    }
-  };
-
   const generateAudio = async (voiceToUse = selectedVoice) => {
-    if (voiceToUse === 'Device') {
-      startDeviceSpeechNarration();
-      return;
-    }
-    stopDeviceSpeech();
-
-    const apiVoiceMap: Record<string, string> = {
+    const apiVoiceMap: Record<'Adinath' | 'Vidur' | 'Sumed', string> = {
       Adinath: 'Puck',
       Vidur: 'Charon',
       Sumed: 'Fenrir',
@@ -493,7 +384,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 
   // Reset audio state on chapter or voice change; wait for user to click generate
   useEffect(() => {
-    stopDeviceSpeech();
     // Abort any in-flight request before initiating a new one
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -517,7 +407,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     }
 
     return () => {
-      stopDeviceSpeech();
       // Abort in-flight request when component unmounts
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -573,7 +462,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     };
 
     const handleStopActivity = () => {
-      stopDeviceSpeech();
       if (audioRef.current) {
         audioRef.current.pause();
       }
@@ -774,10 +662,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             </span>
             <button
               type="button"
-              onClick={() => {
-                stopDeviceSpeech();
-                setSelectedVoice('Adinath');
-              }}
+              onClick={() => setSelectedVoice('Adinath')}
               className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
                 selectedVoice === 'Adinath'
                   ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
@@ -793,10 +678,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => {
-                stopDeviceSpeech();
-                setSelectedVoice('Vidur');
-              }}
+              onClick={() => setSelectedVoice('Vidur')}
               className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
                 selectedVoice === 'Vidur'
                   ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
@@ -812,10 +694,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => {
-                stopDeviceSpeech();
-                setSelectedVoice('Sumed');
-              }}
+              onClick={() => setSelectedVoice('Sumed')}
               className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
                 selectedVoice === 'Sumed'
                   ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
@@ -828,27 +707,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               title="Guru Sumed: Scholarly, focused, and earnest Indian English teacher delivery"
             >
               Guru Sumed (Scholarly)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedVoice('Device');
-                if (status === 'ready' && !deviceSpeechActive) {
-                  setStatus('idle');
-                }
-              }}
-              className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
-                selectedVoice === 'Device'
-                  ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
-                  : 'bg-black/5 dark:bg-white/5 border-stone-300 dark:border-stone-700 hover:opacity-80'
-              }`}
-              style={{
-                color: selectedVoice === 'Device' ? '#FFFFFF' : 'var(--text-primary)',
-                backgroundColor: selectedVoice === 'Device' ? 'var(--accent-saffron)' : undefined,
-              }}
-              title="Device Voice: Browser built-in speech synthesis manual fallback"
-            >
-              Device Voice (Manual Fallback)
             </button>
           </div>
         </div>
@@ -868,14 +726,10 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             </div>
             <div className="space-y-2">
               <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                {selectedVoice === 'Device'
-                  ? 'Ready to Listen with Device Voice (Manual Fallback)'
-                  : `Ready to Listen with Guru ${selectedVoice}`}
+                Ready to Listen with Guru {selectedVoice}
               </h3>
               <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-                {selectedVoice === 'Device'
-                  ? "Narrates the chapter lesson using your device's built-in speech synthesis engine directly."
-                  : 'Select your preferred teacher above and click the button below to start the immersive audio narration.'}
+                Select your preferred teacher above and click the button below to start the immersive audio narration.
               </p>
             </div>
             <button
@@ -885,11 +739,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               style={{ backgroundColor: 'var(--accent-saffron)', color: '#FFFFFF' }}
             >
               <Sparkles className="w-4 h-4" />
-              <span>
-                {selectedVoice === 'Device'
-                  ? 'Start Device Speech Narration'
-                  : `Generate Narration with Guru ${selectedVoice}`}
-              </span>
+              <span>Generate Narration with Guru {selectedVoice}</span>
             </button>
           </div>
         )}
@@ -937,53 +787,33 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               {errorMessage || 'Failed to synthesize audio narration with the Indian Guru voice engine.'}
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  generateAudio(selectedVoice === 'Device' ? 'Adinath' : selectedVoice);
-                }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition-all hover:opacity-90 cursor-pointer"
-                style={{ backgroundColor: 'var(--accent-saffron)', color: '#FFFFFF' }}
-              >
-                <RefreshCw className="w-4 h-4" />
-                <span>Retry Guru Narration</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedVoice('Device');
-                  startDeviceSpeechNarration();
-                }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all hover:opacity-90 cursor-pointer"
-                style={{
-                  backgroundColor: 'var(--bg-main)',
-                  borderColor: 'var(--border-warm)',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <Volume2 className="w-4 h-4" />
-                <span>Play Device Voice (Manual Fallback)</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                generateAudio(selectedVoice);
+              }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition-all hover:opacity-90 cursor-pointer"
+              style={{ backgroundColor: 'var(--accent-saffron)', color: '#FFFFFF' }}
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Retry Narration</span>
+            </button>
           </div>
         )}
 
         {/* READY / AUDIO PLAYER STATE */}
-        {status === 'ready' && (audioUrl || audioBase64 || deviceSpeechActive) && (
+        {status === 'ready' && (audioUrl || audioBase64) && (
           <div className="space-y-8 max-w-2xl mx-auto">
-            {!deviceSpeechActive && (
-              <audio
-                ref={audioRef}
-                src={audioUrl || (audioBase64 ? resolveAudioSrc(audioBase64) : undefined)}
-                onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={handleLoadedMetadata}
-                onEnded={() => {
-                  setIsPlaying(false);
-                  setHasPlayedFullAudio(true);
-                }}
-              />
-            )}
+            <audio
+              ref={audioRef}
+              src={audioUrl || (audioBase64 ? resolveAudioSrc(audioBase64) : undefined)}
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
+              onEnded={() => {
+                setIsPlaying(false);
+                setHasPlayedFullAudio(true);
+              }}
+            />
 
             {/* Visual Equalizer / Waveform Graphic */}
             <div
@@ -998,205 +828,135 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
                   key={i}
                   className="w-1.5 rounded-full transition-all duration-300"
                   style={{
-                    height: (deviceSpeechActive ? deviceSpeechPlaying : isPlaying)
-                      ? `${Math.max(15, (h * (Math.sin(Date.now() / 200 + i) + 1.5)) / 2.5)}%`
-                      : '20%',
-                    backgroundColor: (deviceSpeechActive ? deviceSpeechPlaying : isPlaying)
-                      ? 'var(--accent-saffron)'
-                      : 'var(--border-warm)',
+                    height: isPlaying ? `${Math.max(15, (h * (Math.sin(Date.now() / 200 + i) + 1.5)) / 2.5)}%` : '20%',
+                    backgroundColor: isPlaying ? 'var(--accent-saffron)' : 'var(--border-warm)',
                   }}
                 />
               ))}
             </div>
 
-            {deviceSpeechActive ? (
-              /* Device Speech Player Controls */
-              <div className="text-center space-y-4">
-                <div
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold"
-                  style={{
-                    backgroundColor: 'var(--accent-saffron-light)',
-                    borderColor: 'var(--border-warm)',
-                    color: 'var(--accent-saffron-text)',
-                  }}
-                >
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span>Playing via Device Voice (Manual Fallback)</span>
-                </div>
-                <div className="flex items-center justify-center gap-4 pt-2">
-                  <button
-                    type="button"
-                    onClick={toggleDeviceSpeechPlay}
-                    className="w-16 h-16 rounded-full flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                    style={{
-                      backgroundColor: 'var(--accent-saffron)',
-                      color: '#FFFFFF',
-                    }}
-                    title={deviceSpeechPlaying ? 'Pause' : 'Play'}
-                  >
-                    {deviceSpeechPlaying ? (
-                      <Pause className="w-7 h-7 fill-current" />
-                    ) : (
-                      <Play className="w-7 h-7 fill-current translate-x-0.5" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={stopDeviceSpeech}
-                    className="px-4 py-2 rounded-xl text-xs font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs"
-                    style={{
-                      borderColor: 'var(--border-warm)',
-                      color: 'var(--text-primary)',
-                      backgroundColor: 'var(--bg-main)',
-                    }}
-                  >
-                    Stop
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      stopDeviceSpeech();
-                      setSelectedVoice('Adinath');
-                      generateAudio('Adinath');
-                    }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs"
-                    style={{
-                      borderColor: 'var(--border-warm)',
-                      color: 'var(--accent-saffron-text)',
-                      backgroundColor: 'var(--bg-main)',
-                    }}
-                  >
-                    Switch to Guru Voice
-                  </button>
-                </div>
+            {/* Progress Bar / Slider */}
+            <div className="space-y-2">
+              <input
+                id="audio-progress-slider"
+                type="range"
+                min="0"
+                max={duration || 100}
+                value={currentTime}
+                onChange={handleSeek}
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-amber-600 dark:accent-amber-500"
+                style={{ backgroundColor: 'var(--border-warm)' }}
+              />
+              <div className="flex justify-between text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
               </div>
-            ) : (
-              /* Standard Audio Player Controls */
-              <>
-                {/* Progress Bar / Slider */}
-                <div className="space-y-2">
-                  <input
-                    id="audio-progress-slider"
-                    type="range"
-                    min="0"
-                    max={duration || 100}
-                    value={currentTime}
-                    onChange={handleSeek}
-                    className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-amber-600 dark:accent-amber-500"
-                    style={{ backgroundColor: 'var(--border-warm)' }}
-                  />
-                  <div className="flex justify-between text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                    <span>{formatTime(currentTime)}</span>
-                    <span>{formatTime(duration)}</span>
-                  </div>
-                </div>
+            </div>
 
-                {/* Player Controls (Repeat, -10s, Play/Pause, +10s, Volume) */}
-                <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
-                  <div className="flex items-center gap-2">
-                    {/* Repeat Button */}
-                    <button
-                      type="button"
-                      onClick={handleRepeat}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs"
-                      style={{
-                        borderColor: 'var(--border-warm)',
-                        color: 'var(--text-primary)',
-                      }}
-                      title="Repeat from beginning"
-                    >
-                      <RotateCcw className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                      <span>Repeat</span>
-                    </button>
-                  </div>
+            {/* Player Controls (Repeat, -10s, Play/Pause, +10s, Volume) */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+              <div className="flex items-center gap-2">
+                {/* Repeat Button */}
+                <button
+                  type="button"
+                  onClick={handleRepeat}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs"
+                  style={{
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
+                  title="Repeat from beginning"
+                >
+                  <RotateCcw className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                  <span>Repeat</span>
+                </button>
+              </div>
 
-                  {/* Playback & Seek Controls Cluster */}
-                  <div className="flex items-center gap-3">
-                    {/* 10s Backward */}
-                    <button
-                      type="button"
-                      id="btn-seek-backward-10"
-                      onClick={() => handleSeekRelative(-10)}
-                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs active:scale-95"
-                      style={{
-                        borderColor: 'var(--border-warm)',
-                        color: 'var(--text-primary)',
-                      }}
-                      title="Seek 10s backward"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-                      <span>-10s</span>
-                    </button>
+              {/* Playback & Seek Controls Cluster */}
+              <div className="flex items-center gap-3">
+                {/* 10s Backward */}
+                <button
+                  type="button"
+                  id="btn-seek-backward-10"
+                  onClick={() => handleSeekRelative(-10)}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs active:scale-95"
+                  style={{
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
+                  title="Seek 10s backward"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                  <span>-10s</span>
+                </button>
 
-                    {/* Play / Pause Main Button */}
-                    <button
-                      type="button"
-                      id="btn-toggle-play"
-                      onClick={handleTogglePlay}
-                      className="w-16 h-16 rounded-full flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                      style={{
-                        backgroundColor: 'var(--accent-saffron)',
-                        color: '#FFFFFF',
-                      }}
-                      title={isPlaying ? 'Pause' : 'Play'}
-                    >
-                      {isPlaying ? (
-                        <Pause className="w-7 h-7 fill-current" />
-                      ) : (
-                        <Play className="w-7 h-7 fill-current translate-x-0.5" />
-                      )}
-                    </button>
+                {/* Play / Pause Main Button */}
+                <button
+                  type="button"
+                  id="btn-toggle-play"
+                  onClick={handleTogglePlay}
+                  className="w-16 h-16 rounded-full flex items-center justify-center shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron)',
+                    color: '#FFFFFF',
+                  }}
+                  title={isPlaying ? 'Pause' : 'Play'}
+                >
+                  {isPlaying ? (
+                    <Pause className="w-7 h-7 fill-current" />
+                  ) : (
+                    <Play className="w-7 h-7 fill-current translate-x-0.5" />
+                  )}
+                </button>
 
-                    {/* 10s Forward */}
-                    <button
-                      type="button"
-                      id="btn-seek-forward-10"
-                      onClick={() => handleSeekRelative(10)}
-                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs active:scale-95"
-                      style={{
-                        borderColor: 'var(--border-warm)',
-                        color: 'var(--text-primary)',
-                      }}
-                      title="Seek 10s forward"
-                    >
-                      <RotateCw className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-                      <span>+10s</span>
-                    </button>
-                  </div>
+                {/* 10s Forward */}
+                <button
+                  type="button"
+                  id="btn-seek-forward-10"
+                  onClick={() => handleSeekRelative(10)}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer shadow-2xs active:scale-95"
+                  style={{
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
+                  title="Seek 10s forward"
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                  <span>+10s</span>
+                </button>
+              </div>
 
-                  {/* Volume & Mute Controls */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleToggleMute}
-                      className="p-2 rounded-xl border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
-                      style={{
-                        borderColor: 'var(--border-warm)',
-                        color: 'var(--text-primary)',
-                      }}
-                      title={isMuted ? 'Unmute' : 'Mute'}
-                    >
-                      {isMuted || volume === 0 ? (
-                        <VolumeX className="w-4 h-4 text-red-500" />
-                      ) : (
-                        <Volume2 className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-                      )}
-                    </button>
-                    <input
-                      id="audio-volume-slider"
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={isMuted ? 0 : volume}
-                      onChange={handleVolumeChange}
-                      className="w-20 sm:w-24 h-2 rounded-lg appearance-none cursor-pointer accent-amber-600 dark:accent-amber-500"
-                      style={{ backgroundColor: 'var(--border-warm)' }}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
+              {/* Volume & Mute Controls */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleToggleMute}
+                  className="p-2 rounded-xl border transition-all hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+                  style={{
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted || volume === 0 ? (
+                    <VolumeX className="w-4 h-4 text-red-500" />
+                  ) : (
+                    <Volume2 className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                  )}
+                </button>
+                <input
+                  id="audio-volume-slider"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  className="w-20 sm:w-24 h-2 rounded-lg appearance-none cursor-pointer accent-amber-600 dark:accent-amber-500"
+                  style={{ backgroundColor: 'var(--border-warm)' }}
+                />
+              </div>
+            </div>
           </div>
         )}
 

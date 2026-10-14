@@ -17,7 +17,6 @@ import {
   doc,
   setDoc,
   getDoc,
-  deleteDoc,
   onSnapshot,
   arrayUnion
 } from 'firebase/firestore';
@@ -250,16 +249,21 @@ const saveLocalProfile = (uid: string, data: UserProfileData) => {
  * - longestStreak
  * - activeDays
  */
-export async function cleanupDailyQuotaStatusDoc() {
+export async function checkAndResetDailyQuotas() {
   try {
     const quotaRef = doc(db, 'systemStatus', 'dailyQuotaStatus');
+    const today = getLocalDateString();
     const snap = await getDoc(quotaRef);
-    if (snap.exists()) {
-      await deleteDoc(quotaRef);
-      console.log('[Firestore] Cleaned up dailyQuotaStatus document.');
+    if (!snap.exists() || snap.data()?.date !== today) {
+      await setDoc(quotaRef, {
+        date: today,
+        exceededModels: [],
+        resetAt: Date.now(),
+      });
+      console.log(`[Daily Quota Reset] Quota status sheet reset for today (${today}) by first student login.`);
     }
   } catch (err) {
-    console.debug('Notice checking dailyQuotaStatus in Firestore:', err);
+    console.warn('Error checking/resetting daily quotas:', err);
   }
 }
 
@@ -267,7 +271,7 @@ export async function syncUserAndStreak(user: User): Promise<UserProfileData> {
   const userRef = doc(db, 'users', user.uid);
   const today = getLocalDateString();
 
-  cleanupDailyQuotaStatusDoc().catch(() => {});
+  checkAndResetDailyQuotas().catch(() => {});
 
   const local = getLocalProfile(user.uid);
   const guest = getGuestProfile();
@@ -609,12 +613,13 @@ export async function claimChapterStageReward(
     fileName?: string;
     shravanXpClaimed?: boolean;
     mananXpClaimed?: boolean;
+    parikshaXpClaimed?: boolean;
   },
-  stage: 'shravan' | 'manan',
+  stage: 'shravan' | 'manan' | 'pariksha',
   user: User | null
 ): Promise<ChapterRewardResult> {
-  const xpToAdd = stage === 'shravan' ? 10 : 5;
-  const stageLabel = stage === 'shravan' ? 'Shravan (10 XP)' : 'Manan (5 XP)';
+  const xpToAdd = stage === 'shravan' ? 10 : stage === 'manan' ? 5 : 50;
+  const stageLabel = stage === 'shravan' ? 'Shravan (10 XP)' : stage === 'manan' ? 'Manan (5 XP)' : 'Pariksha (50 XP)';
 
   // Determine user identifier
   let effectiveUserId = user?.uid;
@@ -660,6 +665,15 @@ export async function claimChapterStageReward(
       message: `${stageLabel} has already been claimed for this chapter.`,
     };
   }
+  if (stage === 'pariksha' && chapter.parikshaXpClaimed) {
+    const local = effectiveUserId ? getLocalProfile(effectiveUserId) : getGuestProfile();
+    return {
+      awarded: false,
+      xpAdded: 0,
+      newTotal: local?.xp || 0,
+      message: `${stageLabel} has already been claimed for this chapter.`,
+    };
+  }
 
   // 2. Definitive check in Cloud Firestore database (survives cache clears and cross-device sessions)
   try {
@@ -669,6 +683,7 @@ export async function claimChapterStageReward(
     if (rewardSnap.exists()) {
       if (stage === 'shravan') chapter.shravanXpClaimed = true;
       if (stage === 'manan') chapter.mananXpClaimed = true;
+      if (stage === 'pariksha') chapter.parikshaXpClaimed = true;
       const userDocSnap = await getDoc(doc(db, 'users', effectiveUserId));
       const currentXp = userDocSnap.exists() && typeof userDocSnap.data()?.xp === 'number' ? userDocSnap.data().xp : 0;
       return {
@@ -689,6 +704,7 @@ export async function claimChapterStageReward(
       if (claimedArray.includes(effectiveUserId) || (stageObj?.claimed && stageObj?.userId === effectiveUserId)) {
         if (stage === 'shravan') chapter.shravanXpClaimed = true;
         if (stage === 'manan') chapter.mananXpClaimed = true;
+        if (stage === 'pariksha') chapter.parikshaXpClaimed = true;
         const userDocSnap = await getDoc(doc(db, 'users', effectiveUserId));
         const currentXp = userDocSnap.exists() && typeof userDocSnap.data()?.xp === 'number' ? userDocSnap.data().xp : 0;
         return {
@@ -724,6 +740,7 @@ export async function claimChapterStageReward(
   // Mark chapter flags in memory
   if (stage === 'shravan') chapter.shravanXpClaimed = true;
   if (stage === 'manan') chapter.mananXpClaimed = true;
+  if (stage === 'pariksha') chapter.parikshaXpClaimed = true;
 
   // Update local profile
   const localProf = getLocalProfile(effectiveUserId) || getGuestProfile();

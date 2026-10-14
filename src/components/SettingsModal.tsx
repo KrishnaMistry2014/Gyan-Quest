@@ -58,7 +58,7 @@ export const SettingsModal: React.FC = () => {
     return 25;
   });
 
-  const [activeTab, setActiveTab] = useState<'appearance' | 'account'>('appearance');
+  const [activeTab, setActiveTab] = useState<'appearance' | 'focus' | 'account'>('appearance');
 
   // Sync state with user profile settings whenever modal opens
   useEffect(() => {
@@ -303,7 +303,24 @@ export const SettingsModal: React.FC = () => {
             }}
           >
             <Sun className="w-4 h-4" />
-            <span>Settings</span>
+            <span>Theme & Narration</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('focus')}
+            className={`py-3 px-3 border-b-2 transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'focus'
+                ? 'font-bold'
+                : 'border-transparent opacity-70 hover:opacity-100'
+            }`}
+            style={{
+              color: activeTab === 'focus' ? 'var(--accent-saffron-text)' : 'var(--text-secondary)',
+              borderColor: activeTab === 'focus' ? 'var(--accent-saffron)' : 'transparent',
+            }}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Focus Mode</span>
           </button>
 
           <button
@@ -475,7 +492,119 @@ export const SettingsModal: React.FC = () => {
             </div>
           )}
 
+          {/* TAB 2: Focus Mode */}
+          {activeTab === 'focus' && (
+            <div className="space-y-6">
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Focus Mode Duration
+                  </label>
+                  <span className="text-xs font-bold" style={{ color: 'var(--accent-saffron-text)' }}>
+                    {focusModeOption === 'none'
+                      ? 'No time limit'
+                      : focusModeOption === 'custom'
+                      ? `${customMinutes} mins (Custom)`
+                      : `${focusModeOption} mins`}
+                  </span>
+                </div>
 
+                <p className="text-xs leading-relaxed mb-4" style={{ color: 'var(--text-muted)' }}>
+                  When your study duration elapses after signing in, an audible chime will sound, your screen will be blurred for <strong>mandatory 3 minutes</strong>, and ongoing learning activities will pause to ensure you rest your eyes and move.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-3.5">
+                  {[
+                    { id: '15', label: '15 mins', sub: 'Quick Burst' },
+                    { id: '30', label: '30 mins', sub: 'Standard Pace' },
+                    { id: '45', label: '45 mins', sub: 'Deep Study' },
+                    { id: '60', label: '60 mins', sub: 'Scholar Quest' },
+                    { id: 'custom', label: 'Custom mins', sub: 'Specify Time' },
+                    { id: 'none', label: 'No time limit', sub: 'Continuous' },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleFocusOptionChange(item.id)}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                        focusModeOption === item.id
+                          ? 'ring-2 ring-amber-500 font-bold border-amber-500 shadow-xs'
+                          : 'opacity-80 hover:opacity-100'
+                      }`}
+                      style={{
+                        backgroundColor: focusModeOption === item.id ? 'var(--accent-saffron-light)' : 'var(--bg-card-subtle)',
+                        borderColor: focusModeOption === item.id ? 'var(--accent-saffron)' : 'var(--border-warm)',
+                        color: focusModeOption === item.id ? 'var(--accent-saffron-text)' : 'var(--text-primary)',
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs sm:text-sm font-bold">{item.label}</span>
+                        {focusModeOption === item.id && (
+                          <Check className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                        )}
+                      </div>
+                      <span className="text-[10px] block opacity-80 mt-0.5">{item.sub}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom Minutes Input when 'custom' is selected */}
+                {focusModeOption === 'custom' && (
+                  <div
+                    className="p-4 rounded-2xl border flex items-center justify-between gap-3 animate-in fade-in"
+                    style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-warm)' }}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div>
+                        <span className="text-xs font-semibold block" style={{ color: 'var(--text-primary)' }}>
+                          Set Custom Minutes:
+                        </span>
+                        <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          Between 1 and 480 minutes
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="480"
+                        value={customMinutes}
+                        onChange={(e) => handleCustomMinutesChange(e.target.value)}
+                        className="w-20 px-3 py-1.5 rounded-xl border text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        style={{
+                          backgroundColor: 'var(--bg-card)',
+                          borderColor: 'var(--border-warm)',
+                          color: 'var(--text-primary)',
+                        }}
+                      />
+                      <span className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>
+                        mins
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Informational banner about the mandatory 5-min walk pause */}
+              <div
+                className="p-4 rounded-2xl border space-y-2"
+                style={{
+                  backgroundColor: 'var(--bg-card-subtle)',
+                  borderColor: 'var(--border-warm)',
+                }}
+              >
+                <div className="flex items-center gap-2 font-bold text-xs" style={{ color: 'var(--accent-saffron-text)' }}>
+                  <Footprints className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <span>Mandatory 3-Minute Walking Pause & Screen Blur</span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  When your timer ends, you will be required to take the full 3-minute break. Physical movement and resting your eyes from digital screens prevents cognitive fatigue and improves recall by up to 25%.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* TAB 3: Profile & Account */}
           {activeTab === 'account' && (

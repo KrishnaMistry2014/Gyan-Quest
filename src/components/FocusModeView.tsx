@@ -28,21 +28,8 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
   const { user, streak, openStreakModal, settings } = useAuth();
 
   // Active Timer state
-  const [focusModeOption, setFocusModeOption] = useState<string>(() => {
-    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || '25';
-    if (['15', '30', '45', '60', 'none'].includes(raw)) return raw;
-    return 'custom';
-  });
-
-  const [customMinutes, setCustomMinutes] = useState<number>(() => {
-    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || '25';
-    const parsed = parseInt(raw, 10);
-    return !isNaN(parsed) && parsed > 0 ? parsed : 25;
-  });
-
   const [selectedMinutes, setSelectedMinutes] = useState<number>(() => {
     const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || '25';
-    if (raw === 'none') return 60;
     const parsed = parseInt(raw, 10);
     return !isNaN(parsed) && parsed > 0 ? parsed : 25;
   });
@@ -58,34 +45,12 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
   });
 
   // Adjust timeLeft when user changes duration while timer is stopped
-  const handleFocusOptionChange = (opt: string) => {
-    setFocusModeOption(opt);
-    let mins = 25;
-    if (opt === '15') mins = 15;
-    else if (opt === '30') mins = 30;
-    else if (opt === '45') mins = 45;
-    else if (opt === '60') mins = 60;
-    else if (opt === 'none') mins = 60;
-    else if (opt === 'custom') mins = customMinutes;
-
+  const handleSelectMinutes = (mins: number) => {
     setSelectedMinutes(mins);
     if (!isRunning) {
       setTimeLeftSeconds(mins * 60);
     }
-    localStorage.setItem('gyanquest_focus_mode_minutes', opt === 'custom' ? String(customMinutes) : opt);
-    window.dispatchEvent(new Event('gyanquest_focus_mode_changed'));
-  };
-
-  const handleCustomMinutesChange = (valStr: string) => {
-    const val = parseInt(valStr, 10);
-    const valid = isNaN(val) ? 25 : Math.max(1, Math.min(480, val));
-    setCustomMinutes(valid);
-    setFocusModeOption('custom');
-    setSelectedMinutes(valid);
-    if (!isRunning) {
-      setTimeLeftSeconds(valid * 60);
-    }
-    localStorage.setItem('gyanquest_focus_mode_minutes', String(valid));
+    localStorage.setItem('gyanquest_focus_mode_minutes', String(mins));
     window.dispatchEvent(new Event('gyanquest_focus_mode_changed'));
   };
 
@@ -218,81 +183,27 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
           }}
         >
           {/* Duration Selector Buttons */}
-          <div className="w-full space-y-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {[
-                { id: '15', label: '15 mins', sub: 'Quick Burst' },
-                { id: '30', label: '30 mins', sub: 'Standard Pace' },
-                { id: '45', label: '45 mins', sub: 'Deep Study' },
-                { id: '60', label: '60 mins', sub: 'Scholar Quest' },
-                { id: 'custom', label: 'Custom mins', sub: 'Specify Time' },
-                { id: 'none', label: 'No time limit', sub: 'Continuous' },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleFocusOptionChange(item.id)}
-                  disabled={isRunning}
-                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                    focusModeOption === item.id
-                      ? 'ring-2 ring-amber-500 font-bold border-amber-500 shadow-xs'
-                      : 'opacity-80 hover:opacity-100'
-                  } ${isRunning ? 'opacity-60 cursor-not-allowed' : ''}`}
-                  style={{
-                    backgroundColor: focusModeOption === item.id ? 'var(--accent-saffron-light)' : 'var(--bg-card-subtle)',
-                    borderColor: focusModeOption === item.id ? 'var(--accent-saffron)' : 'var(--border-warm)',
-                    color: focusModeOption === item.id ? 'var(--accent-saffron-text)' : 'var(--text-primary)',
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-bold">{item.label}</span>
-                    {focusModeOption === item.id && (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-                    )}
-                  </div>
-                  <span className="text-[10px] block opacity-80 mt-0.5">{item.sub}</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Custom Minutes Input when 'custom' is selected */}
-            {focusModeOption === 'custom' && (
-              <div
-                className="p-3.5 rounded-2xl border flex items-center justify-between gap-3 animate-in fade-in"
-                style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-warm)' }}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {[15, 25, 40, 60].map((mins) => (
+              <button
+                key={mins}
+                type="button"
+                onClick={() => handleSelectMinutes(mins)}
+                disabled={isRunning}
+                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  selectedMinutes === mins
+                    ? 'shadow-xs border'
+                    : 'hover:opacity-80'
+                } ${isRunning ? 'opacity-60 cursor-not-allowed' : ''}`}
+                style={{
+                  backgroundColor: selectedMinutes === mins ? 'var(--accent-saffron)' : 'var(--bg-card-subtle)',
+                  borderColor: selectedMinutes === mins ? 'var(--accent-saffron)' : 'var(--border-warm)',
+                  color: selectedMinutes === mins ? '#FFFFFF' : 'var(--text-primary)',
+                }}
               >
-                <div className="flex items-center gap-2.5">
-                  <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                  <div>
-                    <span className="text-xs font-semibold block text-left" style={{ color: 'var(--text-primary)' }}>
-                      Set Custom Minutes:
-                    </span>
-                    <span className="text-[10px] block text-left" style={{ color: 'var(--text-muted)' }}>
-                      Between 1 and 480 minutes
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    max="480"
-                    disabled={isRunning}
-                    value={customMinutes}
-                    onChange={(e) => handleCustomMinutesChange(e.target.value)}
-                    className="w-20 px-3 py-1.5 rounded-xl border text-sm font-bold text-center focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    style={{
-                      backgroundColor: 'var(--bg-card)',
-                      borderColor: 'var(--border-warm)',
-                      color: 'var(--text-primary)',
-                    }}
-                  />
-                  <span className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>
-                    mins
-                  </span>
-                </div>
-              </div>
-            )}
+                {mins} mins
+              </button>
+            ))}
           </div>
 
           {/* Big Countdown Clock */}

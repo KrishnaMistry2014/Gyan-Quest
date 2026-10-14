@@ -79,3 +79,33 @@ export interface CrosswordData {
   glossary: CrosswordGlossaryItem[];
 }
 
+export interface ParikshaQuestion {
+  id: string;
+  stage: number; // 1 to 5
+  stageName: string; // 'Foundation' | 'Concepts' | 'Analytics' | 'Crucible' | 'Boss Stage'
+  question: string;
+  options: string[]; // 4 options
+  correctIndex: number; // 0 to 3
+  points: number; // 100, 150, 200, 250, 350
+  topic: string;
+  hint: string;
+  explanation: string;
+  difficulty?: 'easy' | 'medium' | 'hard' | 'expert' | 'boss';
+}
+
+export interface ParikshaFlashcard {
+  concept: string;
+  takeaway: string;
+}
+
+export interface ParikshaData {
+  id?: string;
+  testTitle: string;
+  sourceFileName: string;
+  createdAt: string;
+  topicsCovered: string[];
+  questions: ParikshaQuestion[];
+  summaryFlashcards: ParikshaFlashcard[];
+}
+
+

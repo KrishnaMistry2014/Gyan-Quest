@@ -24,6 +24,7 @@ import { BlankPage } from './components/BlankPage';
 import { MyChapters } from './components/MyChapters';
 import { ShravanPage } from './components/ShravanPage';
 import { MananPage } from './components/MananPage';
+import { ParikshaView } from './components/ParikshaView';
 import { BhagavadGitaView } from './components/BhagavadGitaView';
 import { StoreView } from './components/StoreView';
 import { FocusModeView } from './components/FocusModeView';
@@ -39,6 +40,7 @@ const MainAppContent: React.FC = () => {
   const [selectedChapter, setSelectedChapter] = useState<SavedChapter | null>(null);
   const [activeShravanChapter, setActiveShravanChapter] = useState<SavedChapter | null>(null);
   const [activeMananChapter, setActiveMananChapter] = useState<SavedChapter | null>(null);
+  const [activeParikshaChapter, setActiveParikshaChapter] = useState<SavedChapter | null>(null);
   const [activeSection, setActiveSection] = useState<string>('home');
   const [isGuruModalOpen, setIsGuruModalOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
@@ -69,6 +71,7 @@ const MainAppContent: React.FC = () => {
       setSelectedChapter(null);
       setActiveShravanChapter(null);
       setActiveMananChapter(null);
+      setActiveParikshaChapter(null);
       setUploadedPdf(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -141,6 +144,15 @@ const MainAppContent: React.FC = () => {
     setSelectedChapter(chapter);
     setUploadedPdf(null);
     setCurrentView('blank');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleNavigatePariksha = (chapter?: SavedChapter | null) => {
+    if (chapter) {
+      setSelectedChapter(chapter);
+      setActiveParikshaChapter(chapter);
+    }
+    setCurrentView('pariksha');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -357,6 +369,48 @@ const MainAppContent: React.FC = () => {
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
               }}
+              onNavigatePariksha={handleNavigatePariksha}
+            />
+          ) : currentView === 'pariksha' ? (
+            /* Stage 05: Pariksha 25-Question Examination View */
+            <ParikshaView
+              chapter={activeParikshaChapter || activeMananChapter || activeShravanChapter || selectedChapter}
+              onNavigateHome={() => {
+                if (user) {
+                  setCurrentView('dashboard');
+                } else {
+                  setCurrentView('landing');
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateDashboard={() => {
+                if (!user) {
+                  setCurrentView('landing');
+                } else {
+                  setCurrentView('dashboard');
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateMyChapters={() => {
+                if (!user) {
+                  openAuthModal();
+                } else {
+                  setCurrentView('my-chapters');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+              onNavigateVidya={(ch) => {
+                setSelectedChapter(ch);
+                setCurrentView('blank');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateManan={(ch) => {
+                setSelectedChapter(ch);
+                setActiveMananChapter(ch);
+                setCurrentView('manan');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onPdfUpload={handlePdfUploaded}
             />
           ) : currentView === 'my-chapters' && user ? (
             /* My Chapters Library View */
@@ -365,6 +419,7 @@ const MainAppContent: React.FC = () => {
               onUploadPdf={handlePdfUploaded}
               onNavigateDashboard={() => setCurrentView('dashboard')}
               onNavigateHome={() => setCurrentView('landing')}
+              onNavigatePariksha={handleNavigatePariksha}
             />
           ) : currentView === 'dashboard' && user ? (
             /* Dashboard View - Only accessible when authenticated */
@@ -372,6 +427,7 @@ const MainAppContent: React.FC = () => {
               onResumeLearning={handleResumeLearning}
               onStartLearning={handleStartLearning}
               onPdfUpload={handlePdfUploaded}
+              onNavigatePariksha={() => handleNavigatePariksha(selectedChapter)}
             />
           ) : currentView === 'bhagavad-gita' ? (
             /* Learn Bhagavad Gita Course View */
@@ -454,8 +510,8 @@ const MainAppContent: React.FC = () => {
           )}
         </main>
 
-        {/* Footer (hidden on blank and game views) */}
-        {currentView !== 'blank' && currentView !== 'gita-game' && (
+        {/* Footer (hidden on blank, game, and pariksha exam views) */}
+        {currentView !== 'blank' && currentView !== 'gita-game' && currentView !== 'pariksha' && (
           <Footer onNavigate={(id) => {
             setCurrentView('landing');
             setTimeout(() => scrollToSection(id), 50);

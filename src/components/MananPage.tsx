@@ -14,7 +14,9 @@ import {
   Headphones,
   Image as ImageIcon,
   X,
-  LayoutGrid
+  LayoutGrid,
+  ClipboardCheck,
+  ArrowRight
 } from 'lucide-react';
 import { SavedChapter } from '../lib/chapters';
 import { GyanQuestCrossword } from './GyanQuestCrossword';
@@ -42,6 +44,7 @@ interface MananPageProps {
   onBackToVidya?: () => void;
   onNavigateDashboard?: () => void;
   onNavigateMyChapters?: () => void;
+  onNavigatePariksha?: (chapter: SavedChapter) => void;
 }
 
 export const MananPage: React.FC<MananPageProps> = ({
@@ -50,6 +53,7 @@ export const MananPage: React.FC<MananPageProps> = ({
   onBackToVidya,
   onNavigateDashboard,
   onNavigateMyChapters,
+  onNavigatePariksha,
 }) => {
   const { isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
@@ -579,6 +583,25 @@ export const MananPage: React.FC<MananPageProps> = ({
             >
               <Eye className="w-4 h-4" />
               <span>Preview Image</span>
+            </button>
+          )}
+
+          {onNavigatePariksha && (
+            <button
+              type="button"
+              id="btn-header-go-to-pariksha"
+              data-testid="btn-go-to-pariksha"
+              onClick={() => onNavigatePariksha(chapter)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+              style={{
+                backgroundColor: 'var(--accent-saffron)',
+                color: '#FFFFFF',
+              }}
+              title="Go to Stage 05: Pariksha (परीक्षा)"
+            >
+              <ClipboardCheck className="w-4 h-4" />
+              <span>Go to Pariksha</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
@@ -1308,13 +1331,30 @@ export const MananPage: React.FC<MananPageProps> = ({
                   </button>
                 )}
 
+                {onNavigatePariksha && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigatePariksha(chapter)}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+                    style={{
+                      backgroundColor: 'var(--accent-saffron)',
+                      color: '#FFFFFF',
+                    }}
+                    title="Go to Stage 05: Pariksha"
+                  >
+                    <ClipboardCheck className="w-4 h-4" />
+                    <span>Go to Pariksha</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={handleResetPuzzle}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all hover:bg-black/5 dark:hover:bg-white/5 active:scale-95 cursor-pointer"
                   style={{
-                    backgroundColor: 'var(--accent-saffron)',
-                    color: '#FFFFFF',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
                   }}
                 >
                   <RotateCcw className="w-4 h-4" />
@@ -1325,6 +1365,64 @@ export const MananPage: React.FC<MananPageProps> = ({
           )}
         </div>
       ))}
+
+      {/* Persistent Progression to Pariksha Footer Card */}
+      <div
+        id="manan-to-pariksha-footer"
+        className="p-6 sm:p-7 rounded-3xl border flex flex-col sm:flex-row items-center justify-between gap-5 transition-all shadow-sm mt-8"
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          borderColor: 'var(--border-warm)',
+        }}
+      >
+        <div className="text-center sm:text-left space-y-1">
+          <div className="flex items-center justify-center sm:justify-start gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <h4 className="text-base sm:text-lg font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+              Completed Manan Reflection?
+            </h4>
+          </div>
+          <p className="text-xs sm:text-sm max-w-xl" style={{ color: 'var(--text-secondary)' }}>
+            Advance to Stage 05: Pariksha (परीक्षा) for the 25-Question adaptive mastery exam, or continue reflecting with Wordle and Crosswords.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 w-full sm:w-auto">
+          {onNavigateDashboard && (
+            <button
+              type="button"
+              onClick={onNavigateDashboard}
+              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition-all hover:bg-stone-100 dark:hover:bg-stone-800 active:scale-95 cursor-pointer"
+              style={{
+                backgroundColor: 'var(--bg-main)',
+                borderColor: 'var(--border-warm)',
+                color: 'var(--text-primary)',
+              }}
+            >
+              Back to Dashboard
+            </button>
+          )}
+
+          {onNavigatePariksha && (
+            <button
+              type="button"
+              id="btn-footer-go-to-pariksha"
+              data-testid="btn-footer-go-to-pariksha"
+              onClick={() => onNavigatePariksha(chapter)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+              style={{
+                backgroundColor: 'var(--accent-saffron)',
+                color: '#FFFFFF',
+              }}
+              title="Go to Pariksha 25-Question Examination"
+            >
+              <ClipboardCheck className="w-4 h-4" />
+              <span>Go to Pariksha</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Target Image Reference Modal */}
       {showPreviewModal && imageUrl && (

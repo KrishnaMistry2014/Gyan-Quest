@@ -19,10 +19,15 @@ export interface SavedChapter {
   fileName: string;
   title: string;
   summary: string;
+  pdfBase64?: string;
   audioBase64?: string;
   shravanCompleted?: boolean;
   shravanXpClaimed?: boolean;
   mananXpClaimed?: boolean;
+  parikshaCompleted?: boolean;
+  parikshaXpClaimed?: boolean;
+  parikshaScore?: number;
+  parikshaMaxScore?: number;
   createdAt: string; // ISO string
   fileSize?: number;
 }
@@ -376,5 +381,49 @@ export async function syncGuestChaptersToUser(targetUserId: string, previousAnon
     }
   } catch (err) {
     console.warn('Failed to sync guest chapters to user Firestore account:', err);
+  }
+}
+
+/**
+ * Update chapter Pariksha completion and score status in local cache and Firestore.
+ */
+export async function updateChapterPariksha(
+  chapterId: string,
+  score: number,
+  maxScore: number,
+  userId?: string
+): Promise<void> {
+  const effectiveUserId = userId || auth.currentUser?.uid || 'guest';
+  const localList = getLocalChapters(effectiveUserId);
+  const updated = localList.map((c) => {
+    if (c.id === chapterId) {
+      return {
+        ...c,
+        parikshaCompleted: true,
+        parikshaScore: score,
+        parikshaMaxScore: maxScore,
+        parikshaXpClaimed: true,
+      };
+    }
+    return c;
+  });
+  setLocalChapters(updated, effectiveUserId);
+
+  if (auth.currentUser) {
+    try {
+      const chapterRef = doc(db, 'users', auth.currentUser.uid, 'chapters', chapterId);
+      await setDoc(
+        chapterRef,
+        {
+          parikshaCompleted: true,
+          parikshaScore: score,
+          parikshaMaxScore: maxScore,
+          parikshaXpClaimed: true,
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn('Failed to update Pariksha in Firestore:', err);
+    }
   }
 }

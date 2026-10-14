@@ -11,7 +11,8 @@ import {
   ArrowLeft,
   Calendar,
   Layers,
-  CloudCheck
+  CloudCheck,
+  Trophy
 } from 'lucide-react';
 import {
   SavedChapter,
@@ -26,6 +27,7 @@ import { useAuth } from '../context/AuthContext';
 interface MyChaptersProps {
   onOpenChapter: (chapter: SavedChapter) => void;
   onUploadPdf: (file: File) => void;
+  onNavigatePariksha?: (chapter: SavedChapter) => void;
   onNavigateDashboard?: () => void;
   onNavigateHome?: () => void;
 }
@@ -33,6 +35,7 @@ interface MyChaptersProps {
 export const MyChapters: React.FC<MyChaptersProps> = ({
   onOpenChapter,
   onUploadPdf,
+  onNavigatePariksha,
   onNavigateDashboard,
   onNavigateHome,
 }) => {
@@ -366,12 +369,34 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
                   </span>
                 </div>
 
-                <div
-                  className="inline-flex items-center gap-1 font-bold group-hover:translate-x-1 transition-transform"
-                  style={{ color: 'var(--accent-saffron-text)' }}
-                >
-                  <span>Open Vidya</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-2">
+                  {onNavigatePariksha && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigatePariksha(chapter);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors hover:bg-amber-100 dark:hover:bg-amber-950/60"
+                      style={{
+                        backgroundColor: 'var(--accent-saffron-light)',
+                        borderColor: 'var(--border-warm)',
+                        color: 'var(--accent-saffron-text)',
+                      }}
+                      title="Take Pariksha exam on this chapter"
+                    >
+                      <Trophy className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                      <span>Pariksha</span>
+                    </button>
+                  )}
+
+                  <div
+                    className="inline-flex items-center gap-1 font-bold group-hover:translate-x-1 transition-transform"
+                    style={{ color: 'var(--accent-saffron-text)' }}
+                  >
+                    <span>Open Vidya</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
                 </div>
               </div>
             </div>
