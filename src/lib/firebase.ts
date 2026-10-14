@@ -17,6 +17,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  deleteDoc,
   onSnapshot,
   arrayUnion
 } from 'firebase/firestore';
@@ -249,21 +250,16 @@ const saveLocalProfile = (uid: string, data: UserProfileData) => {
  * - longestStreak
  * - activeDays
  */
-export async function checkAndResetDailyQuotas() {
+export async function cleanupDailyQuotaStatusDoc() {
   try {
     const quotaRef = doc(db, 'systemStatus', 'dailyQuotaStatus');
-    const today = getLocalDateString();
     const snap = await getDoc(quotaRef);
-    if (!snap.exists() || snap.data()?.date !== today) {
-      await setDoc(quotaRef, {
-        date: today,
-        exceededModels: [],
-        resetAt: Date.now(),
-      });
-      console.log(`[Daily Quota Reset] Quota status sheet reset for today (${today}) by first student login.`);
+    if (snap.exists()) {
+      await deleteDoc(quotaRef);
+      console.log('[Firestore] Cleaned up dailyQuotaStatus document.');
     }
   } catch (err) {
-    console.warn('Error checking/resetting daily quotas:', err);
+    console.debug('Notice checking dailyQuotaStatus in Firestore:', err);
   }
 }
 
@@ -271,7 +267,7 @@ export async function syncUserAndStreak(user: User): Promise<UserProfileData> {
   const userRef = doc(db, 'users', user.uid);
   const today = getLocalDateString();
 
-  checkAndResetDailyQuotas().catch(() => {});
+  cleanupDailyQuotaStatusDoc().catch(() => {});
 
   const local = getLocalProfile(user.uid);
   const guest = getGuestProfile();

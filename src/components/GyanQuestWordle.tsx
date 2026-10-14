@@ -18,6 +18,7 @@ import {
 import { SavedChapter } from '../lib/chapters';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useTheme } from '../context/ThemeContext';
 
 export interface WordleQuestion {
   question: string;
@@ -84,6 +85,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
 }) => {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { isDark } = useTheme();
 
   const [deck, setDeck] = useState<WordleQuestion[]>([]);
   const [currentIdx, setCurrentIdx] = useState<number>(0);

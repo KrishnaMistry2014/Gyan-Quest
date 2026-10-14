@@ -127,6 +127,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Automatically close mobile drawer
     setIsMobileOpen(false);
 
+    if (!user && id !== 'home') {
+      openAuthModal();
+      return;
+    }
+
     switch (id) {
       case 'home':
         if (isUserActive) {
@@ -187,7 +192,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
         break;
 
-      case 'theme-narration':
+      case 'settings':
         openSettingsModal();
         break;
 
@@ -456,8 +461,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {renderNavItem('profile', 'Profile', UserIcon, isProfileActive)}
           {renderNavItem('about', 'About GyanQuest', Info, isAboutActive)}
           {renderNavItem(
-            'theme-narration',
-            'Theme and Narration',
+            'settings',
+            'Settings',
             isDark ? Moon : Sun,
             isThemeActive,
             undefined,
