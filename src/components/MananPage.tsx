@@ -641,7 +641,7 @@ export const MananPage: React.FC<MananPageProps> = ({
             }}
           >
             <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>Wordle Quest</span>
+            <span>Word Quest</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
               New
             </span>
@@ -1383,7 +1383,7 @@ export const MananPage: React.FC<MananPageProps> = ({
             </h4>
           </div>
           <p className="text-xs sm:text-sm max-w-xl" style={{ color: 'var(--text-secondary)' }}>
-            Advance to Stage 05: Pariksha (परीक्षा) for the 25-Question adaptive mastery exam, or continue reflecting with Wordle and Crosswords.
+            Advance to Stage 05: Pariksha (परीक्षा) for the Crossword mastery exam, or continue reflecting with Word Quest and Crosswords.
           </p>
         </div>
 

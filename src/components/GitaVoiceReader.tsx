@@ -47,7 +47,6 @@ export const GitaVoiceReader: React.FC<GitaVoiceReaderProps> = ({
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [activeItem, setActiveItem] = useState<'shloka' | number | null>(null);
   const [speechRate, setSpeechRate] = useState<number>(1.0);
-  const [isDroneActive, setIsDroneActive] = useState<boolean>(false);
   const [isVoiceSupported, setIsVoiceSupported] = useState<boolean>(true);
 
   const activeIndexRef = useRef<'shloka' | number | null>(null);
@@ -58,7 +57,7 @@ export const GitaVoiceReader: React.FC<GitaVoiceReaderProps> = ({
     vedicAudio.setTheme(isDark ? 'chandra' : 'surya');
   }, [isDark]);
 
-  // Clean up speech and drone on unmount
+  // Clean up speech on unmount
   useEffect(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       setIsVoiceSupported(true);
@@ -70,14 +69,8 @@ export const GitaVoiceReader: React.FC<GitaVoiceReaderProps> = ({
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
-      vedicAudio.stopDrone();
     };
   }, []);
-
-  const handleToggleDrone = () => {
-    const next = vedicAudio.toggleDrone();
-    setIsDroneActive(next);
-  };
 
   /**
    * Helper to speak a given text with speech synthesis
@@ -432,23 +425,6 @@ export const GitaVoiceReader: React.FC<GitaVoiceReaderProps> = ({
                 </button>
               ))}
             </div>
-
-            {/* Vedic Tanpura Drone Ambience Toggle */}
-            <button
-              type="button"
-              id="btn-toggle-vedic-drone"
-              onClick={handleToggleDrone}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer hover:scale-102 ml-auto"
-              style={{
-                backgroundColor: isDroneActive ? 'var(--accent-saffron-light)' : 'var(--bg-main)',
-                borderColor: isDroneActive ? 'var(--accent-saffron)' : 'var(--border-warm)',
-                color: isDroneActive ? 'var(--accent-saffron-text)' : 'var(--text-secondary)',
-              }}
-              title="Continuous ambient drone synthesized via Web Audio in scale aligned with Surya or Chandra"
-            >
-              <Radio className={`w-3.5 h-3.5 ${isDroneActive ? 'animate-pulse text-amber-600' : ''}`} />
-              <span>Vedic Drone: {isDroneActive ? 'ON' : 'OFF'}</span>
-            </button>
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { Sidebar, AppView } from './components/Sidebar';
 import { Hero } from './components/Hero';
 import { LearningJourney } from './components/LearningJourney';
@@ -14,6 +15,7 @@ import { FinalCTA } from './components/FinalCTA';
 import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
 import { SettingsModal } from './components/SettingsModal';
+import { StartLearningModal } from './components/StartLearningModal';
 import { FocusBreakOverlay } from './components/FocusBreakOverlay';
 import { ProfileModal } from './components/ProfileModal';
 import { StreakModal } from './components/StreakModal';
@@ -34,6 +36,27 @@ import { HarmonyPuzzleGame } from './components/HarmonyPuzzle/HarmonyPuzzleGame'
 import { SavedChapter } from './lib/chapters';
 import { Menu, BookOpenText, Sun, Moon, Flame, Zap } from 'lucide-react';
 
+const RAMAYANA_CHAPTER: SavedChapter = {
+  id: 'epic_ramayana_dharma',
+  uniqueCode: '7849201533',
+  title: 'Ramayana: The Path of Truth, Courage, and Righteous Duty',
+  fileName: 'Ramayana_Valmiki_Epic_Wisdom.pdf',
+  summary: `# Ramayana: The Path of Truth, Courage, and Righteous Duty
+
+The Ramayana, composed by Sage Valmiki, chronicles the eternal journey of Sri Rama of Ayodhya, exemplifying Maryada Purushottama (the ideal embodiment of truth, duty, humility, and steadfast righteousness).
+
+## Core Pillars for Young Scholars (Grades 4–8):
+1. **Satya (Truthfulness)**: Rama's unwavering adherence to his father King Dasharatha's word, joyfully embracing fourteen years of forest exile rather than compromising on truth.
+2. **Dharma (Righteous Action)**: Prioritizing moral duty and the protection of others above personal convenience or comfort.
+3. **Bhratru-prema (Brotherly Loyalty)**: The selfless devotion of Lakshmana, Bharata, and Shatrughna in supporting one another through every challenge.
+4. **Bhakti & Focus (Hanuman's Dedication)**: Facing immense hurdles with single-minded courage, wisdom, and humility.
+5. **Harmony with Nature**: Honoring forests, rivers, and living creatures with reverence and gratitude.
+
+## Student Wisdom:
+True strength is built through quiet, daily choices. Just as Rama remained balanced in the palace and in the forest, a dedicated student practices calm focus and truthfulness in study and daily life.`,
+  createdAt: new Date().toISOString(),
+};
+
 const MainAppContent: React.FC = () => {
   const { openAuthModal, user, isEmailUnverified, loading, streak, openStreakModal, profile } = useAuth();
   const { isDark, toggleTheme } = useTheme();
@@ -45,6 +68,7 @@ const MainAppContent: React.FC = () => {
   const [activeParikshaChapter, setActiveParikshaChapter] = useState<SavedChapter | null>(null);
   const [activeSection, setActiveSection] = useState<string>('home');
   const [isGuruModalOpen, setIsGuruModalOpen] = useState<boolean>(false);
+  const [isStartLearningModalOpen, setIsStartLearningModalOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
@@ -128,11 +152,8 @@ const MainAppContent: React.FC = () => {
   };
 
   const handleStartLearning = () => {
-    // Start learning focuses on the card-upload-textbooks element
-    const uploadEl = document.getElementById('card-upload-textbooks');
-    if (uploadEl) {
-      uploadEl.scrollIntoView({ behavior: 'smooth' });
-    }
+    // Start learning opens the modal with options for Bhagavad Gita, Ramayana, and Custom PDF
+    setIsStartLearningModalOpen(true);
   };
 
   const handlePdfUploaded = (file: File) => {
@@ -559,6 +580,11 @@ const MainAppContent: React.FC = () => {
                 onPdfUpload={handlePdfUploaded}
               />
 
+              <LearningJourney
+                onNavigatePariksha={() => handleNavigatePariksha(selectedChapter)}
+                onStartLearning={handleStartLearning}
+              />
+
               <CustomMaterialSection onPdfUpload={handlePdfUploaded} />
             </div>
           )}
@@ -578,6 +604,28 @@ const MainAppContent: React.FC = () => {
 
       {/* Settings Modal */}
       <SettingsModal />
+
+      {/* Start Learning Modal (Bhagavad Gita & Ramayana Options) */}
+      <StartLearningModal
+        isOpen={isStartLearningModalOpen}
+        onClose={() => setIsStartLearningModalOpen(false)}
+        onSelectGita={() => {
+          setCurrentView('bhagavad-gita');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onSelectRamayana={() => {
+          setSelectedChapter(RAMAYANA_CHAPTER);
+          setUploadedPdf(null);
+          setCurrentView('blank');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onUploadCustomPdf={() => {
+          setSelectedChapter(null);
+          setUploadedPdf(null);
+          setCurrentView('blank');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
 
       {/* Focus Mode 3-min Walking Break Blur Overlay */}
       <FocusBreakOverlay />
@@ -606,12 +654,14 @@ const MainAppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <ToastProvider>
-          <MainAppContent />
-        </ToastProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <MainAppContent />
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </LanguageProvider>
   );
 }

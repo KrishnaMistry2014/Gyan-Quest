@@ -41,6 +41,9 @@ export const SettingsModal: React.FC = () => {
   const [autoplayAudio, setAutoplayAudio] = useState<boolean>(() => {
     return localStorage.getItem('gyanquest_autoplay_audio') === 'true';
   });
+  const [language, setLanguage] = useState<string>(() => {
+    return localStorage.getItem('gyanquest_language') || 'en';
+  });
 
   // Focus Mode configuration: '15' | '30' | '45' | '60' | 'custom' | 'none'
   const [focusModeOption, setFocusModeOption] = useState<string>(() => {
@@ -101,6 +104,12 @@ export const SettingsModal: React.FC = () => {
     const nextVal = !autoplayAudio;
     setAutoplayAudio(nextVal);
     localStorage.setItem('gyanquest_autoplay_audio', String(nextVal));
+  };
+
+  const handleSaveLanguage = (lang: string) => {
+    setLanguage(lang);
+    localStorage.setItem('gyanquest_language', lang);
+    window.dispatchEvent(new CustomEvent('gyanquest_language_changed', { detail: { language: lang } }));
   };
 
   const notifyFocusModeChanged = () => {
@@ -346,6 +355,70 @@ export const SettingsModal: React.FC = () => {
           {/* TAB 1: Theme & Narration */}
           {activeTab === 'appearance' && (
             <div className="space-y-6">
+              {/* Language / भाषा Selection */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-muted)' }}>
+                  Language / भाषा
+                </label>
+                <div className="grid grid-cols-2 gap-3.5">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveLanguage('en')}
+                    className={`flex flex-col gap-2 p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                      language === 'en'
+                        ? 'ring-2 ring-amber-500 shadow-sm border-amber-500'
+                        : 'opacity-70 hover:opacity-100'
+                    }`}
+                    style={{
+                      backgroundColor: language === 'en' ? 'var(--bg-main)' : 'var(--bg-card-subtle)',
+                      borderColor: language === 'en' ? 'var(--accent-saffron)' : 'var(--border-warm)',
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-sm">
+                        <span>English (EN)</span>
+                      </div>
+                      {language === 'en' && (
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs">
+                          <Check className="w-3.5 h-3.5" />
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-tight" style={{ color: 'var(--text-muted)' }}>
+                      English interface & terminology
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSaveLanguage('hi')}
+                    className={`flex flex-col gap-2 p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                      language === 'hi'
+                        ? 'ring-2 ring-amber-500 shadow-sm border-amber-500'
+                        : 'opacity-70 hover:opacity-100'
+                    }`}
+                    style={{
+                      backgroundColor: language === 'hi' ? 'var(--bg-main)' : 'var(--bg-card-subtle)',
+                      borderColor: language === 'hi' ? 'var(--accent-saffron)' : 'var(--border-warm)',
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-sm">
+                        <span>हिन्दी (HI)</span>
+                      </div>
+                      {language === 'hi' && (
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs">
+                          <Check className="w-3.5 h-3.5" />
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-tight" style={{ color: 'var(--text-muted)' }}>
+                      हिंदी भाषा और शब्दावली
+                    </p>
+                  </button>
+                </div>
+              </div>
+
               {/* Theme Preference */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color: 'var(--text-muted)' }}>

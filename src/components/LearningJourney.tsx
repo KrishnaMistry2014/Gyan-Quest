@@ -110,7 +110,15 @@ const STAGES: StageData[] = [
   },
 ];
 
-export const LearningJourney: React.FC = () => {
+interface LearningJourneyProps {
+  onNavigatePariksha?: () => void;
+  onStartLearning?: () => void;
+}
+
+export const LearningJourney: React.FC<LearningJourneyProps> = ({
+  onNavigatePariksha,
+  onStartLearning,
+}) => {
   const { recordStreakActivity } = useAuth();
   const [activeStageId, setActiveStageId] = useState<string>('vidya');
 
@@ -288,6 +296,34 @@ export const LearningJourney: React.FC = () => {
                 {currentStage.outcome}
               </p>
             </div>
+
+            {currentStage.id === 'pariksha' && onNavigatePariksha && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  id="btn-journey-enter-pariksha"
+                  onClick={onNavigatePariksha}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer text-white"
+                  style={{ backgroundColor: 'var(--accent-saffron)' }}
+                >
+                  <ClipboardCheck className="w-4 h-4" />
+                  <span>Enter Stage 05 Pariksha Crossword Exam</span>
+                </button>
+              </div>
+            )}
+            {currentStage.id !== 'pariksha' && onStartLearning && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  id="btn-journey-start-stage"
+                  onClick={onStartLearning}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 active:scale-98 cursor-pointer"
+                  style={{ borderColor: 'var(--border-warm)', color: 'var(--text-primary)' }}
+                >
+                  <span>Start This Stage in Your Study Flow →</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

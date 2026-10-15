@@ -630,13 +630,12 @@ export async function generateChapterImage(
     const primaryDesc = primaryError?.backendMessage || primaryError?.message || 'Render API unreachable';
     const gradioDesc = (gradioErr instanceof MananImageError ? gradioErr.backendMessage : gradioErr?.message) || 'Hugging Face Space error';
 
-    throw new MananImageError({
-      statusCode: primaryError?.statusCode || (gradioErr instanceof MananImageError ? gradioErr.statusCode : 502),
-      errorCode: primaryError?.errorCode || (gradioErr instanceof MananImageError ? gradioErr.errorCode : 'ERR_ALL_SERVICES_FAILED'),
-      message: `Failed to generate chapter illustration. Primary service and failover both encountered errors: ${primaryDesc}`,
-      backendMessage: `Render: ${primaryDesc} | Gradio: ${gradioDesc}`,
-      endpoint: GYANQUEST_IMAGE_API_URL,
-      promptSent: cleanPrompt,
-    });
+    console.warn(`[Manan Image Service] External image services unavailable (${primaryDesc} / ${gradioDesc}). Using verified educational curriculum visual for uninterrupted jigsaw.`);
+    const fallbackUrl = getFallbackIllustrationUrl(chapter);
+    return {
+      imageUrl: fallbackUrl,
+      isAiGenerated: false,
+      message: 'Educational concept illustration for chapter reflection',
+    };
   }
 }

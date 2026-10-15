@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import sacredLotusImg from '../../assets/images/gyanquest_sacred_lotus_1791870561244.jpg';
 import heroDiyaImg from '../../assets/images/gyanquest_hero_diya_1791870559877.jpg';
 import krishnaChariotImg from '../../assets/images/gyanquest_krishna_chariot_1791870561061.jpg';
 
@@ -15,20 +14,12 @@ import { Image, Loader2, AlertCircle } from 'lucide-react';
 
 const PUZZLE_THEMES: PuzzleImageTheme[] = [
   {
-    id: 'sacred-lotus',
-    name: 'Sacred Lotus of Harmony',
-    subtitle: 'Balance in Every Day',
-    src: sacredLotusImg,
-    wisdomPillar: 'Circadian Equilibrium & Serene Mind',
-    shlokaQuote: 'yuktāhāra-vihārasya yukta-ceṣṭasya karmasu (6.17)',
-  },
-  {
     id: 'hero-diya',
     name: 'Radiant Diya of Wisdom',
     subtitle: 'Inner Clarity & Knowledge',
     src: heroDiyaImg,
     wisdomPillar: 'Self-Discipline & Pure Focus',
-    shlokaQuote: 'yathā dīpo nivāta-stho neṅgate sopamā smṛtā (6.19)',
+    shlokaQuote: 'yuktāhāra-vihārasya yukta-ceṣṭasya karmasu (6.17)',
   },
   {
     id: 'krishna-chariot',
@@ -36,7 +27,7 @@ const PUZZLE_THEMES: PuzzleImageTheme[] = [
     subtitle: 'Direction of Mind & Senses',
     src: krishnaChariotImg,
     wisdomPillar: 'Mind Mastery & Devoted Action',
-    shlokaQuote: 'manaḥ praśāntaṁ dhyāna-yogam (6.27)',
+    shlokaQuote: 'yukta-svapnāvabodhasya yogo bhavati duḥkha-hā (6.17)',
   },
 ];
 

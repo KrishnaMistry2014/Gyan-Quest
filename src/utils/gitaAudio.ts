@@ -122,7 +122,7 @@ class VedicSoundEngine {
   }
 
   /**
-   * Submit attempt chime - Radiant brass bowl for Surya, deep calming Tibetan bowl for Chandra
+   * Submit attempt chime - Radiant brass bell for Surya, deep calming harmonic bell for Chandra
    */
   public playSubmitAttempt() {
     if (this.isMuted) return;

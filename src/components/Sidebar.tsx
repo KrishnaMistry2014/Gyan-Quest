@@ -20,10 +20,13 @@ import {
   X,
   Sliders,
   Volume2,
-  Puzzle
+  Puzzle,
+  Settings,
+  UploadCloud
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export type AppView =
   | 'landing'
@@ -32,6 +35,7 @@ export type AppView =
   | 'my-chapters'
   | 'shravan'
   | 'manan'
+  | 'pariksha'
   | 'bhagavad-gita'
   | 'focus-mode'
   | 'store'
@@ -63,6 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsCollapsed,
 }) => {
   const { isDark, toggleTheme } = useTheme();
+  const { language, t } = useLanguage();
   const {
     user,
     profile,
@@ -115,7 +120,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentView === 'my-chapters' ||
     currentView === 'blank' ||
     currentView === 'shravan' ||
-    currentView === 'manan';
+    currentView === 'manan' ||
+    currentView === 'pariksha';
 
   const isGitaActive = currentView === 'bhagavad-gita' || currentView === 'gita-game' || currentView === 'gita-reader';
   const isPuzzleActive = currentView === 'harmony-puzzle';
@@ -151,6 +157,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
         break;
 
+      case 'my-chapters':
+        if (!user) {
+          openAuthModal();
+        } else {
+          onNavigateView('my-chapters');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        break;
+
+      case 'upload-pdf':
+        onNavigateView('blank');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+
       case 'bhagavad-gita':
         onNavigateView('bhagavad-gita');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -175,8 +195,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         break;
 
       case 'store':
-        onNavigateView('store');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (!user) {
+          openAuthModal();
+        } else {
+          onNavigateView('store');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
         break;
 
       case 'profile':
@@ -197,6 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         break;
 
       case 'theme-narration':
+      case 'settings':
         openSettingsModal();
         break;
 
@@ -385,23 +410,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider select-none"
               style={{ color: 'var(--text-muted)' }}
             >
-              Main Navigation
+              {t.groupMainNav}
             </div>
           ) : (
             <div className="my-2 border-t" style={{ borderColor: 'var(--border-warm)' }} />
           )}
 
-          {renderNavItem('home', 'Home', Home, isHomeActive)}
+          {renderNavItem('home', t.navHome, Home, isHomeActive)}
           {renderNavItem(
             'my-books',
-            'My Books',
+            t.navMyBooks,
             BookOpen,
             isMyBooksActive
           )}
-          {renderNavItem('bhagavad-gita', 'Learn Bhagavad Gita', Scroll, isGitaActive)}
+          {renderNavItem('bhagavad-gita', t.navLearnGita, Scroll, isGitaActive)}
           {renderNavItem(
             'guru-ai',
-            'Guru AI',
+            t.navGuruAi,
             Sparkles,
             false,
             <span
@@ -423,16 +448,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider select-none"
               style={{ color: 'var(--text-muted)' }}
             >
-              Learning and Progress
+              {t.groupLearnProgress}
             </div>
           ) : (
             <div className="my-2 border-t" style={{ borderColor: 'var(--border-warm)' }} />
           )}
 
-          {renderNavItem('focus-mode', 'Focus Mode', Clock, isFocusActive)}
+          {renderNavItem('focus-mode', t.navFocusMode, Clock, isFocusActive)}
           {renderNavItem(
             'harmony-puzzle',
-            'Harmony Puzzle',
+            t.navHarmonyPuzzle,
             Puzzle,
             isPuzzleActive,
             <span
@@ -447,7 +472,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
           {renderNavItem(
             'streaks',
-            'Streaks',
+            t.navStreaks,
             Flame,
             isStreakActive,
             <span
@@ -470,38 +495,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider select-none"
               style={{ color: 'var(--text-muted)' }}
             >
-              Explore and Account
+              {t.groupExploreAccount}
             </div>
           ) : (
             <div className="my-2 border-t" style={{ borderColor: 'var(--border-warm)' }} />
           )}
 
-          {renderNavItem('store', 'Store', ShoppingBag, isStoreActive)}
-          {renderNavItem('profile', 'Profile', UserIcon, isProfileActive)}
-          {renderNavItem('about', 'About GyanQuest', Info, isAboutActive)}
-          {renderNavItem(
-            'theme-narration',
-            'Theme and Narration',
-            isDark ? Moon : Sun,
-            isThemeActive,
-            undefined,
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleTheme();
-              }}
-              className="p-1 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              aria-label={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            >
-              {isDark ? (
-                <Sun className="w-3.5 h-3.5 text-amber-400" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-stone-600" />
-              )}
-            </button>
-          )}
+          {renderNavItem('store', t.navStore, ShoppingBag, isStoreActive)}
+          {renderNavItem('my-chapters', t.navMyChapters, BookOpen, currentView === 'my-chapters')}
+          {renderNavItem('upload-pdf', t.navUploadTextbooks, UploadCloud, currentView === 'blank')}
+          {renderNavItem('profile', t.navProfile, UserIcon, isProfileActive)}
+          {renderNavItem('about', t.navAbout, Info, isAboutActive)}
+          {renderNavItem('settings', t.navSettings, Settings, isSettingsModalOpen)}
         </div>
       </div>
 

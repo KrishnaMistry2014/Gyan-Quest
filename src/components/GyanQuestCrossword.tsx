@@ -505,23 +505,6 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
     setTimeout(checkWinCondition, 50);
   };
 
-  // Action: Solve All
-  const handleSolveAll = () => {
-    if (!puzzle || !puzzle.words) return;
-    const solved: Record<string, string> = {};
-    for (const w of puzzle.words) {
-      for (let i = 0; i < w.answer.length; i++) {
-        const r = w.direction === 'across' ? w.row : w.row + i;
-        const c = w.direction === 'across' ? w.col + i : w.col;
-        const key = cellKey(r, c);
-        solved[key] = w.answer[i];
-      }
-    }
-    setUserLetters(solved);
-    setGameStatus('won');
-    setIsTimerRunning(false);
-  };
-
   const formatTimer = (totalSec: number) => {
     const mins = Math.floor(totalSec / 60);
     const secs = totalSec % 60;
@@ -668,38 +651,41 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col p-4 sm:p-6 lg:p-8">
-        {/* Loading Overlay */}
+        {/* Loading Scoped Banner: Compact, does not take over the full screen */}
         <AnimatePresence>
           {isLoading && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 backdrop-blur-md flex flex-col items-center justify-center p-6"
-              style={{ backgroundColor: 'rgba(20, 18, 16, 0.75)' }}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="z-30 my-4 mx-auto max-w-md w-full border p-4 sm:p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center text-center animate-in fade-in"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-warm)',
+              }}
             >
-              <div className="w-20 h-20 relative flex items-center justify-center">
+              <div className="w-12 h-12 relative flex items-center justify-center">
                 <div
                   className="absolute inset-0 rounded-2xl animate-ping opacity-25"
                   style={{ backgroundColor: 'var(--accent-saffron)' }}
                 />
                 <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-xs"
                   style={{
                     backgroundColor: 'var(--accent-saffron)',
                     color: '#FFFFFF',
                   }}
                 >
-                  <Sparkles className="w-8 h-8" />
+                  <Sparkles className="w-5 h-5" />
                 </div>
               </div>
-              <h2 className="text-xl font-bold font-serif-heading mt-6 text-white text-center">
+              <h2 className="text-base font-bold font-serif-heading mt-3" style={{ color: 'var(--text-primary)' }}>
                 Guru AI is crafting your puzzle
               </h2>
-              <p className="text-sm text-stone-300 mt-2 max-w-md text-center">
+              <p className="text-xs mt-1 max-w-sm" style={{ color: 'var(--text-secondary)' }}>
                 {loadingMessage}
               </p>
-              <div className="w-48 h-1.5 bg-stone-700 rounded-full mt-6 overflow-hidden">
+              <div className="w-40 h-1.5 bg-stone-200 dark:bg-stone-700 rounded-full mt-3 overflow-hidden">
                 <div
                   className="h-full animate-pulse"
                   style={{
@@ -947,18 +933,6 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                 >
                   <Eye className="w-4 h-4" style={{ color: 'var(--accent-saffron)' }} />
                   <span>Reveal Word</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSolveAll}
-                  className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all hover:bg-red-500/10 cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--bg-main)',
-                    borderColor: 'var(--border-warm)',
-                    color: '#DC2626',
-                  }}
-                >
-                  Solve All
                 </button>
               </div>
             </div>

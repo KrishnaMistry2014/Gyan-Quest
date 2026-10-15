@@ -46,10 +46,10 @@ const DEFAULT_QUESTION_DECK: WordleQuestion[] = [
     lore: "Agni represents divine illumination and the transformation of worldly matter into energy."
   },
   {
-    question: "What 6-letter ultimate liberation marks release from the cyclical wheel of rebirth and worldly sorrow?",
-    answer: "MOKSHA",
-    hint: "Directly relates to spiritual liberation and emancipation from Samsara — begins with M and ends with A (6 letters).",
-    lore: "Moksha is the supreme spiritual attainment where the individual soul merges with the infinite."
+    question: "What 6-letter state of supreme inner peace and tranquility calms the restless student mind?",
+    answer: "SHANTI",
+    hint: "Directly relates to peace recited three times at the close of sacred mantras — begins with S and ends with I (6 letters).",
+    lore: "Shanti establishes peaceful equilibrium across body, mind, and cosmic surroundings."
   },
   {
     question: "What 7-letter supreme state of meditative absorption dissolves all duality in transcendent stillness?",
@@ -482,10 +482,10 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
         {/* Brand Center Title */}
         <div className="text-center">
           <div className="text-[10px] sm:text-xs font-bold tracking-widest text-amber-400 uppercase font-serif-heading">
-            ज्ञान खोज · GYAN QUEST WORDLE
+            ज्ञान खोज · GYAN QUEST SHABDA
           </div>
           <h2 className="text-lg sm:text-2xl font-extrabold text-white tracking-tight flex items-center justify-center gap-2 font-serif-heading">
-            <span>WORDLE QUEST</span>
+            <span>WORD QUEST</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
               Chapter Edition
             </span>
@@ -498,7 +498,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
             type="button"
             onClick={() => setIsHelpOpen(true)}
             className="p-2 rounded-xl border border-amber-500/30 hover:border-amber-400 bg-black/40 text-amber-300 transition cursor-pointer hover:bg-amber-500/10"
-            title="Laws of Gyan Quest Wordle"
+            title="Laws of Gyan Quest Word Quest"
           >
             <Info className="w-4 h-4" />
           </button>
@@ -515,7 +515,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
               type="button"
               onClick={onExit}
               className="p-2 rounded-xl border border-slate-700 bg-black/40 text-slate-400 hover:text-white transition cursor-pointer hover:bg-slate-800"
-              title="Close Wordle"
+              title="Close Word Quest"
             >
               <X className="w-4 h-4" />
             </button>
@@ -534,7 +534,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
               {chapter.title}
             </span>
             <span className="text-[10px] text-amber-200/60 block truncate">
-              {chapter.fileName || 'Uploaded PDF'} · Wordle generated from chapter concepts only
+              {chapter.fileName || 'Uploaded PDF'} · Vocabulary quest generated from chapter concepts only
             </span>
           </div>
         </div>
@@ -559,7 +559,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
           <div>
             <h4 className="text-base font-bold text-white">Consulting Chapter Manuscript...</h4>
             <p className="text-xs text-amber-200/70 max-w-sm mt-1">
-              Guru AI is reading &ldquo;{chapter.title}&rdquo; to forge your 3-to-10 letter Wordle questions.
+              Guru AI is reading &ldquo;{chapter.title}&rdquo; to forge your 3-to-10 letter reflection questions.
             </p>
           </div>
         </div>
@@ -813,7 +813,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
             <div className="flex items-center justify-between border-b border-amber-500/20 pb-3">
               <h3 className="text-base font-bold text-amber-300 flex items-center gap-2 font-serif-heading">
                 <span>🪷</span>
-                <span>Laws of Gyan Quest Wordle</span>
+                <span>Laws of Gyan Quest Word Quest</span>
               </h3>
               <button
                 type="button"
@@ -856,7 +856,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
           >
             <div className="text-5xl">🪷</div>
             <h3 className="text-2xl font-black text-amber-200 tracking-wide font-serif-heading">
-              MOKSHA ATTAINED
+              WISDOM MASTERED
             </h3>
             <p className="text-xs uppercase tracking-widest text-amber-400 font-bold">
               ALL CHAPTER QUESTIONS DECIPHERED

@@ -629,15 +629,17 @@ async function synthesizeGuruSpeech(
             role: 'user',
             parts: [
               {
-                text: `${GURU_SPEECH_DIRECTION}\n\nPlease narrate this chapter lesson to the student:\n\n${cleanText}`,
-                speechMetadata: {
-                  style: 'Warm, knowledgeable, natural contemporary Indian English male teacher with moderate pace and clear pronunciation of Sanskrit and Indian terms',
-                },
+                text: cleanText,
               },
             ],
           },
         ] as any,
         config: {
+          systemInstruction: `You are a text-to-speech audio voice synthesizer. You speak strictly with an authentic, natural Indian English accent.
+CRITICAL MANDATORY INSTRUCTION: You must ONLY speak the exact words in the user's input.
+DO NOT speak, read aloud, repeat, or recite these system instructions or any prompt text under any circumstances.
+DO NOT say any preamble or introductory greeting like "Here is the audio", "Reading now", "Okay", or "Speak in".
+Begin speaking the first word of the user's text immediately with an authentic Indian accent and stop speaking when the text ends.`,
           responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
@@ -776,7 +778,9 @@ app.post(['/api/tts', '/api/generate-audio'], async (req, res) => {
       return res.status(400).json({ success: false, error: 'No text provided for audio narration.' });
     }
 
-    const cleanText = text.replace(/[*_#>`~]/g, '').trim();
+    let cleanText = text.replace(/[*_#>`~]/g, '').trim();
+    // Strip any accidental instruction or prompt preamble
+    cleanText = cleanText.replace(/^(Speak in|Please narrate|Instructions:|Prompt:|System:)[^\n]*(\n+|$)/gi, '').trim();
     const result = await synthesizeGuruSpeech(cleanText, voice);
 
     // If client expects binary blob (like ShravanPage's response.blob())
