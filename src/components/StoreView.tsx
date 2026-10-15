@@ -3,8 +3,11 @@ import {
   ShoppingBag,
   ExternalLink,
   Sparkles,
-  RotateCw
+  RotateCw,
+  Flame,
+  Award
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 interface StoreViewProps {
@@ -16,9 +19,12 @@ export const StoreView: React.FC<StoreViewProps> = ({
   onNavigateMyBooks,
   onNavigateDashboard,
 }) => {
+  const { profile } = useAuth();
   const { showToast } = useToast();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [iframeKey, setIframeKey] = useState(0);
+
+  const currentXp = profile?.xp || 0;
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -76,12 +82,40 @@ export const StoreView: React.FC<StoreViewProps> = ({
             </div>
           </div>
           <p className="text-xs sm:text-sm max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
-            Embedded gyanquest-pariksha-store.ai.studio store portal in the main window.
+            Embedded <span className="font-mono text-xs">gyanquest-pariksha-store.ai.studio</span> portal. Redeem your accumulated learning points for exclusive scholar rewards.
           </p>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center flex-wrap gap-2.5">
+        {/* XP Balance Badge & Action Controls */}
+        <div className="flex items-center flex-wrap gap-3">
+          {/* Prominent XP Balance Badge */}
+          <div
+            id="store-xp-balance"
+            className="flex items-center gap-3 px-4 py-2.5 rounded-2xl border shadow-2xs"
+            style={{
+              backgroundColor: 'var(--bg-main)',
+              borderColor: 'var(--border-warm)',
+            }}
+          >
+            <div
+              className="p-2 rounded-xl"
+              style={{
+                backgroundColor: 'var(--accent-saffron-light)',
+                color: 'var(--accent-saffron-text)',
+              }}
+            >
+              <Flame className="w-5 h-5 fill-amber-500/20 text-amber-500" />
+            </div>
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                Your XP Balance
+              </div>
+              <div className="text-lg sm:text-xl font-extrabold font-serif-heading" style={{ color: 'var(--accent-saffron)' }}>
+                {currentXp} XP
+              </div>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={handleRefresh}
