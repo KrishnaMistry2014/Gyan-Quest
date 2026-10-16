@@ -392,7 +392,7 @@ const MainAppContent: React.FC = () => {
               onNavigatePariksha={handleNavigatePariksha}
             />
           ) : currentView === 'pariksha' ? (
-            /* Stage 05: Pariksha 25-Question Examination View */
+            /* Stage 05: Pariksha Crossword Exam View */
             <ParikshaView
               chapter={activeParikshaChapter || activeMananChapter || activeShravanChapter || selectedChapter}
               onNavigateHome={() => {

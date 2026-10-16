@@ -74,10 +74,10 @@ export const TRANSLATIONS = {
     uploadCustomPrompt: 'Upload a custom school textbook or PDF chapter instead →',
 
     // Pariksha
-    parikshaTitle: 'Stage 05 • Pariksha 25-Question Examination',
-    parikshaSubtitle: 'Demonstrate retention across 5 adaptive stages with textbook-grounded rationale!',
+    parikshaTitle: 'Stage 05 • Pariksha Crossword Exam',
+    parikshaSubtitle: 'Solve the crossword puzzle to test your vocabulary and conceptual recall!',
     congratulations: 'Congratulations!',
-    parikshaPassed: 'You have conquered the Pariksha Examination!',
+    parikshaPassed: 'You have solved the crossword puzzle!',
   },
   hi: {
     // Brand & App
@@ -152,9 +152,9 @@ export const TRANSLATIONS = {
     uploadCustomPrompt: 'अपनी स्कूल पाठ्यपुस्तक या कस्टम पीडीएफ यहां अपलोड करें →',
 
     // Pariksha
-    parikshaTitle: 'चरण ०५ • परीक्षा २५-प्रश्न परीक्षण',
-    parikshaSubtitle: '५ अनुकूलन चरणों में प्रश्नों के उत्तर देकर अपनी निपुणता प्रमाणित करें!',
+    parikshaTitle: 'चरण ०५ • परीक्षा वर्गपहेली',
+    parikshaSubtitle: 'शब्दावली और अवधारणाओं की स्मृति जांचने के लिए वर्गपहेली हल करें!',
     congratulations: 'हार्दिक बधाई!',
-    parikshaPassed: 'आपने परीक्षा २५-प्रश्न परीक्षण सफलता से पूर्ण कर ली है!',
+    parikshaPassed: 'आपने वर्गपहेली सफलता से हल कर ली है!',
   },
 };
