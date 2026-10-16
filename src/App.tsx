@@ -10,11 +10,9 @@ import { GamificationSection } from './components/GamificationSection';
 import { CustomMaterialSection } from './components/CustomMaterialSection';
 import { GuruSection } from './components/GuruSection';
 import { FocusModeSection } from './components/FocusModeSection';
-import { AboutSection } from './components/AboutSection';
 import { FinalCTA } from './components/FinalCTA';
 import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
-import { SettingsModal } from './components/SettingsModal';
 import { StartLearningModal } from './components/StartLearningModal';
 import { FocusBreakOverlay } from './components/FocusBreakOverlay';
 import { ProfileModal } from './components/ProfileModal';
@@ -30,9 +28,6 @@ import { ParikshaView } from './components/ParikshaView';
 import { BhagavadGitaView } from './components/BhagavadGitaView';
 import { StoreView } from './components/StoreView';
 import { FocusModeView } from './components/FocusModeView';
-import { GitaWordGame } from './components/GitaWordGame/GitaWordGame';
-import { GitaVoiceReader } from './components/GitaVoiceReader';
-import { HarmonyPuzzleGame } from './components/HarmonyPuzzle/HarmonyPuzzleGame';
 import { SavedChapter } from './lib/chapters';
 import { Menu, BookOpenText, Sun, Moon, Flame, Zap } from 'lucide-react';
 
@@ -458,18 +453,6 @@ const MainAppContent: React.FC = () => {
               onOpenGuruChatWithPrompt={(prompt) => {
                 setIsGuruModalOpen(true);
               }}
-              onNavigateReader={() => {
-                setCurrentView('gita-reader');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onStartGitaGame={() => {
-                setCurrentView('gita-game');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onStartHarmonyPuzzle={() => {
-                setCurrentView('harmony-puzzle');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
               onNavigateHome={() => {
                 if (user) {
                   setCurrentView('dashboard');
@@ -484,58 +467,6 @@ const MainAppContent: React.FC = () => {
                 } else {
                   openAuthModal();
                 }
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-            />
-          ) : currentView === 'gita-reader' ? (
-            /* Bhagavad Gita for Students Voice Reader & Lesson */
-            <GitaVoiceReader
-              onBack={() => {
-                setCurrentView('bhagavad-gita');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onPlayQuest={() => {
-                setCurrentView('gita-game');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onPlayJigsaw={() => {
-                setCurrentView('harmony-puzzle');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-            />
-          ) : currentView === 'gita-game' ? (
-            /* Bhagavad Gita Interactive Word Quest Game */
-            <GitaWordGame
-              onBackToGita={() => {
-                setCurrentView('gita-reader');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onOpenReader={() => {
-                setCurrentView('gita-reader');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onOpenJigsaw={() => {
-                setCurrentView('harmony-puzzle');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-            />
-          ) : currentView === 'harmony-puzzle' ? (
-            /* Harmony of Life Interactive Jigsaw Puzzle Game */
-            <HarmonyPuzzleGame
-              onHome={() => {
-                if (user) {
-                  setCurrentView('dashboard');
-                } else {
-                  setCurrentView('landing');
-                }
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onOpenReader={() => {
-                setCurrentView('gita-reader');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onNavigateGitaGame={() => {
-                setCurrentView('gita-game');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
             />
@@ -601,9 +532,6 @@ const MainAppContent: React.FC = () => {
 
       {/* Firebase Authentication Modal */}
       <AuthModal />
-
-      {/* Settings Modal */}
-      <SettingsModal />
 
       {/* Start Learning Modal (Bhagavad Gita & Ramayana Options) */}
       <StartLearningModal
