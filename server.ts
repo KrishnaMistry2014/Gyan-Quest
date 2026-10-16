@@ -74,7 +74,20 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = 3000;
+
+const args = process.argv.slice(2);
+let port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+let host = process.env.HOST || '0.0.0.0';
+
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '--port' && args[i + 1]) {
+    port = parseInt(args[i + 1], 10);
+    i++;
+  } else if (args[i] === '--host' && args[i + 1]) {
+    host = args[i + 1];
+    i++;
+  }
+}
 
 // Support large PDF payloads up to 100MB
 app.use(express.json({ limit: '100mb' }));
@@ -1552,8 +1565,8 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Server listening on port ${port}`);
+  app.listen(port, host, () => {
+    console.log(`Server listening on http://${host}:${port}`);
   });
 }
 
