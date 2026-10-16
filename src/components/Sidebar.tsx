@@ -3,7 +3,6 @@ import {
   BookOpenText,
   Home,
   BookOpen,
-  Scroll,
   Sparkles,
   Clock,
   Flame,
@@ -123,7 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentView === 'manan' ||
     currentView === 'pariksha';
 
-  const isGitaActive = currentView === 'bhagavad-gita' || currentView === 'gita-game' || currentView === 'gita-reader';
   const isPuzzleActive = currentView === 'harmony-puzzle';
   const isFocusActive = currentView === 'focus-mode';
   const isStoreActive = currentView === 'store';
@@ -168,11 +166,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       case 'upload-pdf':
         onNavigateView('blank');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        break;
-
-      case 'bhagavad-gita':
-        onNavigateView('bhagavad-gita');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
 
@@ -423,7 +416,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             BookOpen,
             isMyBooksActive
           )}
-          {renderNavItem('bhagavad-gita', t.navLearnGita, Scroll, isGitaActive)}
           {renderNavItem(
             'guru-ai',
             t.navGuruAi,
