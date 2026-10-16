@@ -25,7 +25,6 @@ import { MyChapters } from './components/MyChapters';
 import { ShravanPage } from './components/ShravanPage';
 import { MananPage } from './components/MananPage';
 import { ParikshaView } from './components/ParikshaView';
-import { BhagavadGitaView } from './components/BhagavadGitaView';
 import { StoreView } from './components/StoreView';
 import { FocusModeView } from './components/FocusModeView';
 import { SavedChapter } from './lib/chapters';
@@ -447,29 +446,6 @@ const MainAppContent: React.FC = () => {
               onPdfUpload={handlePdfUploaded}
               onNavigatePariksha={() => handleNavigatePariksha(selectedChapter)}
             />
-          ) : currentView === 'bhagavad-gita' ? (
-            /* Learn Bhagavad Gita Course View */
-            <BhagavadGitaView
-              onOpenGuruChatWithPrompt={(prompt) => {
-                setIsGuruModalOpen(true);
-              }}
-              onNavigateHome={() => {
-                if (user) {
-                  setCurrentView('dashboard');
-                } else {
-                  setCurrentView('landing');
-                }
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onNavigateMyBooks={() => {
-                if (user) {
-                  setCurrentView('my-chapters');
-                } else {
-                  openAuthModal();
-                }
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-            />
           ) : currentView === 'focus-mode' ? (
             /* Focus Mode Dedicated Dashboard View */
             <FocusModeView
@@ -538,7 +514,9 @@ const MainAppContent: React.FC = () => {
         isOpen={isStartLearningModalOpen}
         onClose={() => setIsStartLearningModalOpen(false)}
         onSelectGita={() => {
-          setCurrentView('bhagavad-gita');
+          setSelectedChapter(null);
+          setUploadedPdf(null);
+          setCurrentView('blank');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onSelectRamayana={() => {
