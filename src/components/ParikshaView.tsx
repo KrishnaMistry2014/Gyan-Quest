@@ -48,7 +48,7 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
 
   // When chapter test is completed
   const handleParikshaCompleted = () => {
-    // Stage 05 Pariksha awards 50 XP (allowed per requirement 8: "Do not give Xp rewards over 15Xp in anything other than Pariksha and manan")
+    // Stage 04 Pariksha awards 50 XP (allowed per requirement 8: "Do not give Xp rewards over 15Xp in anything other than Pariksha and manan")
     const newXp = (profile?.xp || 0) + 50;
     updateProfileXp(newXp);
     recordStreakActivity('pariksha_mastery');
@@ -82,7 +82,7 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
               }}
             >
               <ClipboardCheck className="w-3.5 h-3.5" />
-              <span>{language === 'hi' ? 'चरण ०५ • परीक्षा' : 'STAGE 05 • PARIKSHA (परीक्षा)'}</span>
+              <span>{language === 'hi' ? 'चरण ०४ • परीक्षा' : 'STAGE 04 • PARIKSHA (परीक्षा)'}</span>
             </span>
 
             <span

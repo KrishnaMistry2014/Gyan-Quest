@@ -599,7 +599,7 @@ export const MananPage: React.FC<MananPageProps> = ({
                 backgroundColor: 'var(--accent-saffron)',
                 color: '#FFFFFF',
               }}
-              title="Go to Stage 05: Pariksha (परीक्षा)"
+              title="Go to Stage 04: Pariksha (परीक्षा)"
             >
               <ClipboardCheck className="w-4 h-4" />
               <span>{t.goToPariksha}</span>
@@ -1342,7 +1342,7 @@ export const MananPage: React.FC<MananPageProps> = ({
                       backgroundColor: 'var(--accent-saffron)',
                       color: '#FFFFFF',
                     }}
-                    title="Go to Stage 05: Pariksha"
+                    title="Go to Stage 04: Pariksha"
                   >
                     <ClipboardCheck className="w-4 h-4" />
                     <span>Go to Pariksha</span>
@@ -1385,7 +1385,7 @@ export const MananPage: React.FC<MananPageProps> = ({
             </h4>
           </div>
           <p className="text-xs sm:text-sm max-w-xl" style={{ color: 'var(--text-secondary)' }}>
-            Advance to Stage 05: Pariksha (परीक्षा) for the Crossword mastery exam, or continue reflecting with Word Quest and Crosswords.
+            Advance to Stage 04: Pariksha (परीक्षा) for the Crossword mastery exam, or continue reflecting with Word Quest and Crosswords.
           </p>
         </div>
 

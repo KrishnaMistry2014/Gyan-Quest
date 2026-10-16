@@ -5,7 +5,6 @@ import {
   BookOpen,
   Headphones,
   Brain,
-  MessageCircleQuestion,
   ClipboardCheck,
   Compass,
   Sparkles
@@ -51,14 +50,6 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
     },
     {
       num: '04',
-      sanskrit: 'प्रश्न',
-      title: 'Prashna',
-      desc: t.heroPrashnaDesc,
-      icon: MessageCircleQuestion,
-      xp: 'Optional',
-    },
-    {
-      num: '05',
       sanskrit: 'परीक्षा',
       title: 'Pariksha',
       desc: t.heroParikshaDesc,
@@ -201,7 +192,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
             </div>
           </div>
 
-          {/* Right Column: Minimalist 5-Stage Stele */}
+          {/* Right Column: Minimalist 4-Stage Stele */}
           <div className="lg:col-span-5">
             <div
               id="hero-progression-card"
@@ -214,7 +205,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
               <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: 'var(--border-warm)' }}>
                 <div>
                   <div className="text-[11px] font-serif uppercase tracking-widest text-amber-700 dark:text-amber-400 font-semibold">
-                    पञ्चपदी · The Fivefold Path
+                    चतुष्पदी · The Fourfold Path
                   </div>
                   <h3 className="text-base font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
                     Curriculum Progression
@@ -225,7 +216,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
                 </div>
               </div>
 
-              {/* Sequential 5 Stages List */}
+              {/* Sequential 4 Stages List */}
               <div className="space-y-2">
                 {stages.map((st) => {
                   const Icon = st.icon;

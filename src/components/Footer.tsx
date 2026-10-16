@@ -37,7 +37,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               Gyan Quest is an educational platform uniting timeless Indian learning traditions with thoughtful gamification and AI-guided study assistance.
             </p>
             <div className="text-xs font-semibold px-3 py-1 rounded-full border inline-block" style={{ backgroundColor: 'var(--accent-saffron-light)', borderColor: 'var(--border-warm)', color: 'var(--accent-saffron-text)' }}>
-              विद्या • श्रवण • मनन • प्रश्न • परीक्षा
+              विद्या • श्रवण • मनन • परीक्षा
             </div>
           </div>
         </div>

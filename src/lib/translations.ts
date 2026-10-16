@@ -5,7 +5,7 @@ export const TRANSLATIONS = {
     // Brand & App
     appName: 'GYAN QUEST',
     appSubtitle: 'Vedic Learning Quest',
-    tagline: 'Learn. Reflect. Question. Conquer.',
+    tagline: 'Learn. Reflect. Conquer.',
 
     // Navigation
     navHome: 'Home',
@@ -14,7 +14,6 @@ export const TRANSLATIONS = {
     navLearnScriptures: 'Learn the Scriptures',
     navGuruAi: 'Guru AI',
     navFocusMode: 'Focus Mode',
-    navHarmonyPuzzle: 'Harmony Puzzle',
     navStreaks: 'Streaks',
     navStore: 'Store',
     navProfile: 'Profile',
@@ -27,8 +26,8 @@ export const TRANSLATIONS = {
     groupExploreAccount: 'Explore and Account',
 
     // Hero
-    heroSanskrit: 'विद्या • श्रवण • मनन • प्रश्न • परीक्षा',
-    heroKicker: 'The Fivefold Vedic Path',
+    heroSanskrit: 'विद्या • श्रवण • मनन • परीक्षा',
+    heroKicker: 'The Fourfold Vedic Path',
     heroTitlePre: 'Become the Architect of Your Own ',
     heroTitleHighlight: 'Success',
     heroTitlePost: 'Through Timeless Wisdom',
@@ -38,7 +37,6 @@ export const TRANSLATIONS = {
     heroVidyaDesc: 'Foundational knowledge and study goals.',
     heroShravanDesc: 'Audio immersion and chapter narration.',
     heroMananDesc: 'Deep reflection and active recall.',
-    heroPrashnaDesc: 'Interactive Socratic AI mentor guidance.',
     heroParikshaDesc: 'Crossword exams and mastery verification.',
 
     // Bhagavad Gita View
@@ -72,7 +70,6 @@ export const TRANSLATIONS = {
     stageVidya: 'Vidya (Knowledge)',
     stageShravan: 'Shravan (Listening)',
     stageManan: 'Manan (Reflection)',
-    stagePrashna: 'Prashna (Inquiry)',
     stagePariksha: 'Pariksha (Mastery)',
     chapterNotesTitle: 'Chapter Study Notes',
     wordQuest: 'Word Quest',
@@ -85,7 +82,7 @@ export const TRANSLATIONS = {
     proceedToManan: 'Proceed to Manan',
     proceedToShravan: 'Proceed to Shravan',
     backToVidya: 'Back to Vidya',
-    journeyTitle: 'Your 5-Stage Vedic Journey',
+    journeyTitle: 'Your 4-Stage Vedic Journey',
     journeySubtitle: 'A structured progression from listening to mastery.',
     journeyStartStage: 'Start Stage',
     journeyEnterPariksha: 'Enter Pariksha',
@@ -155,7 +152,7 @@ export const TRANSLATIONS = {
     uploadCustomPrompt: 'Upload a custom school textbook or PDF chapter instead →',
 
     // Pariksha
-    parikshaTitle: 'Stage 05 • Pariksha Crossword Exam',
+    parikshaTitle: 'Stage 04 • Pariksha Crossword Exam',
     parikshaSubtitle: 'Solve the chapter questions by entering answers into the crossword puzzle!',
     congratulations: 'Congratulations!',
     parikshaPassed: 'You have conquered the Pariksha Crossword Exam!',
@@ -164,7 +161,7 @@ export const TRANSLATIONS = {
     // Brand & App
     appName: 'ज्ञान क्वेस्ट',
     appSubtitle: 'वैदिक ज्ञान साधना',
-    tagline: 'सीखें। चिंतन करें। प्रश्न पूछें। विजय प्राप्त करें।',
+    tagline: 'सीखें। चिंतन करें। विजय प्राप्त करें।',
 
     // Navigation
     navHome: 'गृह',
@@ -173,7 +170,6 @@ export const TRANSLATIONS = {
     navLearnScriptures: 'धर्मग्रंथ सीखें',
     navGuruAi: 'गुरु एआई',
     navFocusMode: 'एकाग्रता मोड',
-    navHarmonyPuzzle: 'सामंजस्य पहेली',
     navStreaks: 'दैनिक स्ट्रीक',
     navStore: 'दुकान',
     navProfile: 'प्रोफ़ाइल',
@@ -186,8 +182,8 @@ export const TRANSLATIONS = {
     groupExploreAccount: 'अन्वेषण एवं खाता',
 
     // Hero
-    heroSanskrit: 'विद्या • श्रवण • मनन • प्रश्न • परीक्षा',
-    heroKicker: 'पंचपदी वैदिक मार्ग',
+    heroSanskrit: 'विद्या • श्रवण • मनन • परीक्षा',
+    heroKicker: 'चतुष्पदी वैदिक मार्ग',
     heroTitlePre: 'अपनी सफलता के ',
     heroTitleHighlight: 'शिल्पकार बनें',
     heroTitlePost: 'कालजयी ज्ञान द्वारा',
@@ -197,7 +193,6 @@ export const TRANSLATIONS = {
     heroVidyaDesc: 'मूलभूत ज्ञान और अध्ययन लक्ष्य।',
     heroShravanDesc: 'श्रवण और अध्याय वाचन।',
     heroMananDesc: 'गहन चिंतन और स्मरण।',
-    heroPrashnaDesc: 'संवादात्मक गुरु एआई मार्गदर्शन।',
     heroParikshaDesc: 'क्रॉसवर्ड परीक्षा और निपुणता।',
 
     // Bhagavad Gita View
@@ -231,7 +226,6 @@ export const TRANSLATIONS = {
     stageVidya: 'विद्या (ज्ञान)',
     stageShravan: 'श्रवण (सुनना)',
     stageManan: 'मनन (चिंतन)',
-    stagePrashna: 'प्रश्न (जिज्ञासा)',
     stagePariksha: 'परीक्षा (निपुणता)',
     chapterNotesTitle: 'अध्याय अध्ययन नोट्स',
     wordQuest: 'शब्द क्वैस्ट',
@@ -244,7 +238,7 @@ export const TRANSLATIONS = {
     proceedToManan: 'मनन पर आगे बढ़ें',
     proceedToShravan: 'श्रवण पर आगे बढ़ें',
     backToVidya: 'विद्या पर वापस जाएं',
-    journeyTitle: 'आपकी ५-चरण वैदिक यात्रा',
+    journeyTitle: 'आपकी ४-चरण वैदिक यात्रा',
     journeySubtitle: 'श्रवण से निपुणता तक की संरचित प्रगति।',
     journeyStartStage: 'चरण शुरू करें',
     journeyEnterPariksha: 'परीक्षा दें',
@@ -314,7 +308,7 @@ export const TRANSLATIONS = {
     uploadCustomPrompt: 'अपनी स्कूल पाठ्यपुस्तक या कस्टम पीडीएफ यहां अपलोड करें →',
 
     // Pariksha
-    parikshaTitle: 'चरण ०५ • परीक्षा क्रॉसवर्ड टेस्ट',
+    parikshaTitle: 'चरण ०४ • परीक्षा क्रॉसवर्ड टेस्ट',
     parikshaSubtitle: 'प्रश्नों को पढ़ें और क्रॉसवर्ड पहेली में सीधे उत्तर लिखकर अपनी समझ सिद्ध करें!',
     congratulations: 'हार्दिक बधाई!',
     parikshaPassed: 'आपने परीक्षा क्रॉसवर्ड सफलता से पूर्ण कर ली है!',

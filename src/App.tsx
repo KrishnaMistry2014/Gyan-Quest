@@ -52,6 +52,44 @@ True strength is built through quiet, daily choices. Just as Rama remained balan
   createdAt: new Date().toISOString(),
 };
 
+const GITA_CHAPTER: SavedChapter = {
+  id: 'gita_chapter_6_17',
+  uniqueCode: '6170061700',
+  title: 'Bhagavad Gita: Dhyana Yoga (Verse 6.17)',
+  fileName: 'Bhagavad_Gita_Chapter_6_Verse_17.pdf',
+  summary: `# Bhagavad Gita for Students
+## Become the Architect of Your Own Success Through Timeless Ancient Wisdom
+
+### Chapter 6: Dhyana Yoga - Verse 6.17
+
+Have you ever felt too busy or cluttered with homework, projects, classes, or studies? Timeless ancient wisdom revealed about 5000 years ago in the holy Bhagavad Gita will help you find a solution and discover enduring success in life. Verse 6.17 emphasizes the supreme importance of daily balance and prioritization.
+
+> *yuktahara-viharasya yukta-cestasya karmasu*
+> *yukta-swapnavabodhasya yogo bhavati duhkha-ha*
+
+> *"He who is regulated in his habits of eating, sleeping, recreation, and work can mitigate all material pains by practicing the yoga system."*
+
+### Word-by-Word Breakdown:
+- **yukta** — regulated, balanced
+- **ahara** — eating, nourishment
+- **viharasya** — recreation, joyful leisure
+- **cestasya** — of one who works with purpose
+- **karmasu** — in discharging duties and studies
+- **swapna-avabodhasya** — sleep and wakefulness
+- **yogo** — practice of yoga and mindfulness
+- **bhavati** — becomes
+- **duhkha-ha** — diminishing all pains and anxiety
+
+### Practical Pillars for Student Success:
+1. **Regulated Resting**: Maintaining 8–10 hours of restorative sleep to ensure sharp memory recall, quick reaction times, and calm clarity of thought.
+2. **Regulated Eating**: Treating the physical body like a sacred machine fueled with nutrient-rich foods, fruits, and hydration rather than processed snacks.
+3. **Staying Active**: Regular daily movement, sports, or yoga to cultivate physical vitality and reduce mental stress.
+4. **Regulated Work & Study**: Approaching academic tasks with dedicated concentration (Sankalp) and periodic breaks, avoiding rushed last-minute panic.
+5. **Mindful Recreation**: Enjoying creative, rejuvenating hobbies in balanced moderation to refresh the intellect without distraction.
+6. **Habit Formation**: Practicing daily discipline consistently for 21 days or more to forge unbreakable habits of focus and peace.`,
+  createdAt: new Date().toISOString(),
+};
+
 const pathToView = (path: string): AppView => {
   const cleanPath = path.replace(/\/$/, '');
   switch (cleanPath) {
@@ -63,7 +101,6 @@ const pathToView = (path: string): AppView => {
     case '/shravan': return 'shravan';
     case '/manan': return 'manan';
     case '/pariksha': return 'pariksha';
-    case '/harmony-puzzle': return 'harmony-puzzle';
     default: return 'landing';
   }
 };
@@ -78,7 +115,6 @@ const viewToPath = (view: AppView): string => {
     case 'shravan': return '/shravan';
     case 'manan': return '/manan';
     case 'pariksha': return '/pariksha';
-    case 'harmony-puzzle': return '/harmony-puzzle';
     default: return '/';
   }
 };
@@ -201,14 +237,14 @@ const MainAppContent: React.FC = () => {
   const handlePdfUploaded = (file: File) => {
     setSelectedChapter(null);
     setUploadedPdf(file);
-    setCurrentView('blank');
+    setCurrentView('vidya');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleOpenChapter = (chapter: SavedChapter) => {
     setSelectedChapter(chapter);
     setUploadedPdf(null);
-    setCurrentView('blank');
+    setCurrentView('vidya');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -228,7 +264,10 @@ const MainAppContent: React.FC = () => {
         currentView={currentView}
         onNavigateView={(view) => {
           if (view === 'bhagavad-gita') {
-            setIsStartLearningModalOpen(true);
+            setSelectedChapter(GITA_CHAPTER);
+            setUploadedPdf(null);
+            setCurrentView('vidya');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
           } else {
             setCurrentView(view);
           }
@@ -393,7 +432,7 @@ const MainAppContent: React.FC = () => {
             <ShravanPage
               chapter={activeShravanChapter}
               onBackToVidya={() => {
-                setCurrentView('blank');
+                setCurrentView('vidya');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onNavigateDashboard={() => {
@@ -421,7 +460,7 @@ const MainAppContent: React.FC = () => {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onBackToVidya={() => {
-                setCurrentView('blank');
+                setCurrentView('vidya');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onNavigateDashboard={() => {
@@ -443,7 +482,7 @@ const MainAppContent: React.FC = () => {
               onNavigatePariksha={handleNavigatePariksha}
             />
           ) : currentView === 'pariksha' ? (
-            /* Stage 05: Pariksha 25-Question Examination View */
+            /* Stage 04: Pariksha Crossword Examination View */
             <ParikshaView
               chapter={activeParikshaChapter || activeMananChapter || activeShravanChapter || selectedChapter}
               onNavigateHome={() => {
@@ -472,7 +511,7 @@ const MainAppContent: React.FC = () => {
               }}
               onNavigateVidya={(ch) => {
                 setSelectedChapter(ch);
-                setCurrentView('blank');
+                setCurrentView('vidya');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onNavigateManan={(ch) => {
@@ -552,8 +591,8 @@ const MainAppContent: React.FC = () => {
           )}
         </main>
 
-        {/* Footer (hidden on blank, game, and pariksha exam views) */}
-        {currentView !== 'blank' && currentView !== 'gita-game' && currentView !== 'pariksha' && (
+        {/* Footer (hidden on vidya and pariksha exam views) */}
+        {currentView !== 'vidya' && currentView !== 'pariksha' && (
           <Footer onNavigate={(id) => {
             setCurrentView('landing');
             setTimeout(() => scrollToSection(id), 50);
@@ -569,19 +608,21 @@ const MainAppContent: React.FC = () => {
         isOpen={isStartLearningModalOpen}
         onClose={() => setIsStartLearningModalOpen(false)}
         onSelectGita={() => {
-          setCurrentView('bhagavad-gita');
+          setSelectedChapter(GITA_CHAPTER);
+          setUploadedPdf(null);
+          setCurrentView('vidya');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onSelectRamayana={() => {
           setSelectedChapter(RAMAYANA_CHAPTER);
           setUploadedPdf(null);
-          setCurrentView('blank');
+          setCurrentView('vidya');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onUploadCustomPdf={() => {
           setSelectedChapter(null);
           setUploadedPdf(null);
-          setCurrentView('blank');
+          setCurrentView('vidya');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
       />

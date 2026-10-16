@@ -12,6 +12,9 @@ interface StartLearningModalProps {
 export const StartLearningModal: React.FC<StartLearningModalProps> = ({
   isOpen,
   onClose,
+  onSelectGita,
+  onSelectRamayana,
+  onUploadCustomPdf,
 }) => {
   if (!isOpen) return null;
 
@@ -52,6 +55,10 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
           {/* Option 1: Learn Bhagavad Gita */}
           <button
             type="button"
+            onClick={() => {
+              onSelectGita?.();
+              onClose();
+            }}
             className="w-full p-4 rounded-2xl border text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center gap-4 shadow-2xs group"
             style={{
               backgroundColor: 'var(--bg-main)',
@@ -69,14 +76,21 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
             </div>
             <div className="flex-1">
               <h4 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-                Learn Bhagavad Gita
+                Learn Bhagavad Gita (Verse 6.17)
               </h4>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                Dhyana Yoga · Daily habits, balance & self-mastery
+              </p>
             </div>
           </button>
 
           {/* Option 2: Learn Ramayana */}
           <button
             type="button"
+            onClick={() => {
+              onSelectRamayana?.();
+              onClose();
+            }}
             className="w-full p-4 rounded-2xl border text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center gap-4 shadow-2xs group"
             style={{
               backgroundColor: 'var(--bg-main)',
@@ -96,12 +110,19 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
               <h4 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
                 Learn Ramayana
               </h4>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                Valmiki Epic · Truth, duty, courage & righteousness
+              </p>
             </div>
           </button>
 
-          {/* Option 3: Learn Mahabharata (Defunct with matching theme styling) */}
+          {/* Option 3: Custom PDF Upload */}
           <button
             type="button"
+            onClick={() => {
+              onUploadCustomPdf?.();
+              onClose();
+            }}
             className="w-full p-4 rounded-2xl border text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center gap-4 shadow-2xs group"
             style={{
               backgroundColor: 'var(--bg-main)',
@@ -119,8 +140,11 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
             </div>
             <div className="flex-1">
               <h4 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-                Learn Mahabharata
+                Upload Custom Textbook / PDF
               </h4>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                Synthesize any school chapter into the 4-stage journey
+              </p>
             </div>
           </button>
         </div>

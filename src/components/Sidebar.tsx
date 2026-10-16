@@ -38,10 +38,7 @@ export type AppView =
   | 'pariksha'
   | 'bhagavad-gita'
   | 'focus-mode'
-  | 'store'
-  | 'gita-game'
-  | 'gita-reader'
-  | 'harmony-puzzle';
+  | 'store';
 
 interface SidebarProps {
   currentView: AppView;
@@ -123,7 +120,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentView === 'manan' ||
     currentView === 'pariksha';
 
-  const isPuzzleActive = currentView === 'harmony-puzzle';
   const isGitaActive = currentView === 'bhagavad-gita';
   const isFocusActive = currentView === 'focus-mode';
   const isStoreActive = currentView === 'store';
@@ -182,11 +178,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       case 'bhagavad-gita':
         onNavigateView('bhagavad-gita');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        break;
-
-      case 'harmony-puzzle':
-        onNavigateView('harmony-puzzle');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
 

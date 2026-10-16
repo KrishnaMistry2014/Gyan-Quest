@@ -1,4 +1,4 @@
-export type LearningStageId = 'vidya' | 'shravan' | 'manan' | 'prashna' | 'pariksha';
+export type LearningStageId = 'vidya' | 'shravan' | 'manan' | 'pariksha';
 
 export interface LearningStage {
   id: LearningStageId;
@@ -7,7 +7,7 @@ export interface LearningStage {
   transliteration: string;
   tagline: string;
   description: string;
-  iconName: 'BookOpen' | 'Headphones' | 'Brain' | 'MessageCircleQuestion' | 'ClipboardCheck';
+  iconName: 'BookOpen' | 'Headphones' | 'Brain' | 'ClipboardCheck';
   xpReward: number;
   isOptional?: boolean;
   sampleContent: {

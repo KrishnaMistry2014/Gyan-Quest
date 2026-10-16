@@ -175,7 +175,7 @@ export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ on
             </h3>
 
             <p className="text-xs sm:text-sm leading-relaxed max-w-xs font-normal" style={{ color: 'var(--text-secondary)' }}>
-              Step through the 5 stages at your own pace and earn up to 80 XP on your personal learning journey.
+              Step through the 4 stages at your own pace and earn up to 80 XP on your personal learning journey.
             </p>
           </div>
 

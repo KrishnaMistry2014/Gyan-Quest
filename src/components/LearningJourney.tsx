@@ -5,7 +5,6 @@ import {
   BookOpen,
   Headphones,
   Brain,
-  MessageCircleQuestion,
   ClipboardCheck,
   ChevronRight,
   Sparkles
@@ -78,24 +77,8 @@ const STAGES: StageData[] = [
     outcome: 'Authentic intellectual ownership, moving far beyond rote memorization.',
   },
   {
-    id: 'prashna',
-    step: '04',
-    english: 'Prashna',
-    sanskrit: 'प्रश्न',
-    tagline: 'Socratic Inquiry',
-    description: 'Asking probing questions and resolving lingering ambiguities with the AI Guru.',
-    icon: MessageCircleQuestion,
-    xpReward: 0,
-    xpLabel: 'Optional · 0 XP',
-    isOptional: true,
-    shloka: 'प्रश्नेन सत्यं प्रकाश्यते · Truth is illuminated through inquiry',
-    essence: 'A sacred safe haven for curiosity—no XP penalties, no rush, only clarity.',
-    action: 'Converse directly with Guru AI to dissect difficult points and understand the "why" behind principles.',
-    outcome: 'Complete resolution of misconceptions before formal examination.',
-  },
-  {
     id: 'pariksha',
-    step: '05',
+    step: '04',
     english: 'Pariksha',
     sanskrit: 'परीक्षा',
     tagline: 'Mastery Validation',
@@ -136,7 +119,7 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
       {/* Minimalist Section Header */}
       <div className="text-center max-w-3xl mx-auto mb-8 sm:mb-10 space-y-3">
         <div className="text-xs font-serif tracking-widest uppercase font-semibold" style={{ color: 'var(--accent-saffron-text)' }}>
-          पञ्चपदी · The Sacred Fivefold Progression
+          चतुष्पदी · The Sacred Fourfold Progression
         </div>
 
         <h2
@@ -152,8 +135,8 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
         </p>
       </div>
 
-      {/* 5 Stage Horizontal Selector Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+      {/* 4 Stage Horizontal Selector Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         {STAGES.map((stage) => {
           const isSelected = stage.id === activeStageId;
           const Icon = stage.icon;
@@ -269,7 +252,7 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
             </div>
 
             <div className="pt-2 text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
-              Stage {currentStage.step} of 05 in the Gyan Quest curriculum
+              Stage {currentStage.step} of 04 in the Gyan Quest curriculum
             </div>
           </div>
 
