@@ -7,7 +7,7 @@
     "predev": "node scripts/ensure-auth-bypass.cjs",
     "dev": "node scripts/ensure-auth-bypass.cjs && tsx server.ts",
     "build": "vite build && rm -rf server.js",
-    "start": "node server.ts",
+    "start": "NODE_OPTIONS='--import tsx' node server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
