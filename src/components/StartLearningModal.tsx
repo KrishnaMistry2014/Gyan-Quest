@@ -99,7 +99,7 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
             </div>
           </button>
 
-          {/* Option 3: Learn Bhagwat Mahapurana */}
+          {/* Option 3: Learn Mahabharata (Defunct with matching theme styling) */}
           <button
             type="button"
             className="w-full p-4 rounded-2xl border text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center gap-4 shadow-2xs group"
@@ -119,7 +119,7 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
             </div>
             <div className="flex-1">
               <h4 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-                Learn Bhagwat Mahapurana
+                Learn Mahabharata
               </h4>
             </div>
           </button>
