@@ -147,8 +147,9 @@ const MainAppContent: React.FC = () => {
   };
 
   const handleStartLearning = () => {
-    // Start learning opens the modal with options for Bhagavad Gita, Ramayana, and Custom PDF
-    setIsStartLearningModalOpen(true);
+    // Directly navigate to Learn Bhagavad Gita view
+    setCurrentView('bhagavad-gita');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handlePdfUploaded = (file: File) => {

@@ -3,14 +3,7 @@ import {
   Scroll,
   BookOpen,
   Sparkles,
-  ArrowRight,
-  Compass,
-  CheckCircle2,
-  BookMarked,
-  Layers,
-  MessageSquare,
-  Gamepad2,
-  Puzzle
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -20,8 +13,8 @@ interface BhagavadGitaViewProps {
   onNavigateHome?: () => void;
   onNavigateMyBooks?: () => void;
   onStartGitaGame?: () => void;
-  onNavigateReader?: () => void;
   onStartHarmonyPuzzle?: () => void;
+  onNavigateReader?: () => void;
 }
 
 interface GitaChapterPreview {
@@ -49,8 +42,8 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
   onNavigateHome,
   onNavigateMyBooks,
   onStartGitaGame,
-  onNavigateReader,
   onStartHarmonyPuzzle,
+  onNavigateReader,
 }) => {
   const { user, openAuthModal } = useAuth();
   const { showToast } = useToast();
@@ -60,7 +53,7 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
     if (!user) {
       showToast({
         title: 'Sign In Required',
-        message: 'Please sign in to access the Bhagavad Gita Chapter 6 lesson and Play Quest.',
+        message: 'Please sign in to access the Bhagavad Gita Chapter 6 lesson.',
         type: 'info',
       });
       openAuthModal();
@@ -145,7 +138,7 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
               Chapter Explorer
             </h2>
             <p className="text-xs sm:text-sm" style={{ color: 'var(--text-muted)' }}>
-              Interactive Dhyana Yoga study with shloka breakdown, wisdom reflections, and Word Quest gameplay.
+              Interactive Dhyana Yoga study with shloka breakdown, wisdom reflections, and personalized Guru guidance.
             </p>
           </div>
         </div>
@@ -192,183 +185,120 @@ export const BhagavadGitaView: React.FC<BhagavadGitaViewProps> = ({
                   </p>
                 </div>
 
-                <div className="pt-4 mt-3 border-t flex items-center justify-between text-xs font-bold" style={{ borderColor: 'var(--border-warm)' }}>
+                <div className="pt-4 mt-3 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-bold" style={{ borderColor: 'var(--border-warm)' }}>
                   <span style={{ color: 'var(--text-muted)' }}>
                     Status:{' '}
                     {ch.number === 6 ? (
                       <span className="text-emerald-700 dark:text-emerald-400 font-bold inline-flex items-center gap-1">
                         <Sparkles className="w-3 h-3 text-amber-500" />
-                        <span>Game Ready</span>
+                        <span>Interactive Study</span>
                       </span>
                     ) : (
                       <span className="text-amber-600 dark:text-amber-400">Curating</span>
                     )}
                   </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedChapter(ch);
-                      if (ch.number === 6) {
-                        handleLearnClick();
-                      }
-                    }}
-                    className="flex items-center gap-1 cursor-pointer transition-transform hover:scale-105 active:scale-95"
-                    style={{ color: 'var(--accent-saffron-text)' }}
-                  >
-                    <span>{ch.number === 6 ? 'Play Quest' : 'Details'}</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+
+                  {/* Options: Learn, Play Word Quest, Harmony Puzzle, Ask Guru AI */}
+                  <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      id={`btn-learn-ch-${ch.number}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedChapter(ch);
+                        if (ch.number === 6) {
+                          handleLearnClick();
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-2xs"
+                      style={{
+                        backgroundColor: 'var(--accent-saffron-light)',
+                        color: 'var(--accent-saffron-text)',
+                      }}
+                      title={`Learn Chapter ${ch.number}`}
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                      <span>Learn & Audio</span>
+                    </button>
+
+                    {onStartGitaGame && (
+                      <button
+                        type="button"
+                        id={`btn-game-ch-${ch.number}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!user) {
+                            openAuthModal();
+                          } else {
+                            onStartGitaGame();
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-2xs border"
+                        style={{
+                          backgroundColor: 'var(--bg-card-subtle)',
+                          borderColor: 'var(--border-warm)',
+                          color: 'var(--text-primary)',
+                        }}
+                        title="Play Word Quest Game"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Word Quest</span>
+                      </button>
+                    )}
+
+                    {onStartHarmonyPuzzle && (
+                      <button
+                        type="button"
+                        id={`btn-puzzle-ch-${ch.number}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!user) {
+                            openAuthModal();
+                          } else {
+                            onStartHarmonyPuzzle();
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-2xs border"
+                        style={{
+                          backgroundColor: 'var(--bg-card-subtle)',
+                          borderColor: 'var(--border-warm)',
+                          color: 'var(--text-primary)',
+                        }}
+                        title="Play Harmony Puzzle"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>Harmony Puzzle</span>
+                      </button>
+                    )}
+
+                    {onOpenGuruChatWithPrompt && (
+                      <button
+                        type="button"
+                        id={`btn-ask-guru-ch-${ch.number}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedChapter(ch);
+                          onOpenGuruChatWithPrompt(
+                            `Teach me the key concepts of Bhagavad Gita Chapter ${ch.number} (${ch.sanskritName} - ${ch.englishTitle}) with practical student examples.`
+                          );
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-2xs"
+                        style={{
+                          backgroundColor: 'var(--accent-saffron)',
+                        }}
+                        title={`Ask Guru AI about Chapter ${ch.number}`}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-white" />
+                        <span>Ask Guru AI</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       </div>
-
-      {/* Selected Chapter Deep Dive */}
-      {selectedChapter && (
-        <div
-          className="p-6 rounded-3xl border space-y-4"
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            borderColor: 'var(--border-warm)',
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-xs"
-              style={{
-                backgroundColor: 'var(--accent-saffron-light)',
-                color: 'var(--accent-saffron-text)',
-              }}
-            >
-              <BookMarked className="w-5 h-5 text-amber-700 dark:text-amber-400" />
-            </div>
-            <div>
-              <h3 className="text-lg sm:text-xl font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-                Chapter {selectedChapter.number}: {selectedChapter.sanskritName}
-              </h3>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {selectedChapter.englishTitle} • {selectedChapter.versesCount} Verses
-              </p>
-            </div>
-          </div>
-
-          <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            {selectedChapter.summary}
-          </p>
-
-          <div
-            className="p-4 rounded-2xl border text-xs leading-relaxed flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-            style={{
-              backgroundColor: 'var(--bg-main)',
-              borderColor: 'var(--border-warm)',
-            }}
-          >
-            <div>
-              <span className="font-bold block" style={{ color: 'var(--text-primary)' }}>
-                Would you like Guru AI to teach you this chapter?
-              </span>
-              <span style={{ color: 'var(--text-muted)' }}>
-                You can ask questions regarding Sanskrit terms, practical moral applications, or philosophical inquiries.
-              </span>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full sm:w-auto">
-              {onOpenGuruChatWithPrompt && (
-                <button
-                  type="button"
-                  id="btn-ask-guru-ai"
-                  onClick={() => onOpenGuruChatWithPrompt(`Teach me the key concepts of Bhagavad Gita Chapter ${selectedChapter.number} (${selectedChapter.sanskritName}) with real-life student examples.`)}
-                  className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all hover:scale-102 active:scale-98 cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--accent-saffron)',
-                    color: '#FFFFFF',
-                  }}
-                >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Ask Guru AI</span>
-                </button>
-              )}
-
-              {/* In CH-6 under / alongside Ask Guru AI: Option of Learn */}
-              {selectedChapter.number === 6 && (
-                <button
-                  type="button"
-                  id="btn-learn-ch6-game"
-                  onClick={handleLearnClick}
-                  className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all hover:scale-102 active:scale-98 cursor-pointer shadow-xs"
-                  style={{
-                    backgroundColor: 'var(--accent-saffron-light)',
-                    borderColor: 'var(--accent-saffron)',
-                    color: 'var(--accent-saffron-text)',
-                  }}
-                  title="Learn Dhyana Yoga through the Interactive Word Quest Game"
-                >
-                  <Gamepad2 className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-                  <span>Learn</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Dedicated Chapter 6 Interactive Game Showcase Banner */}
-          {selectedChapter.number === 6 && (
-            <div
-              className="p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in"
-              style={{
-                backgroundColor: 'var(--bg-card-subtle)',
-                borderColor: 'var(--accent-saffron)',
-              }}
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  <span className="font-bold text-xs sm:text-sm text-amber-900 dark:text-amber-300">
-                    Interactive Word Quest Game • Chapter 6 Verse 6.17
-                  </span>
-                </div>
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  Practice moderation, sleep habits, and mental discipline from Dhyana Yoga. Guess the 5-letter sacred keywords (YUKTA, DHYAN, SLEEP, HABIT, FOCUS) in 6 attempts!
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-                {onStartHarmonyPuzzle && (
-                  <button
-                    type="button"
-                    id="btn-start-jigsaw-ch6"
-                    onClick={onStartHarmonyPuzzle}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all hover:scale-102 active:scale-98 cursor-pointer shadow-2xs"
-                    style={{
-                      backgroundColor: 'var(--bg-card)',
-                      borderColor: 'var(--accent-saffron)',
-                      color: 'var(--accent-saffron-text)',
-                    }}
-                  >
-                    <Puzzle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    <span>Harmony Jigsaw</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  id="btn-start-game-ch6-banner"
-                  onClick={handleLearnClick}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer text-white"
-                  style={{
-                    backgroundColor: 'var(--accent-saffron)',
-                  }}
-                >
-                  <Gamepad2 className="w-4 h-4" />
-                  <span>Start Word Quest</span>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };
