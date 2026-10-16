@@ -307,7 +307,7 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
                   style={{ backgroundColor: 'var(--accent-saffron)' }}
                 >
                   <ClipboardCheck className="w-4 h-4" />
-                  <span>Enter Stage 05 Pariksha Crossword Exam</span>
+                  <span>Enter Stage 05 Pariksha Examination</span>
                 </button>
               </div>
             )}

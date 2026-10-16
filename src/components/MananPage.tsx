@@ -1383,7 +1383,7 @@ export const MananPage: React.FC<MananPageProps> = ({
             </h4>
           </div>
           <p className="text-xs sm:text-sm max-w-xl" style={{ color: 'var(--text-secondary)' }}>
-            Advance to Stage 05: Pariksha (परीक्षा) for the Crossword mastery exam, or continue reflecting with Word Quest and Crosswords.
+            Advance to Stage 05: Pariksha (परीक्षा) for the 25-Question mastery examination, or continue reflecting with Word Quest and Crosswords.
           </p>
         </div>
 

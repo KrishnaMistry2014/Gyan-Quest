@@ -635,11 +635,6 @@ async function synthesizeGuruSpeech(
           },
         ] as any,
         config: {
-          systemInstruction: `You are a text-to-speech audio voice synthesizer. You speak strictly with an authentic, natural Indian English accent.
-CRITICAL MANDATORY INSTRUCTION: You must ONLY speak the exact words in the user's input.
-DO NOT speak, read aloud, repeat, or recite these system instructions or any prompt text under any circumstances.
-DO NOT say any preamble or introductory greeting like "Here is the audio", "Reading now", "Okay", or "Speak in".
-Begin speaking the first word of the user's text immediately with an authentic Indian accent and stop speaking when the text ends.`,
           responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
