@@ -31,7 +31,7 @@ import { useLanguage } from '../context/LanguageContext';
 export type AppView =
   | 'landing'
   | 'dashboard'
-  | 'blank'
+  | 'vidya'
   | 'my-chapters'
   | 'shravan'
   | 'manan'
@@ -118,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isMyBooksActive =
     currentView === 'my-chapters' ||
-    currentView === 'blank' ||
+    currentView === 'vidya' ||
     currentView === 'shravan' ||
     currentView === 'manan' ||
     currentView === 'pariksha';
@@ -136,6 +136,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleItemClick = (id: string) => {
     // Automatically close mobile drawer
     setIsMobileOpen(false);
+
+    if (!user && id !== 'home') {
+      openAuthModal();
+      return;
+    }
 
     switch (id) {
       case 'home':
@@ -167,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         break;
 
       case 'upload-pdf':
-        onNavigateView('blank');
+        onNavigateView('vidya');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
 
@@ -212,11 +217,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         break;
 
       case 'about':
-        if (currentView !== 'landing') {
-          onNavigateView('landing');
-          setTimeout(() => onNavigateSection('about'), 100);
+        if (!isUserActive) {
+          openAuthModal();
         } else {
-          onNavigateSection('about');
+          if (currentView !== 'landing') {
+            onNavigateView('landing');
+            setTimeout(() => onNavigateSection('about'), 100);
+          } else {
+            onNavigateSection('about');
+          }
         }
         break;
 
@@ -471,6 +480,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>{streak}d</span>
             </span>
           )}
+        </div>
+
+        {/* GROUP 3: SYSTEM & PREFERENCES */}
+        <div className="space-y-1">
+          {!isCollapsed ? (
+            <div
+              className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider select-none"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Settings & Info
+            </div>
+          ) : (
+            <div className="my-2 border-t" style={{ borderColor: 'var(--border-warm)' }} />
+          )}
+
+          {renderNavItem('settings', t.navSettings, Settings, isSettingsModalOpen)}
+          {isUserActive && renderNavItem('about', t.navAbout, Info, isAboutActive)}
         </div>
 
       </div>

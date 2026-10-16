@@ -23,6 +23,7 @@ import {
   syncGuestChaptersToUser
 } from '../lib/chapters';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface MyChaptersProps {
   onOpenChapter: (chapter: SavedChapter) => void;
@@ -40,6 +41,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
   onNavigateHome,
 }) => {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [chapters, setChapters] = useState<SavedChapter[]>(getLocalChapters());
   const [searchQuery, setSearchQuery] = useState('');
   const [chapterToDelete, setChapterToDelete] = useState<string | null>(null);
@@ -142,7 +144,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
               }}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>Chapter Library</span>
+              <span>{t.chapterLibrary}</span>
             </span>
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
               • {chapters.length} {chapters.length === 1 ? 'Chapter' : 'Chapters'} Saved
@@ -153,11 +155,11 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
             className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight"
             style={{ color: 'var(--text-primary)' }}
           >
-            My Chapters
+            {t.myChaptersTitle}
           </h1>
 
           <p className="text-sm sm:text-base mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Access all your uploaded PDF chapters and Vidya study notes in one place.
+            {t.myChaptersSubtitle}
           </p>
         </div>
 
@@ -173,7 +175,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
                 color: 'var(--text-primary)',
               }}
             >
-              Dashboard
+              {t.backToDashboard}
             </button>
           )}
 
@@ -187,7 +189,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
             }}
           >
             <UploadCloud className="w-4 h-4" />
-            <span>Upload New Chapter</span>
+            <span>{t.uploadNewChapter}</span>
           </button>
         </div>
       </div>
@@ -200,7 +202,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search chapters or topics..."
+            placeholder={t.searchChaptersPlaceholder}
             className="w-full pl-10 pr-4 py-2.5 rounded-2xl border text-sm focus:outline-none focus:ring-2 transition-all"
             style={{
               backgroundColor: 'var(--bg-card)',
@@ -235,11 +237,11 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
           </div>
 
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight mb-2" style={{ color: 'var(--text-primary)' }}>
-            No Chapters Saved Yet
+            {t.noChaptersTitle}
           </h2>
 
           <p className="text-sm sm:text-base leading-relaxed max-w-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
-            Upload a textbook chapter or study notes PDF to generate your first study guide. All your chapters will be saved here automatically.
+            {t.noChaptersDesc}
           </p>
 
           <button
@@ -252,7 +254,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
             }}
           >
             <UploadCloud className="w-4 h-4" />
-            <span>Upload Your First PDF Chapter</span>
+            <span>{t.uploadNewChapter}</span>
           </button>
         </div>
       ) : filteredChapters.length === 0 ? (

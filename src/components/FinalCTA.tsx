@@ -1,12 +1,15 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface FinalCTAProps {
   onStartQuest: () => void;
 }
 
 export const FinalCTA: React.FC<FinalCTAProps> = ({ onStartQuest }) => {
+  const { language, t } = useLanguage();
+
   return (
     <section id="final-cta" className="py-8 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <motion.div
@@ -31,14 +34,14 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onStartQuest }) => {
             className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight leading-tight font-serif-heading"
             style={{ color: 'var(--text-primary)' }}
           >
-            Your Quest For Wisdom Begins Here
+            {t.ctaTitle}
           </h2>
 
           <p
             className="text-base sm:text-lg max-w-xl mx-auto font-normal leading-relaxed"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Transform any textbook into an inspiring journey. Master concepts through Vidya, Shravan, Manan, Prashna, and Pariksha today.
+            {t.ctaSubtitle}
           </p>
 
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -52,7 +55,7 @@ export const FinalCTA: React.FC<FinalCTAProps> = ({ onStartQuest }) => {
                 color: '#FFFFFF',
               }}
             >
-              <span>Start Your Quest</span>
+              <span>{t.ctaButton}</span>
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </button>
           </div>

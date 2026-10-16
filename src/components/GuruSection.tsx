@@ -5,8 +5,11 @@ import {
   Lightbulb,
   MessageSquare
 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 export const GuruSection: React.FC = () => {
+  const { language, t } = useLanguage();
+
   return (
     <section id="guru" className="py-8 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       {/* Minimalist Section Header */}
@@ -20,11 +23,11 @@ export const GuruSection: React.FC = () => {
           className="text-3xl sm:text-4xl lg:text-[42px] font-bold tracking-tight font-serif-heading"
           style={{ color: 'var(--text-primary)' }}
         >
-          Meet Guru — Your Study Guide
+          {t.guruTitle}
         </h2>
 
         <p className="text-sm sm:text-base leading-relaxed max-w-2xl mx-auto font-normal" style={{ color: 'var(--text-secondary)' }}>
-          Guru is Gyan Quest's dedicated academic guide and cultural mentor. It helps students master concepts, explore Indian traditions, mythology, and Sanskrit, and clear doubts with depth and clarity.
+          {t.guruSubtitle}
         </p>
       </div>
 

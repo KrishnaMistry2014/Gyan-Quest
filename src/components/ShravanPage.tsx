@@ -19,6 +19,7 @@ import {
 import { SavedChapter, updateChapterAudio, generateUniqueChapterCode } from '../lib/chapters';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { claimChapterStageReward } from '../lib/firebase';
 
 interface ShravanPageProps {
@@ -163,6 +164,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 }) => {
   const { user, refreshUser, updateProfileXp, isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const [selectedVoice, setSelectedVoice] = useState<'Adinath' | 'Vidur' | 'Sumed'>('Adinath');
   const [ttsMeta, setTtsMeta] = useState<{ voice?: string; fromCache?: boolean } | null>(null);
   const [audioBase64, setAudioBase64] = useState<string | null>(chapter.audioBase64 || null);
@@ -624,7 +626,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
           }}
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Go back to Vidya</span>
+          <span>{t.backToVidya}</span>
         </button>
 
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border shadow-2xs"
@@ -635,7 +637,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
           }}
         >
           <Headphones className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
-          <span>Vidya • Stage 02: Shravan (श्रवण)</span>
+          <span>{t.shravanStageBadge}</span>
         </div>
       </div>
 
@@ -649,7 +651,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       >
         <div className="text-center space-y-3 max-w-2xl mx-auto">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-            Shravan Audio Narration
+            {t.shravanTitle}
           </h1>
           <p className="text-sm sm:text-base font-medium truncate" style={{ color: 'var(--accent-saffron-text)' }}>
             {chapter.title.replace(/^Vidya:\s*/i, '')}
@@ -658,7 +660,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
           {/* Teacher Voice Selector */}
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
             <span className="text-xs font-semibold mr-1" style={{ color: 'var(--text-secondary)' }}>
-              Teacher Voice Style:
+              {t.teacherVoiceStyle}
             </span>
             <button
               type="button"
@@ -973,7 +975,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             }}
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Go back to Vidya</span>
+            <span>{t.backToVidya}</span>
           </button>
 
           {hasPlayedFullAudio && (
@@ -987,7 +989,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
                 color: '#FFFFFF',
               }}
             >
-              <span>Go to Manan</span>
+              <span>{t.proceedToManan}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           )}

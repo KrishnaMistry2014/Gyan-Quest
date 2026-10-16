@@ -14,6 +14,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { playMindfulChime } from '../lib/chime';
 
 interface FocusModeViewProps {
@@ -26,6 +27,7 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
   onOpenSettingsModal,
 }) => {
   const { user, streak, openStreakModal, settings } = useAuth();
+  const { t } = useLanguage();
 
   // Active Timer state
   const [selectedMinutes, setSelectedMinutes] = useState<number>(() => {
@@ -125,15 +127,15 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
               }}
             >
               <Timer className="w-3.5 h-3.5" />
-              <span>Digital Wellness & Focused Learning</span>
+              <span>{t.digitalWellness}</span>
             </div>
 
             <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-              Focus Mode
+              {t.focusModeTitle}
             </h1>
 
             <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              Structure your study in focused intervals. When your session timer finishes, GyanQuest rings a gentle temple chime and initiates a mandatory 3-minute walking break to preserve your vision and refresh your cognitive recall.
+              {t.focusModeSubtitle}
             </p>
           </div>
 
@@ -144,7 +146,7 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
               style={{ backgroundColor: 'var(--bg-card-subtle)', borderColor: 'var(--border-warm)' }}
             >
               <span className="text-[10px] uppercase font-bold tracking-wider block" style={{ color: 'var(--text-muted)' }}>
-                Sessions Today
+                {t.sessionsToday}
               </span>
               <span className="text-2xl font-bold font-mono tabular-nums" style={{ color: 'var(--accent-saffron-text)' }}>
                 {completedSessions}
@@ -160,7 +162,7 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
                 title="View Streak Details"
               >
                 <span className="text-[10px] uppercase font-bold tracking-wider block" style={{ color: 'var(--text-muted)' }}>
-                  Active Streak
+                  {t.activeStreakBadge}
                 </span>
                 <span className="text-2xl font-bold font-mono tabular-nums text-amber-600 dark:text-amber-400 flex items-center justify-center gap-1">
                   <span>🔥</span>
@@ -256,7 +258,7 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
               }}
             >
               {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
-              <span>{isRunning ? 'Pause Timer' : 'Start Focus Session'}</span>
+              <span>{isRunning ? t.pauseFocusTimer : t.startFocusTimer}</span>
             </button>
 
             <button
@@ -303,7 +305,7 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
           >
             <div className="flex items-center gap-2.5 font-bold text-sm" style={{ color: 'var(--accent-saffron-text)' }}>
               <Footprints className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span>Mandatory 3-Minute Walking Pause</span>
+              <span>{t.mandatoryPause}</span>
             </div>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
               When your timer elapses, your screen blurs with a calm breathing animation. Stand up, drink water, and walk around for 180 seconds. Physical circulation oxygenates the brain and cements information in long-term memory.
@@ -319,7 +321,7 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
             }}
           >
             <h3 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-              Ready to Study?
+              {t.readyToStudy}
             </h3>
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
               Keep this Focus timer active while reading your uploaded NCERT textbooks or listening to Shravan audio recitations.
@@ -339,7 +341,7 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
                 >
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    <span>Open My Books & Chapters</span>
+                    <span>{t.openMyBooks}</span>
                   </div>
                   <span>→</span>
                 </button>
@@ -358,7 +360,7 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
                 >
                   <div className="flex items-center gap-2">
                     <Sliders className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    <span>Configure Focus Preferences in Settings</span>
+                    <span>{t.configureFocus}</span>
                   </div>
                   <span>→</span>
                 </button>

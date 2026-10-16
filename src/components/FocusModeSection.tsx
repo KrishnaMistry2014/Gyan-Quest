@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Timer, Clock, Flame, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export const FocusModeSection: React.FC = () => {
   const { user, streak, openStreakModal } = useAuth();
+  const { language, t } = useLanguage();
   const [selectedDuration, setSelectedDuration] = useState<number>(25);
 
   const durationOptions = [
@@ -39,11 +41,11 @@ export const FocusModeSection: React.FC = () => {
               className="text-3xl sm:text-4xl font-bold tracking-tight font-serif-heading"
               style={{ color: 'var(--text-primary)' }}
             >
-              Focus Mode for Mindful Study
+              {t.focusModeTitle}
             </h2>
 
             <p className="text-sm sm:text-base leading-relaxed font-normal" style={{ color: 'var(--text-secondary)' }}>
-              Inspired by the Vedic practice of *Ekagrata* (one-pointed concentration), Focus Mode structures learning in concentrated, uninterrupted windows, discouraging endless screen fatigue and mindless browsing.
+              {t.focusModeSubtitle}
             </p>
 
             <div className="space-y-2 pt-2 text-xs sm:text-sm font-normal" style={{ color: 'var(--text-secondary)' }}>

@@ -23,6 +23,7 @@ import { GyanQuestCrossword } from './GyanQuestCrossword';
 import { GyanQuestWordle } from './GyanQuestWordle';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { playMindfulChime } from '../lib/chime';
 import {
   generateChapterImage,
@@ -57,6 +58,7 @@ export const MananPage: React.FC<MananPageProps> = ({
 }) => {
   const { isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   // Active contemplation activity: Jigsaw puzzle reflection, Wordle Quest, or AI Crossword
   const [activeActivity, setActiveActivity] = useState<'jigsaw' | 'wordle' | 'crossword'>('jigsaw');
@@ -550,7 +552,7 @@ export const MananPage: React.FC<MananPageProps> = ({
             }}
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Shravan</span>
+            <span>{t.backToShravan}</span>
           </button>
 
           {onBackToVidya && (
@@ -565,7 +567,7 @@ export const MananPage: React.FC<MananPageProps> = ({
               }}
             >
               <BookOpen className="w-4 h-4" />
-              <span>Vidya Notes</span>
+              <span>{t.chapterNotesTitle}</span>
             </button>
           )}
 
@@ -600,7 +602,7 @@ export const MananPage: React.FC<MananPageProps> = ({
               title="Go to Stage 05: Pariksha (परीक्षा)"
             >
               <ClipboardCheck className="w-4 h-4" />
-              <span>Go to Pariksha</span>
+              <span>{t.goToPariksha}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
@@ -624,7 +626,7 @@ export const MananPage: React.FC<MananPageProps> = ({
             }}
           >
             <Brain className="w-4 h-4" />
-            <span>Jigsaw Reflection</span>
+            <span>{t.jigsawReflection}</span>
           </button>
 
           <button
@@ -641,7 +643,7 @@ export const MananPage: React.FC<MananPageProps> = ({
             }}
           >
             <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>Word Quest</span>
+            <span>{t.wordQuest}</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
               New
             </span>
@@ -661,7 +663,7 @@ export const MananPage: React.FC<MananPageProps> = ({
             }}
           >
             <LayoutGrid className="w-4 h-4" />
-            <span>Crossword Quest</span>
+            <span>{t.crosswordQuest}</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
               AI
             </span>

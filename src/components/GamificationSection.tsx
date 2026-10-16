@@ -7,9 +7,11 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export const GamificationSection: React.FC = () => {
   const { user, streak, openStreakModal, openAuthModal } = useAuth();
+  const { language, t } = useLanguage();
 
   return (
     <section id="gamification" className="py-8 sm:py-14 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -24,11 +26,11 @@ export const GamificationSection: React.FC = () => {
           className="text-3xl sm:text-4xl lg:text-[42px] font-bold tracking-tight font-serif-heading"
           style={{ color: 'var(--text-primary)' }}
         >
-          Motivation Rooted in Mastery
+          {t.gamificationTitle}
         </h2>
 
         <p className="text-sm sm:text-base leading-relaxed max-w-2xl mx-auto font-normal" style={{ color: 'var(--text-secondary)' }}>
-          Gyan Quest designs progression strictly around educational psychology. We celebrate disciplined study, thoughtful inquiry, and real comprehension rather than superficial clicks.
+          {t.gamificationSubtitle}
         </p>
       </div>
 

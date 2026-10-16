@@ -20,11 +20,10 @@ import {
   Flame,
   Radio,
   ExternalLink,
-  MessageSquare
+  Puzzle
 } from 'lucide-react';
 import { STUDENT_ARTICLE_DATA } from '../data/gitaQuestData';
 import { useTheme } from '../context/ThemeContext';
-import { useAuth } from '../context/AuthContext';
 import { vedicAudio } from '../utils/gitaAudio';
 
 import heroDiyaImg from '../assets/images/gyanquest_hero_diya_1791870559877.jpg';
@@ -32,17 +31,16 @@ import krishnaChariotImg from '../assets/images/gyanquest_krishna_chariot_179187
 
 interface GitaVoiceReaderProps {
   onBack: () => void;
-  onOpenGuruChatWithPrompt?: (prompt: string) => void;
-  onStartGame?: () => void;
+  onPlayQuest: () => void;
+  onPlayJigsaw?: () => void;
 }
 
 export const GitaVoiceReader: React.FC<GitaVoiceReaderProps> = ({
   onBack,
-  onOpenGuruChatWithPrompt,
-  onStartGame,
+  onPlayQuest,
+  onPlayJigsaw,
 }) => {
   const { isDark, toggleTheme } = useTheme();
-  const { user, openAuthModal } = useAuth();
 
   // TTS Speech State
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -272,27 +270,38 @@ export const GitaVoiceReader: React.FC<GitaVoiceReaderProps> = ({
             )}
           </button>
 
-
-
-          {/* Ask Guru AI button */}
-          {onOpenGuruChatWithPrompt && (
+          {/* Harmony Jigsaw Puzzle button */}
+          {onPlayJigsaw && (
             <button
               type="button"
-              id="btn-ask-guru-top"
-              onClick={() =>
-                onOpenGuruChatWithPrompt(
-                  'Help me understand Bhagavad Gita Chapter 6 Verse 17 on balanced living and student concentration.'
-                )
-              }
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold text-white shadow-md transition-all hover:scale-103 active:scale-97 cursor-pointer"
+              id="btn-play-jigsaw-top"
+              onClick={onPlayJigsaw}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all hover:scale-103 active:scale-97 cursor-pointer shadow-2xs"
               style={{
-                backgroundColor: 'var(--accent-saffron)',
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--accent-saffron)',
+                color: 'var(--accent-saffron-text)',
               }}
+              title="Play 12-Piece Harmony of Life Jigsaw Puzzle"
             >
-              <MessageSquare className="w-4 h-4 text-white" />
-              <span>Ask Guru AI</span>
+              <Puzzle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span className="hidden sm:inline">Harmony Puzzle</span>
             </button>
           )}
+
+          {/* Prominent Play Quest button */}
+          <button
+            type="button"
+            id="btn-play-quest-top"
+            onClick={onPlayQuest}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white shadow-md transition-all hover:scale-103 active:scale-97 cursor-pointer"
+            style={{
+              backgroundColor: 'var(--accent-saffron)',
+            }}
+          >
+            <Gamepad2 className="w-4 h-4 text-white animate-pulse" />
+            <span>Play Quest</span>
+          </button>
         </div>
       </div>
 
@@ -521,23 +530,17 @@ export const GitaVoiceReader: React.FC<GitaVoiceReaderProps> = ({
             </p>
           </div>
 
-          {onOpenGuruChatWithPrompt && (
-            <button
-              type="button"
-              onClick={() =>
-                onOpenGuruChatWithPrompt(
-                  'Explain the Six Pillars of Student Success from Bhagavad Gita Chapter 6 Verse 17 with practical exam-study tips.'
-                )
-              }
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-all hover:scale-102 cursor-pointer self-start sm:self-auto"
-              style={{
-                backgroundColor: 'var(--accent-saffron)',
-              }}
-            >
-              <MessageSquare className="w-3.5 h-3.5 text-white" />
-              <span>Ask Guru AI</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onPlayQuest}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-all hover:scale-102 cursor-pointer self-start sm:self-auto"
+            style={{
+              backgroundColor: 'var(--accent-saffron)',
+            }}
+          >
+            <Gamepad2 className="w-3.5 h-3.5 text-white" />
+            <span>Play Quest Now</span>
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -661,51 +664,44 @@ export const GitaVoiceReader: React.FC<GitaVoiceReaderProps> = ({
           </div>
 
           <h2 className="text-xl sm:text-3xl font-extrabold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-            Deepen Chapter 6 Wisdom with Guru AI
+            Ready to Play the Chapter 6 Word Quest?
           </h2>
 
           <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            Ask questions on Verse 6.17, moderation, student habits, and Sanskrit terms with your personalized Guru AI mentor.
+            Test your understanding of Verse 6.17 keywords. Guess 5-letter sacred terms like <strong>YUKTA</strong>, <strong>DHYAN</strong>, and <strong>FOCUS</strong> in 6 attempts with acoustic sound feedback aligned with {isDark ? 'Chandra' : 'Surya'} mode.
           </p>
         </div>
 
         <div className="flex flex-wrap justify-center gap-3 pt-2">
-          {onStartGame && (
+          {onPlayJigsaw && (
             <button
               type="button"
-              id="btn-play-word-quest"
-              onClick={onStartGame}
-              className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-bold shadow-lg transition-all hover:scale-104 active:scale-96 cursor-pointer"
+              id="btn-play-jigsaw-bottom"
+              onClick={onPlayJigsaw}
+              className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-bold border transition-all hover:scale-104 active:scale-96 cursor-pointer shadow-md"
               style={{
-                backgroundColor: 'var(--accent-saffron-light)',
-                color: 'var(--accent-saffron-text)',
+                backgroundColor: 'var(--bg-card)',
                 borderColor: 'var(--accent-saffron)',
-                borderWidth: '1px',
+                color: 'var(--accent-saffron-text)',
               }}
             >
-              <Gamepad2 className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-              <span>Play Word Quest Game</span>
+              <Puzzle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <span>Play Harmony Jigsaw (12 Pieces)</span>
             </button>
           )}
 
-          {onOpenGuruChatWithPrompt && (
-            <button
-              type="button"
-              id="btn-ask-guru-bottom"
-              onClick={() =>
-                onOpenGuruChatWithPrompt(
-                  'Teach me how to apply Bhagavad Gita Chapter 6 (Dhyana Yoga) to daily student routines, exam concentration, and peaceful sleep.'
-                )
-              }
-              className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-bold text-white shadow-lg transition-all hover:scale-104 active:scale-96 cursor-pointer"
-              style={{
-                backgroundColor: 'var(--accent-saffron)',
-              }}
-            >
-              <MessageSquare className="w-5 h-5 text-white" />
-              <span>Ask Guru AI</span>
-            </button>
-          )}
+          <button
+            type="button"
+            id="btn-play-quest-bottom"
+            onClick={onPlayQuest}
+            className="inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl text-sm font-bold text-white shadow-lg transition-all hover:scale-104 active:scale-96 cursor-pointer"
+            style={{
+              backgroundColor: 'var(--accent-saffron)',
+            }}
+          >
+            <Gamepad2 className="w-5 h-5 text-white animate-bounce" />
+            <span>Play Quest</span>
+          </button>
         </div>
       </div>
     </div>

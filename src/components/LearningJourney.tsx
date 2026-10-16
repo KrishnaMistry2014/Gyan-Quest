@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   BookOpen,
   Headphones,
@@ -120,6 +121,7 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
   onStartLearning,
 }) => {
   const { recordStreakActivity } = useAuth();
+  const { language, t } = useLanguage();
   const [activeStageId, setActiveStageId] = useState<string>('vidya');
 
   const handleStageChange = (stageId: string) => {
@@ -142,11 +144,11 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
           className="text-3xl sm:text-4xl lg:text-[42px] font-bold tracking-tight font-serif-heading"
           style={{ color: 'var(--text-primary)' }}
         >
-          The Gyan Quest Journey
+          {t.journeyTitle}
         </h2>
 
         <p className="text-sm sm:text-base leading-relaxed max-w-2xl mx-auto font-normal" style={{ color: 'var(--text-secondary)' }}>
-          Rooted in the timeless Indian sequence of knowledge acquisition, every textbook chapter is experienced as one unbroken progression toward complete mastery.
+          {t.journeySubtitle}
         </p>
       </div>
 
@@ -307,7 +309,7 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
                   style={{ backgroundColor: 'var(--accent-saffron)' }}
                 >
                   <ClipboardCheck className="w-4 h-4" />
-                  <span>Enter Stage 05 Pariksha Crossword Exam</span>
+                  <span>{t.journeyEnterPariksha}</span>
                 </button>
               </div>
             )}
@@ -320,7 +322,7 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 active:scale-98 cursor-pointer"
                   style={{ borderColor: 'var(--border-warm)', color: 'var(--text-primary)' }}
                 >
-                  <span>Start This Stage in Your Study Flow →</span>
+                  <span>{t.journeyStartStage}</span>
                 </button>
               </div>
             )}

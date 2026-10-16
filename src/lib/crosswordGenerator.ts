@@ -1,4 +1,4 @@
-import { CrosswordWord, CrosswordData } from '../types.ts';
+import { CrosswordWord, CrosswordData } from '../types';
 
 export interface RawCrosswordInputWord {
   answer: string;

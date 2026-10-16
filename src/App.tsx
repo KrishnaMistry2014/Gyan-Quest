@@ -18,14 +18,14 @@ import { FocusBreakOverlay } from './components/FocusBreakOverlay';
 import { ProfileModal } from './components/ProfileModal';
 import { StreakModal } from './components/StreakModal';
 import { GuruModal } from './components/GuruModal';
+import { SettingsModal } from './components/SettingsModal';
 import { Dashboard } from './components/Dashboard';
 import { VerificationScreen } from './components/VerificationScreen';
-import { BlankPage } from './components/BlankPage';
+import { VidyaPage } from './components/VidyaPage';
 import { MyChapters } from './components/MyChapters';
 import { ShravanPage } from './components/ShravanPage';
 import { MananPage } from './components/MananPage';
 import { ParikshaView } from './components/ParikshaView';
-import { BhagavadGitaView } from './components/BhagavadGitaView';
 import { StoreView } from './components/StoreView';
 import { FocusModeView } from './components/FocusModeView';
 import { SavedChapter } from './lib/chapters';
@@ -52,10 +52,57 @@ True strength is built through quiet, daily choices. Just as Rama remained balan
   createdAt: new Date().toISOString(),
 };
 
+const pathToView = (path: string): AppView => {
+  const cleanPath = path.replace(/\/$/, '');
+  switch (cleanPath) {
+    case '/dashboard': return 'dashboard';
+    case '/my-chapters': return 'my-chapters';
+    case '/focus-mode': return 'focus-mode';
+    case '/store': return 'store';
+    case '/vidya': return 'vidya';
+    case '/shravan': return 'shravan';
+    case '/manan': return 'manan';
+    case '/pariksha': return 'pariksha';
+    case '/harmony-puzzle': return 'harmony-puzzle';
+    default: return 'landing';
+  }
+};
+
+const viewToPath = (view: AppView): string => {
+  switch (view) {
+    case 'dashboard': return '/dashboard';
+    case 'my-chapters': return '/my-chapters';
+    case 'focus-mode': return '/focus-mode';
+    case 'store': return '/store';
+    case 'vidya': return '/vidya';
+    case 'shravan': return '/shravan';
+    case 'manan': return '/manan';
+    case 'pariksha': return '/pariksha';
+    case 'harmony-puzzle': return '/harmony-puzzle';
+    default: return '/';
+  }
+};
+
 const MainAppContent: React.FC = () => {
   const { openAuthModal, user, isEmailUnverified, loading, streak, openStreakModal, profile } = useAuth();
   const { isDark, toggleTheme } = useTheme();
-  const [currentView, setCurrentView] = useState<AppView>('landing');
+  const [currentView, setCurrentView] = useState<AppView>(() => pathToView(window.location.pathname));
+
+  // Sync currentView with browser URL history
+  useEffect(() => {
+    const targetPath = viewToPath(currentView);
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+  }, [currentView]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentView(pathToView(window.location.pathname));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
   const [selectedChapter, setSelectedChapter] = useState<SavedChapter | null>(null);
   const [activeShravanChapter, setActiveShravanChapter] = useState<SavedChapter | null>(null);
@@ -147,9 +194,8 @@ const MainAppContent: React.FC = () => {
   };
 
   const handleStartLearning = () => {
-    // Directly navigate to Learn Bhagavad Gita view
-    setCurrentView('bhagavad-gita');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Start learning opens the modal with options for Bhagavad Gita, Ramayana, and Custom PDF
+    setIsStartLearningModalOpen(true);
   };
 
   const handlePdfUploaded = (file: File) => {
@@ -180,7 +226,13 @@ const MainAppContent: React.FC = () => {
       {/* Modern, Persistent & Collapsible Sidebar (Replaces former floating Navbar) */}
       <Sidebar
         currentView={currentView}
-        onNavigateView={(view) => setCurrentView(view)}
+        onNavigateView={(view) => {
+          if (view === 'bhagavad-gita') {
+            setIsStartLearningModalOpen(true);
+          } else {
+            setCurrentView(view);
+          }
+        }}
         activeSection={activeSection}
         onNavigateSection={scrollToSection}
         onOpenGuruModal={() => setIsGuruModalOpen(true)}
@@ -297,9 +349,9 @@ const MainAppContent: React.FC = () => {
           {/* If user is logged in with email/password and unverified, gate dashboard behind verification screen */}
           {user && isEmailUnverified ? (
             <VerificationScreen />
-          ) : currentView === 'blank' ? (
-            /* Blank Page loaded on PDF Upload or opening a chapter */
-            <BlankPage
+          ) : currentView === 'vidya' ? (
+            /* Vidya Page loaded on PDF Upload or opening a chapter */
+            <VidyaPage
               uploadedFile={uploadedPdf}
               selectedChapter={selectedChapter}
               onNavigateHome={() => {
@@ -448,29 +500,7 @@ const MainAppContent: React.FC = () => {
               onPdfUpload={handlePdfUploaded}
               onNavigatePariksha={() => handleNavigatePariksha(selectedChapter)}
             />
-          ) : currentView === 'bhagavad-gita' ? (
-            /* Learn Bhagavad Gita Course View */
-            <BhagavadGitaView
-              onOpenGuruChatWithPrompt={(prompt) => {
-                setIsGuruModalOpen(true);
-              }}
-              onNavigateHome={() => {
-                if (user) {
-                  setCurrentView('dashboard');
-                } else {
-                  setCurrentView('landing');
-                }
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onNavigateMyBooks={() => {
-                if (user) {
-                  setCurrentView('my-chapters');
-                } else {
-                  openAuthModal();
-                }
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-            />
+
           ) : currentView === 'focus-mode' ? (
             /* Focus Mode Dedicated Dashboard View */
             <FocusModeView
@@ -561,6 +591,9 @@ const MainAppContent: React.FC = () => {
 
       {/* Profile Modal (Contains name textbox and Submit button, saving to Firestore) */}
       <ProfileModal />
+
+      {/* Settings Modal */}
+      <SettingsModal />
 
       {/* Guru AI Chatbot Modal */}
       <GuruModal

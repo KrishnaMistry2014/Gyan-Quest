@@ -5,6 +5,7 @@ import {
   Sparkles,
   Award
 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface CustomMaterialSectionProps {
   onPdfUpload?: (file: File) => void;
@@ -12,6 +13,7 @@ interface CustomMaterialSectionProps {
 
 export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ onPdfUpload }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { language, t } = useLanguage();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -39,11 +41,11 @@ export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ on
           className="text-3xl sm:text-4xl lg:text-[42px] font-bold tracking-tight font-serif-heading"
           style={{ color: 'var(--text-primary)' }}
         >
-          Master Any Chapter — Upload Your PDF
+          {t.customMaterialTitle}
         </h2>
 
         <p className="text-sm sm:text-base leading-relaxed max-w-2xl mx-auto font-normal" style={{ color: 'var(--text-secondary)' }}>
-          Have a coaching module, school handout, NCERT chapter, or textbook PDF you need to master? Upload it to generate a full 5-stage quest with notes, audio, and assessment.
+          {t.customMaterialSubtitle}
         </p>
       </div>
 

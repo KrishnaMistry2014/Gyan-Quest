@@ -11,6 +11,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface HeroProps {
   onStartQuest: () => void;
@@ -20,6 +21,7 @@ interface HeroProps {
 
 export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload }) => {
   const { openAuthModal, user } = useAuth();
+  const { language, t } = useLanguage();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const stages = [
@@ -27,7 +29,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
       num: '01',
       sanskrit: 'विद्या',
       title: 'Vidya',
-      desc: 'Structured reading & foundational concept synthesis',
+      desc: t.heroVidyaDesc,
       icon: BookOpen,
       xp: '10 XP',
     },
@@ -35,7 +37,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
       num: '02',
       sanskrit: 'श्रवण',
       title: 'Shravan',
-      desc: 'Immersive oral narration for auditory retention',
+      desc: t.heroShravanDesc,
       icon: Headphones,
       xp: '5 XP',
     },
@@ -43,7 +45,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
       num: '03',
       sanskrit: 'मनन',
       title: 'Manan',
-      desc: 'Deep contemplation & reflective concept assembly',
+      desc: t.heroMananDesc,
       icon: Brain,
       xp: '15 XP',
     },
@@ -51,7 +53,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
       num: '04',
       sanskrit: 'प्रश्न',
       title: 'Prashna',
-      desc: 'Socratic inquiry & doubt resolution with Guru',
+      desc: t.heroPrashnaDesc,
       icon: MessageCircleQuestion,
       xp: 'Optional',
     },
@@ -59,7 +61,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
       num: '05',
       sanskrit: 'परीक्षा',
       title: 'Pariksha',
-      desc: 'Mastery validation & adaptive retention check',
+      desc: t.heroParikshaDesc,
       icon: ClipboardCheck,
       xp: '50 XP',
     },
@@ -106,10 +108,10 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
           <div className="lg:col-span-7 space-y-6">
             {/* Elegant Sanskrit Kicker (Unboxed text with subtle separator) */}
             <div className="flex items-center gap-2 text-xs font-serif tracking-wider" style={{ color: 'var(--accent-saffron-text)' }}>
-              <span className="font-semibold text-sm">विद्या ददाति विनयं</span>
+              <span className="font-semibold text-sm">{t.heroSanskrit}</span>
               <span aria-hidden="true" className="opacity-40">·</span>
               <span className="text-[12px] uppercase tracking-widest font-sans font-medium opacity-85">
-                Vedic Inquiry Meets Modern Learning
+                {t.heroKicker}
               </span>
             </div>
 
@@ -119,11 +121,11 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
               className="text-4xl sm:text-5xl lg:text-[52px] font-bold tracking-tight leading-[1.12] font-serif-heading"
               style={{ color: 'var(--text-primary)' }}
             >
-              Transform Any Chapter Into a{' '}
+              {t.heroTitlePre}
               <span className="text-amber-600 dark:text-amber-400 font-serif">
-                5-Stage Journey
+                {t.heroTitleHighlight}
               </span>{' '}
-              of Wisdom
+              {t.heroTitlePost}
             </h1>
 
             {/* Description */}
@@ -132,7 +134,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
               className="text-base sm:text-lg leading-relaxed max-w-2xl font-normal"
               style={{ color: 'var(--text-secondary)' }}
             >
-              Gyan Quest revives the time-tested Indian tradition of deep scholastic inquiry — structured notes, attentive narration, thoughtful reflection, Socratic dialogue, and adaptive mastery. Upload any textbook chapter or PDF to embark on your quest.
+              {t.heroSubtitle}
             </p>
 
             {/* Action Buttons */}
@@ -147,7 +149,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
                   color: '#FFFFFF',
                 }}
               >
-                <span>Begin Your Quest</span>
+                <span>{t.beginQuest}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 
@@ -163,7 +165,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
                 }}
               >
                 <Compass className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                <span>Explore the 5 Stages</span>
+                <span>{t.exploreStages}</span>
               </button>
 
               <input

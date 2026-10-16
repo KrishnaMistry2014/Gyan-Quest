@@ -19,6 +19,7 @@ import {
 import { SavedChapter, saveChapter, generateUniqueChapterCode } from '../lib/chapters';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useLanguage } from '../context/LanguageContext';
 import { claimChapterStageReward } from '../lib/firebase';
 
 const EXTRACTION_STAGES = [
@@ -113,7 +114,7 @@ const extractTextFromBuffer = (buffer: ArrayBuffer): string => {
   }
 };
 
-interface BlankPageProps {
+interface VidyaPageProps {
   uploadedFile?: File | null;
   selectedChapter?: SavedChapter | null;
   onNavigateHome?: () => void;
@@ -125,7 +126,7 @@ interface BlankPageProps {
   onClearUploadedPdf?: () => void;
 }
 
-export const BlankPage: React.FC<BlankPageProps> = ({
+export const VidyaPage: React.FC<VidyaPageProps> = ({
   uploadedFile,
   selectedChapter,
   onNavigateHome,
@@ -138,6 +139,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
 }) => {
   const { user, updateProfileXp, isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const [status, setStatus] = useState<'idle' | 'processing' | 'done' | 'error'>('idle');
   const [stageMessage, setStageMessage] = useState<string>('Reading document text and diagrams...');
   const [summary, setSummary] = useState<string>('');
@@ -530,7 +532,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
 
   return (
     <div
-      id="blank-page"
+      id="vidya-page"
       className="flex-1 w-full min-h-[calc(100vh-5rem)] flex flex-col py-6 sm:py-10 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto"
       style={{ backgroundColor: 'var(--bg-main)' }}
     >
@@ -540,7 +542,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
         accept=".pdf,application/pdf"
         onChange={handleNewFile}
         className="hidden"
-        id="blank-page-file-upload-input"
+        id="vidya-page-file-upload-input"
       />
 
       {/* ==============================================================
@@ -548,7 +550,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
           ============================================================== */}
       {status === 'idle' && (
         <div
-          id="blank-page-idle-view"
+          id="vidya-page-idle-view"
           className="flex-1 flex flex-col items-center justify-center text-center p-8 sm:p-14 my-auto rounded-3xl border shadow-sm max-w-lg mx-auto w-full transition-all"
           style={{
             backgroundColor: 'var(--bg-card)',
@@ -567,7 +569,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
           </div>
 
           <h3 className="text-xl sm:text-2xl font-bold tracking-tight mb-2" style={{ color: 'var(--text-primary)' }}>
-            Upload Chapter to Begin
+            Upload Chapter to Begin Vidya
           </h3>
 
           <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--text-secondary)' }}>
@@ -594,7 +596,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
           ============================================================== */}
       {status === 'processing' && (
         <div
-          id="blank-page-loading-view"
+          id="vidya-page-loading-view"
           className="flex-1 flex flex-col items-center justify-center text-center p-8 sm:p-14 my-auto rounded-3xl border shadow-sm max-w-2xl mx-auto w-full transition-all"
           style={{
             backgroundColor: 'var(--bg-card)',
@@ -616,7 +618,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
             className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2"
             style={{ color: 'var(--text-primary)' }}
           >
-            Reading Your Chapter
+            {t.readingChapter}
           </h2>
 
           {activeFile?.name && (
@@ -648,7 +650,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
             }}
           >
             <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-            <span>Please do not leave this page while processing</span>
+            <span>{t.pleaseDoNotLeave}</span>
           </div>
 
           {/* Cancel Option to abort extraction */}
@@ -663,7 +665,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
             }}
           >
             <XCircle className="w-4 h-4" />
-            <span>Cancel Extraction</span>
+            <span>{t.cancelExtraction}</span>
           </button>
         </div>
       )}
@@ -673,7 +675,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
           ============================================================== */}
       {status === 'error' && (
         <div
-          id="blank-page-error-view"
+          id="vidya-page-error-view"
           className="flex-1 flex flex-col items-center justify-center text-center p-8 sm:p-12 my-auto rounded-3xl border shadow-sm max-w-lg mx-auto w-full"
           style={{
             backgroundColor: 'var(--bg-card)',
@@ -685,7 +687,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
           </div>
 
           <h3 className="text-xl sm:text-2xl font-bold tracking-tight mb-2" style={{ color: 'var(--text-primary)' }}>
-            Could Not Read Document
+            {t.couldNotReadDoc}
           </h3>
 
           <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--text-secondary)' }}>
@@ -705,7 +707,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                 }}
               >
                 <RefreshCw className="w-4 h-4" />
-                <span>Try Again</span>
+                <span>{t.tryAgain}</span>
               </button>
             )}
 
@@ -721,7 +723,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
               }}
             >
               <UploadCloud className="w-4 h-4" />
-              <span>Select Another PDF</span>
+              <span>{t.selectAnotherPdf}</span>
             </button>
 
             {onNavigateDashboard && (
@@ -734,7 +736,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                   color: 'var(--text-primary)',
                 }}
               >
-                Back to Dashboard
+                {t.backToDashboard}
               </button>
             )}
           </div>
@@ -745,7 +747,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
           STATE 3: COMPLETED STUDY NOTES
           ============================================================== */}
       {status === 'done' && (
-        <div id="blank-page-summary-view" className="space-y-6">
+        <div id="vidya-page-summary-view" className="space-y-6">
           {/* Top Action Bar */}
           <div
             className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl border shadow-xs"
@@ -798,7 +800,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                   title="View all saved chapters"
                 >
                   <Layers className="w-3.5 h-3.5 text-orange-500" />
-                  <span>My Chapters</span>
+                  <span>{t.navMyChapters}</span>
                 </button>
               )}
 
@@ -816,12 +818,12 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                 {copied ? (
                   <>
                     <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Copied!</span>
+                    <span>{t.copied}</span>
                   </>
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Copy Vidya</span>
+                    <span>{t.copy}</span>
                   </>
                 )}
               </button>
@@ -838,7 +840,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                 title="Print or save as PDF"
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span>Print</span>
+                <span>{t.print}</span>
               </button>
 
               <button
@@ -851,7 +853,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                 }}
               >
                 <UploadCloud className="w-3.5 h-3.5" />
-                <span>New PDF</span>
+                <span>{t.uploadAnotherPdf}</span>
               </button>
             </div>
           </div>
@@ -992,7 +994,7 @@ export const BlankPage: React.FC<BlankPageProps> = ({
                     color: '#FFFFFF',
                   }}
                 >
-                  <span>Go to Shravan</span>
+                  <span>{t.proceedToShravan}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               )}

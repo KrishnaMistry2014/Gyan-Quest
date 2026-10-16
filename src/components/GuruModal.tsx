@@ -20,7 +20,6 @@ import {
 interface GuruModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialPrompt?: string;
 }
 
 const INITIAL_GURU_MESSAGE: ChatMessage = {
@@ -38,7 +37,7 @@ const SUGGESTED_QUESTIONS = [
   'Explain the concepts of Dharma and Karma',
 ];
 
-export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose, initialPrompt }) => {
+export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_GURU_MESSAGE]);
   const [inputText, setInputText] = useState<string>('');
@@ -52,16 +51,6 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose, initialPr
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
-
-  // Set initialPrompt if provided
-  useEffect(() => {
-    if (isOpen && initialPrompt) {
-      setInputText(initialPrompt);
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 150);
-    }
-  }, [isOpen, initialPrompt]);
 
   // Load chat history from Firestore when modal opens
   useEffect(() => {
