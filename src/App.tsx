@@ -26,6 +26,8 @@ import { ShravanPage } from './components/ShravanPage';
 import { MananPage } from './components/MananPage';
 import { ParikshaView } from './components/ParikshaView';
 import { BhagavadGitaView } from './components/BhagavadGitaView';
+import { RamayanaView } from './components/RamayanaView';
+import { MahabharataView } from './components/MahabharataView';
 import { StoreView } from './components/StoreView';
 import { FocusModeView } from './components/FocusModeView';
 import { SavedChapter } from './lib/chapters';
@@ -49,6 +51,26 @@ The Ramayana, composed by Sage Valmiki, chronicles the eternal journey of Sri Ra
 
 ## Student Wisdom:
 True strength is built through quiet, daily choices. Just as Rama remained balanced in the palace and in the forest, a dedicated student practices calm focus and truthfulness in study and daily life.`,
+  createdAt: new Date().toISOString(),
+};
+
+const MAHABHARATA_CHAPTER: SavedChapter = {
+  id: 'epic_mahabharata_dharma',
+  uniqueCode: '9028374156',
+  title: 'Mahabharata: The Epic of Duty, Wisdom, and Righteous Choices',
+  fileName: 'Mahabharata_Vyasa_Epic_Wisdom.pdf',
+  summary: `# Mahabharata: The Epic of Duty, Wisdom, and Righteous Choices
+
+The Mahabharata, composed by Sage Vedavyasa, is the monumental epic chronicling the Kurukshetra War and the eternal victory of Dharma over adharma.
+
+## Core Pillars for Young Scholars (Grades 4–8):
+1. **Dharma-Sankat (Moral Courage)**: Making righteous choices when faced with complex ethical dilemmas.
+2. **Nishkama Karma (Action without Attachment)**: Giving your 100% to your studies and duties without anxiety over exam scores or rewards.
+3. **Friendship & Loyalty (Karna & Duryodhana / Krishna & Arjuna)**: The power of steadfast loyalty, truth, and righteous counsel.
+4. **Mindfulness & Self-Mastery**: Controlling the senses and mastering the inner chariot of the mind.
+
+## Student Wisdom:
+True victory belongs to those who stand by truth and integrity in every situation.`,
   createdAt: new Date().toISOString(),
 };
 
@@ -447,6 +469,52 @@ const MainAppContent: React.FC = () => {
               onPdfUpload={handlePdfUploaded}
               onNavigatePariksha={() => handleNavigatePariksha(selectedChapter)}
             />
+          ) : currentView === 'ramayana' ? (
+            /* Learn Ramayana Course View */
+            <RamayanaView
+              onOpenGuruChatWithPrompt={(prompt) => {
+                setIsGuruModalOpen(true);
+              }}
+              onNavigateHome={() => {
+                if (user) {
+                  setCurrentView('dashboard');
+                } else {
+                  setCurrentView('landing');
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateMyBooks={() => {
+                if (user) {
+                  setCurrentView('my-chapters');
+                } else {
+                  openAuthModal();
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          ) : currentView === 'mahabharata' ? (
+            /* Learn Mahabharata Course View */
+            <MahabharataView
+              onOpenGuruChatWithPrompt={(prompt) => {
+                setIsGuruModalOpen(true);
+              }}
+              onNavigateHome={() => {
+                if (user) {
+                  setCurrentView('dashboard');
+                } else {
+                  setCurrentView('landing');
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateMyBooks={() => {
+                if (user) {
+                  setCurrentView('my-chapters');
+                } else {
+                  openAuthModal();
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
           ) : currentView === 'bhagavad-gita' ? (
             /* Learn Bhagavad Gita Course View */
             <BhagavadGitaView
@@ -533,7 +601,7 @@ const MainAppContent: React.FC = () => {
       {/* Firebase Authentication Modal */}
       <AuthModal />
 
-      {/* Start Learning Modal (Bhagavad Gita & Ramayana Options) */}
+      {/* Start Learning Modal (Bhagavad Gita, Ramayana, Mahabharata Options) */}
       <StartLearningModal
         isOpen={isStartLearningModalOpen}
         onClose={() => setIsStartLearningModalOpen(false)}
@@ -542,9 +610,11 @@ const MainAppContent: React.FC = () => {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onSelectRamayana={() => {
-          setSelectedChapter(RAMAYANA_CHAPTER);
-          setUploadedPdf(null);
-          setCurrentView('blank');
+          setCurrentView('ramayana');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onSelectMahabharata={() => {
+          setCurrentView('mahabharata');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onUploadCustomPdf={() => {
