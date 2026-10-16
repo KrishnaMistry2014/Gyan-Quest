@@ -3,6 +3,7 @@ import {
   BookOpenText,
   Home,
   BookOpen,
+  Scroll,
   Sparkles,
   Clock,
   Flame,
@@ -35,6 +36,7 @@ export type AppView =
   | 'shravan'
   | 'manan'
   | 'pariksha'
+  | 'bhagavad-gita'
   | 'focus-mode'
   | 'store'
   | 'gita-game'
@@ -122,6 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentView === 'pariksha';
 
   const isPuzzleActive = currentView === 'harmony-puzzle';
+  const isGitaActive = currentView === 'bhagavad-gita';
   const isFocusActive = currentView === 'focus-mode';
   const isStoreActive = currentView === 'store';
   const isAboutActive = currentView === 'landing' && activeSection === 'about';
@@ -170,6 +173,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       case 'guru-ai':
         onOpenGuruModal();
+        break;
+
+      case 'bhagavad-gita':
+        onNavigateView('bhagavad-gita');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
 
       case 'harmony-puzzle':
@@ -409,6 +417,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {renderNavItem('home', t.navHome, Home, isHomeActive)}
+          {renderNavItem('bhagavad-gita', t.navLearnScriptures, Scroll, isGitaActive)}
           {renderNavItem(
             'guru-ai',
             t.navGuruAi,
