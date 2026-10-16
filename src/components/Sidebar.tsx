@@ -480,26 +480,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* GROUP 3: EXPLORE AND ACCOUNT */}
-        <div className="space-y-1">
-          {!isCollapsed ? (
-            <div
-              className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider select-none"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {t.groupExploreAccount}
-            </div>
-          ) : (
-            <div className="my-2 border-t" style={{ borderColor: 'var(--border-warm)' }} />
-          )}
 
-          {renderNavItem('store', t.navStore, ShoppingBag, isStoreActive)}
-          {renderNavItem('my-chapters', t.navMyChapters, BookOpen, currentView === 'my-chapters')}
-          {renderNavItem('upload-pdf', t.navUploadTextbooks, UploadCloud, currentView === 'blank')}
-          {renderNavItem('profile', t.navProfile, UserIcon, isProfileActive)}
-          {renderNavItem('about', t.navAbout, Info, isAboutActive)}
-          {renderNavItem('settings', t.navSettings, Settings, isSettingsModalOpen)}
-        </div>
       </div>
 
       {/* 3. Account / Status Footer */}
