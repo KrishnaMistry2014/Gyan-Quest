@@ -3,6 +3,7 @@ import {
   BookOpenText,
   Home,
   BookOpen,
+  Scroll,
   Sparkles,
   Clock,
   Flame,
@@ -123,6 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentView === 'pariksha';
 
   const isPuzzleActive = currentView === 'harmony-puzzle';
+  const isGitaActive = currentView === 'bhagavad-gita';
   const isFocusActive = currentView === 'focus-mode';
   const isStoreActive = currentView === 'store';
   const isAboutActive = currentView === 'landing' && activeSection === 'about';
@@ -171,6 +173,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       case 'guru-ai':
         onOpenGuruModal();
+        break;
+
+      case 'bhagavad-gita':
+        onNavigateView('bhagavad-gita');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
 
       case 'harmony-puzzle':
@@ -410,12 +417,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {renderNavItem('home', t.navHome, Home, isHomeActive)}
-          {renderNavItem(
-            'my-books',
-            t.navMyBooks,
-            BookOpen,
-            isMyBooksActive
-          )}
+          {renderNavItem('bhagavad-gita', t.navLearnScriptures, Scroll, isGitaActive)}
           {renderNavItem(
             'guru-ai',
             t.navGuruAi,
@@ -448,19 +450,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {renderNavItem('focus-mode', t.navFocusMode, Clock, isFocusActive)}
           {renderNavItem(
-            'harmony-puzzle',
-            t.navHarmonyPuzzle,
-            Puzzle,
-            isPuzzleActive,
-            <span
-              className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-              style={{
-                backgroundColor: 'var(--accent-saffron)',
-                color: '#FFFFFF',
-              }}
-            >
-              12P
-            </span>
+            'my-books',
+            t.navMyBooks,
+            BookOpen,
+            isMyBooksActive
           )}
           {renderNavItem(
             'streaks',
@@ -478,6 +471,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>{streak}d</span>
             </span>
           )}
+        </div>
+
+        {/* GROUP 3: EXPLORE AND ACCOUNT */}
+        <div className="space-y-1">
+          {!isCollapsed ? (
+            <div
+              className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider select-none"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {t.groupExploreAccount}
+            </div>
+          ) : (
+            <div className="my-2 border-t" style={{ borderColor: 'var(--border-warm)' }} />
+          )}
+
+          {renderNavItem('about', t.navAbout, Info, isAboutActive)}
+          {renderNavItem('settings', t.navSettings, Settings, isSettingsModalOpen)}
         </div>
 
 

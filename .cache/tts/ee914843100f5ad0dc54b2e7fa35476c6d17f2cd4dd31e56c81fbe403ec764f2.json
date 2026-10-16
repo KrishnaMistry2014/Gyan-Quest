@@ -1,7 +1,0 @@
-{
-  "model": "gemini-3.8-flash-tts",
-  "voice": "Puck",
-  "createdAt": "2026-10-16T04:10:44.315Z",
-  "textLength": 76,
-  "audioBytes": 257634
-}
