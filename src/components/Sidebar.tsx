@@ -123,8 +123,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentView === 'manan' ||
     currentView === 'pariksha';
 
+  const isGitaActive = currentView === 'bhagavad-gita' || currentView === 'gita-game' || currentView === 'gita-reader';
   const isPuzzleActive = currentView === 'harmony-puzzle';
-  const isGitaActive = currentView === 'bhagavad-gita';
   const isFocusActive = currentView === 'focus-mode';
   const isStoreActive = currentView === 'store';
   const isAboutActive = currentView === 'landing' && activeSection === 'about';
@@ -171,13 +171,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
 
-      case 'guru-ai':
-        onOpenGuruModal();
-        break;
-
       case 'bhagavad-gita':
         onNavigateView('bhagavad-gita');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+
+      case 'guru-ai':
+        onOpenGuruModal();
         break;
 
       case 'harmony-puzzle':
@@ -417,7 +417,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {renderNavItem('home', t.navHome, Home, isHomeActive)}
-          {renderNavItem('bhagavad-gita', t.navLearnScriptures, Scroll, isGitaActive)}
+          {renderNavItem(
+            'my-books',
+            t.navMyBooks,
+            BookOpen,
+            isMyBooksActive
+          )}
+          {renderNavItem('bhagavad-gita', t.navLearnGita, Scroll, isGitaActive)}
           {renderNavItem(
             'guru-ai',
             t.navGuruAi,
@@ -450,10 +456,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {renderNavItem('focus-mode', t.navFocusMode, Clock, isFocusActive)}
           {renderNavItem(
-            'my-books',
-            t.navMyBooks,
-            BookOpen,
-            isMyBooksActive
+            'harmony-puzzle',
+            t.navHarmonyPuzzle,
+            Puzzle,
+            isPuzzleActive,
+            <span
+              className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+              style={{
+                backgroundColor: 'var(--accent-saffron)',
+                color: '#FFFFFF',
+              }}
+            >
+              12P
+            </span>
           )}
           {renderNavItem(
             'streaks',
@@ -486,11 +501,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="my-2 border-t" style={{ borderColor: 'var(--border-warm)' }} />
           )}
 
+          {renderNavItem('store', t.navStore, ShoppingBag, isStoreActive)}
+          {renderNavItem('my-chapters', t.navMyChapters, BookOpen, currentView === 'my-chapters')}
+          {renderNavItem('upload-pdf', t.navUploadTextbooks, UploadCloud, currentView === 'blank')}
+          {renderNavItem('profile', t.navProfile, UserIcon, isProfileActive)}
           {renderNavItem('about', t.navAbout, Info, isAboutActive)}
           {renderNavItem('settings', t.navSettings, Settings, isSettingsModalOpen)}
         </div>
-
-
       </div>
 
       {/* 3. Account / Status Footer */}
