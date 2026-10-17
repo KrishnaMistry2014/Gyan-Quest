@@ -529,7 +529,10 @@ const MainAppContent: React.FC = () => {
                 onStartLearning={handleStartLearning}
               />
 
-              <CustomMaterialSection onPdfUpload={handlePdfUploaded} />
+              <CustomMaterialSection 
+                onPdfUpload={handlePdfUploaded} 
+                onStartLearning={handleStartLearning}
+              />
             </div>
           )}
         </main>

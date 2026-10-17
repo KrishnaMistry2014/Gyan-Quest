@@ -6,14 +6,17 @@ import {
   Award
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 
 interface CustomMaterialSectionProps {
   onPdfUpload?: (file: File) => void;
+  onStartLearning?: () => void;
 }
 
-export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ onPdfUpload }) => {
+export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ onPdfUpload, onStartLearning }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { language, t } = useLanguage();
+  const { user, openAuthModal } = useAuth();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -51,7 +54,7 @@ export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ on
 
       {/* 3 Pipeline Step Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Step 1: Upload */}
+        {/* Step 1: Upload / Scriptures & Custom PDF */}
         <div
           className="rounded-2xl border p-6 text-center shadow-xs flex flex-col items-center justify-between space-y-4"
           style={{
@@ -59,9 +62,9 @@ export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ on
             borderColor: 'var(--border-warm)',
           }}
         >
-          <div className="space-y-3 flex flex-col items-center">
+          <div className="space-y-3 flex flex-col items-center w-full">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center border"
+              className="w-10 h-10 rounded-xl flex items-center justify-center border mx-auto"
               style={{
                 backgroundColor: 'var(--bg-main)',
                 borderColor: 'var(--border-warm)',
@@ -76,11 +79,11 @@ export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ on
             </div>
 
             <h3 className="text-lg font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-              Upload Chapter PDF
+              Scriptures & Custom PDF
             </h3>
 
-            <p className="text-xs sm:text-sm leading-relaxed max-w-xs font-normal" style={{ color: 'var(--text-secondary)' }}>
-              Select any school textbook chapter, syllabus handout, or coaching PDF document.
+            <p className="text-xs sm:text-sm leading-relaxed max-w-xs font-normal mx-auto" style={{ color: 'var(--text-secondary)' }}>
+              Explore ancient scriptures or upload your textbook chapter PDF. Sign in required.
             </p>
           </div>
 
@@ -93,19 +96,47 @@ export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ on
             id="landing-pdf-upload-input"
           />
 
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold border transition-all hover:opacity-90 active:scale-95 cursor-pointer shadow-2xs"
-            style={{
-              backgroundColor: 'var(--accent-saffron)',
-              borderColor: 'var(--accent-saffron)',
-              color: '#FFFFFF',
-            }}
-          >
-            <UploadCloud className="w-4 h-4" />
-            <span>Select PDF File</span>
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (!user) {
+                  openAuthModal();
+                } else {
+                  onStartLearning?.();
+                }
+              }}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all hover:opacity-90 active:scale-95 cursor-pointer shadow-2xs"
+              style={{
+                backgroundColor: 'var(--bg-main)',
+                borderColor: 'var(--border-warm)',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-amber-600" />
+              <span>Scriptures</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!user) {
+                  openAuthModal();
+                } else {
+                  fileInputRef.current?.click();
+                }
+              }}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all hover:opacity-90 active:scale-95 cursor-pointer shadow-2xs"
+              style={{
+                backgroundColor: 'var(--accent-saffron)',
+                borderColor: 'var(--accent-saffron)',
+                color: '#FFFFFF',
+              }}
+            >
+              <UploadCloud className="w-3.5 h-3.5" />
+              <span>Upload PDF</span>
+            </button>
+          </div>
         </div>
 
         {/* Step 2: Synthesis */}
