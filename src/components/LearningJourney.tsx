@@ -89,7 +89,7 @@ const STAGES: StageData[] = [
     isOptional: false,
     shloka: 'सिद्धेः प्रमाणं परीक्षा · Assessment is the verification of mastery',
     essence: 'Validation of true learning—ensuring knowledge is permanent, dependable, and durable.',
-    action: 'Demonstrate retention through an adaptive 5-question chapter test with detailed rationale.',
+    action: 'Solve the 25-word chapter crossword exam. Each word solved has a weightage of 2 XP.',
     outcome: 'Verified chapter mastery, achievement milestone, and 50 XP added to your scholar journey.',
   },
 ];

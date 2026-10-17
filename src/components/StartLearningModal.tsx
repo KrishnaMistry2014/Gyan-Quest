@@ -6,6 +6,7 @@ interface StartLearningModalProps {
   onClose: () => void;
   onSelectGita?: () => void;
   onSelectRamayana?: () => void;
+  onSelectMahabharata?: () => void;
   onUploadCustomPdf?: () => void;
 }
 
@@ -14,6 +15,7 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
   onClose,
   onSelectGita,
   onSelectRamayana,
+  onSelectMahabharata,
   onUploadCustomPdf,
 }) => {
   if (!isOpen) return null;
@@ -116,7 +118,39 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
             </div>
           </button>
 
-          {/* Option 3: Custom PDF Upload */}
+          {/* Option 3: Learn Mahabharata */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectMahabharata?.();
+              onClose();
+            }}
+            className="w-full p-4 rounded-2xl border text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center gap-4 shadow-2xs group"
+            style={{
+              backgroundColor: 'var(--bg-main)',
+              borderColor: 'var(--border-warm)',
+            }}
+          >
+            <div
+              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform"
+              style={{
+                backgroundColor: 'var(--accent-saffron-light)',
+                color: 'var(--accent-saffron-text)',
+              }}
+            >
+              <BookOpen className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+                Learn Mahabharata
+              </h4>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                Vyasa Itihasa · Dharma, focus, selflessness & Kurukshetra
+              </p>
+            </div>
+          </button>
+
+          {/* Option 4: Custom PDF Upload */}
           <button
             type="button"
             onClick={() => {

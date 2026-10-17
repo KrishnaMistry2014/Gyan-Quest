@@ -21,16 +21,21 @@ import { CrosswordData, CrosswordWord, CrosswordDifficulty } from '../types';
 import { SAMPLE_CROSSWORDS } from '../lib/sampleCrosswords';
 import { SavedChapter } from '../lib/chapters';
 import { buildValidCrosswordLayout, hasNoLetterCollisions } from '../lib/crosswordGenerator';
+import { useAuth } from '../context/AuthContext';
 
 interface GyanQuestCrosswordProps {
   initialChapter?: SavedChapter;
   onExit?: () => void;
+  onComplete?: () => void;
 }
 
 export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
   initialChapter,
   onExit,
+  onComplete,
 }) => {
+  const { profile, updateProfileXp, recordStreakActivity } = useAuth();
+  const rewardClaimedRef = useRef<boolean>(false);
   const [view, setView] = useState<'welcome' | 'playing'>(initialChapter ? 'playing' : 'welcome');
   const [puzzle, setPuzzle] = useState<CrosswordData | null>(null);
   const [samples, setSamples] = useState<CrosswordData[]>(SAMPLE_CROSSWORDS);
@@ -357,6 +362,15 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
     if (allCorrect && Object.keys(userLetters).length > 0) {
       setGameStatus('won');
       setIsTimerRunning(false);
+      if (!rewardClaimedRef.current) {
+        rewardClaimedRef.current = true;
+        const totalXp = 50; // 25 words * 2 XP = 50 XP
+        const newXp = (profile?.xp || 0) + totalXp;
+        updateProfileXp(newXp);
+        recordStreakActivity('pariksha_mastery');
+        showToast('Crossword Mastered! +50 XP (25 words × 2 XP)', 'success');
+        onComplete?.();
+      }
       try {
         confetti({
           particleCount: 120,

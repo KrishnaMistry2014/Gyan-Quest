@@ -176,6 +176,50 @@ export function buildValidCrosswordLayout(
     }
   }
 
+  // 1.5 If fewer than target words were placed, attempt to safely place remaining candidate words
+  // with at least 1-cell border spacing from existing cells
+  const targetWordCount = 25;
+  if (placedWords.length < targetWordCount && candidates.length > placedWords.length) {
+    const placedSet = new Set(placedWords.map((pw) => pw.answer));
+    const unplaced = candidates.filter((c) => !placedSet.has(c.answer));
+
+    let scanRow = 0;
+    for (const pw of placedWords) {
+      scanRow = Math.max(scanRow, pw.row + (pw.direction === 'down' ? pw.answer.length : 1));
+    }
+    scanRow += 2; // Add safe margin
+
+    for (const cand of unplaced) {
+      if (placedWords.length >= targetWordCount) break;
+
+      // Check if placing across at scanRow, col 0 is free
+      let canPlace = true;
+      for (let c = -1; c <= cand.answer.length; c++) {
+        for (let r = scanRow - 1; r <= scanRow + 1; r++) {
+          if (grid.has(key(r, c))) {
+            canPlace = false;
+            break;
+          }
+        }
+        if (!canPlace) break;
+      }
+
+      if (canPlace) {
+        for (let c = 0; c < cand.answer.length; c++) {
+          grid.set(key(scanRow, c), cand.answer[c]);
+        }
+        placedWords.push({
+          answer: cand.answer,
+          clue: cand.clue,
+          direction: 'across',
+          row: scanRow,
+          col: 0,
+        });
+        scanRow += 2; // Leave blank row between
+      }
+    }
+  }
+
   // 2. Normalize coordinates to start from (0, 0)
   let minR = 0;
   let maxR = 0;

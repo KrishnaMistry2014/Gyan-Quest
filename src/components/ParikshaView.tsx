@@ -93,7 +93,7 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
                 color: 'var(--text-muted)',
               }}
             >
-              {language === 'hi' ? 'क्रॉसवर्ड प्रश्न परीक्षण' : 'Crossword Question Exam'}
+              {language === 'hi' ? '२५ शब्द • प्रति शब्द २ XP (कुल ५० XP)' : '25 Words • 2 XP per Word (50 XP Total)'}
             </span>
           </div>
 
@@ -103,8 +103,8 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
 
           <p className="text-xs sm:text-sm max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
             {language === 'hi'
-              ? 'प्रश्नों के उत्तर दाएं फलक (Right Pane) में दिए गए संकेतों से पढ़ें और बिना विकल्प के क्रॉसवर्ड में सही उत्तर लिखें।'
-              : 'Answer the chapter assessment questions given as clue prompts on the right pane by filling answers directly into the crossword puzzle grid.'}
+              ? 'अध्याय के २५ प्रश्नों के उत्तर क्रॉसवर्ड में लिखें। प्रत्येक सही शब्द पर २ XP प्राप्त होंगे (कुल ५० XP)।'
+              : 'Conquer the 25-word chapter assessment crossword. Each solved word carries a weightage of 2 XP, awarding up to 50 XP upon completion.'}
           </p>
         </div>
 
@@ -149,6 +149,7 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
         <GyanQuestCrossword
           initialChapter={activeChapter || undefined}
           onExit={onNavigateDashboard || onNavigateHome}
+          onComplete={handleParikshaCompleted}
         />
       </div>
     </div>

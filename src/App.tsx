@@ -29,66 +29,12 @@ import { ParikshaView } from './components/ParikshaView';
 import { StoreView } from './components/StoreView';
 import { FocusModeView } from './components/FocusModeView';
 import { SavedChapter } from './lib/chapters';
+import { SCRIPTURES } from './lib/scriptureData';
 import { Menu, BookOpenText, Sun, Moon, Flame, Zap } from 'lucide-react';
 
-const RAMAYANA_CHAPTER: SavedChapter = {
-  id: 'epic_ramayana_dharma',
-  uniqueCode: '7849201533',
-  title: 'Ramayana: The Path of Truth, Courage, and Righteous Duty',
-  fileName: 'Ramayana_Valmiki_Epic_Wisdom.pdf',
-  summary: `# Ramayana: The Path of Truth, Courage, and Righteous Duty
-
-The Ramayana, composed by Sage Valmiki, chronicles the eternal journey of Sri Rama of Ayodhya, exemplifying Maryada Purushottama (the ideal embodiment of truth, duty, humility, and steadfast righteousness).
-
-## Core Pillars for Young Scholars (Grades 4–8):
-1. **Satya (Truthfulness)**: Rama's unwavering adherence to his father King Dasharatha's word, joyfully embracing fourteen years of forest exile rather than compromising on truth.
-2. **Dharma (Righteous Action)**: Prioritizing moral duty and the protection of others above personal convenience or comfort.
-3. **Bhratru-prema (Brotherly Loyalty)**: The selfless devotion of Lakshmana, Bharata, and Shatrughna in supporting one another through every challenge.
-4. **Bhakti & Focus (Hanuman's Dedication)**: Facing immense hurdles with single-minded courage, wisdom, and humility.
-5. **Harmony with Nature**: Honoring forests, rivers, and living creatures with reverence and gratitude.
-
-## Student Wisdom:
-True strength is built through quiet, daily choices. Just as Rama remained balanced in the palace and in the forest, a dedicated student practices calm focus and truthfulness in study and daily life.`,
-  createdAt: new Date().toISOString(),
-};
-
-const GITA_CHAPTER: SavedChapter = {
-  id: 'gita_chapter_6_17',
-  uniqueCode: '6170061700',
-  title: 'Bhagavad Gita: Dhyana Yoga (Verse 6.17)',
-  fileName: 'Bhagavad_Gita_Chapter_6_Verse_17.pdf',
-  summary: `# Bhagavad Gita for Students
-## Become the Architect of Your Own Success Through Timeless Ancient Wisdom
-
-### Chapter 6: Dhyana Yoga - Verse 6.17
-
-Have you ever felt too busy or cluttered with homework, projects, classes, or studies? Timeless ancient wisdom revealed about 5000 years ago in the holy Bhagavad Gita will help you find a solution and discover enduring success in life. Verse 6.17 emphasizes the supreme importance of daily balance and prioritization.
-
-> *yuktahara-viharasya yukta-cestasya karmasu*
-> *yukta-swapnavabodhasya yogo bhavati duhkha-ha*
-
-> *"He who is regulated in his habits of eating, sleeping, recreation, and work can mitigate all material pains by practicing the yoga system."*
-
-### Word-by-Word Breakdown:
-- **yukta** — regulated, balanced
-- **ahara** — eating, nourishment
-- **viharasya** — recreation, joyful leisure
-- **cestasya** — of one who works with purpose
-- **karmasu** — in discharging duties and studies
-- **swapna-avabodhasya** — sleep and wakefulness
-- **yogo** — practice of yoga and mindfulness
-- **bhavati** — becomes
-- **duhkha-ha** — diminishing all pains and anxiety
-
-### Practical Pillars for Student Success:
-1. **Regulated Resting**: Maintaining 8–10 hours of restorative sleep to ensure sharp memory recall, quick reaction times, and calm clarity of thought.
-2. **Regulated Eating**: Treating the physical body like a sacred machine fueled with nutrient-rich foods, fruits, and hydration rather than processed snacks.
-3. **Staying Active**: Regular daily movement, sports, or yoga to cultivate physical vitality and reduce mental stress.
-4. **Regulated Work & Study**: Approaching academic tasks with dedicated concentration (Sankalp) and periodic breaks, avoiding rushed last-minute panic.
-5. **Mindful Recreation**: Enjoying creative, rejuvenating hobbies in balanced moderation to refresh the intellect without distraction.
-6. **Habit Formation**: Practicing daily discipline consistently for 21 days or more to forge unbreakable habits of focus and peace.`,
-  createdAt: new Date().toISOString(),
-};
+const RAMAYANA_CHAPTER: SavedChapter = SCRIPTURES.ramayana;
+const GITA_CHAPTER: SavedChapter = SCRIPTURES.gita;
+const MAHABHARATA_CHAPTER: SavedChapter = SCRIPTURES.mahabharata;
 
 const pathToView = (path: string): AppView => {
   const cleanPath = path.replace(/\/$/, '');
@@ -264,10 +210,7 @@ const MainAppContent: React.FC = () => {
         currentView={currentView}
         onNavigateView={(view) => {
           if (view === 'bhagavad-gita') {
-            setSelectedChapter(GITA_CHAPTER);
-            setUploadedPdf(null);
-            setCurrentView('vidya');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setIsStartLearningModalOpen(true);
           } else {
             setCurrentView(view);
           }
@@ -615,6 +558,12 @@ const MainAppContent: React.FC = () => {
         }}
         onSelectRamayana={() => {
           setSelectedChapter(RAMAYANA_CHAPTER);
+          setUploadedPdf(null);
+          setCurrentView('vidya');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onSelectMahabharata={() => {
+          setSelectedChapter(MAHABHARATA_CHAPTER);
           setUploadedPdf(null);
           setCurrentView('vidya');
           window.scrollTo({ top: 0, behavior: 'smooth' });
