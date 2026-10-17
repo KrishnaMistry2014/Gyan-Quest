@@ -1050,35 +1050,37 @@ export const MananPage: React.FC<MananPageProps> = ({
 
             {/* Difficulty, Model & Reset controls */}
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-              {isAiGenerated ? (
-                <div
-                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border shadow-2xs"
-                  style={{
-                    backgroundColor: 'var(--bg-main)',
-                    borderColor: 'var(--border-warm)',
-                    color: 'var(--accent-saffron-text)',
-                  }}
-                  title="AI Image Generator"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Powered by Krea 2 Turbo</span>
-                </div>
-              ) : (
-                <div
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border shadow-2xs bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200"
-                  title="Chapter Educational Concept Visual"
-                >
-                  <Brain className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                  <span>Chapter Visual</span>
-                  <button
-                    type="button"
-                    onClick={() => loadPuzzleImage(true)}
-                    className="ml-1 text-[11px] underline font-bold hover:text-amber-600 cursor-pointer"
-                    title="Retry generating with Krea 2 Turbo"
+              {!scripture && (
+                isAiGenerated ? (
+                  <div
+                    className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border shadow-2xs"
+                    style={{
+                      backgroundColor: 'var(--bg-main)',
+                      borderColor: 'var(--border-warm)',
+                      color: 'var(--accent-saffron-text)',
+                    }}
+                    title="AI Image Generator"
                   >
-                    Retry Krea 2 Turbo
-                  </button>
-                </div>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Powered by Krea 2 Turbo</span>
+                  </div>
+                ) : (
+                  <div
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border shadow-2xs bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200"
+                    title="Chapter Educational Concept Visual"
+                  >
+                    <Brain className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>Chapter Visual</span>
+                    <button
+                      type="button"
+                      onClick={() => loadPuzzleImage(true)}
+                      className="ml-1 text-[11px] underline font-bold hover:text-amber-600 cursor-pointer"
+                      title="Retry generating with Krea 2 Turbo"
+                    >
+                      Retry Krea 2 Turbo
+                    </button>
+                  </div>
+                )
               )}
 
               <div className="inline-flex rounded-xl p-0.5 border" style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-warm)' }}>

@@ -663,60 +663,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             {chapter.title.replace(/^Vidya:\s*/i, '')}
           </p>
 
-          {/* Teacher Voice Selector */}
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-            <span className="text-xs font-semibold mr-1" style={{ color: 'var(--text-secondary)' }}>
-              {t.teacherVoiceStyle}
-            </span>
-            <button
-              type="button"
-              onClick={() => setSelectedVoice('Adinath')}
-              className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
-                selectedVoice === 'Adinath'
-                  ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
-                  : 'bg-black/5 dark:bg-white/5 border-stone-300 dark:border-stone-700 hover:opacity-80'
-              }`}
-              style={{
-                color: selectedVoice === 'Adinath' ? '#FFFFFF' : 'var(--text-primary)',
-                backgroundColor: selectedVoice === 'Adinath' ? 'var(--accent-saffron)' : undefined,
-              }}
-              title="Guru Adinath: Warm, conversational, and encouraging Indian English teacher delivery"
-            >
-              Guru Adinath (Warm Teacher)
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedVoice('Vidur')}
-              className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
-                selectedVoice === 'Vidur'
-                  ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
-                  : 'bg-black/5 dark:bg-white/5 border-stone-300 dark:border-stone-700 hover:opacity-80'
-              }`}
-              style={{
-                color: selectedVoice === 'Vidur' ? '#FFFFFF' : 'var(--text-primary)',
-                backgroundColor: selectedVoice === 'Vidur' ? 'var(--accent-saffron)' : undefined,
-              }}
-              title="Guru Vidur: Grounded, patient, and calm Indian English teacher delivery"
-            >
-              Guru Vidur (Grounded)
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedVoice('Sumed')}
-              className={`px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${
-                selectedVoice === 'Sumed'
-                  ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
-                  : 'bg-black/5 dark:bg-white/5 border-stone-300 dark:border-stone-700 hover:opacity-80'
-              }`}
-              style={{
-                color: selectedVoice === 'Sumed' ? '#FFFFFF' : 'var(--text-primary)',
-                backgroundColor: selectedVoice === 'Sumed' ? 'var(--accent-saffron)' : undefined,
-              }}
-              title="Guru Sumed: Scholarly, focused, and earnest Indian English teacher delivery"
-            >
-              Guru Sumed (Scholarly)
-            </button>
-          </div>
         </div>
 
         {/* IDLE STATE */}
@@ -734,20 +680,20 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             </div>
             <div className="space-y-2">
               <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                Ready to Listen with Guru {selectedVoice}
+                Ready to Listen & Learn
               </h3>
               <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Select your preferred teacher above and click the button below to start the immersive audio narration.
+                Click below to start high-quality immersive audio narration of this chapter.
               </p>
             </div>
             <button
               type="button"
-              onClick={() => generateAudio(selectedVoice)}
+              onClick={() => generateAudio('Adinath')}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold shadow-sm transition-all hover:opacity-95 cursor-pointer"
               style={{ backgroundColor: 'var(--accent-saffron)', color: '#FFFFFF' }}
             >
               <Sparkles className="w-4 h-4" />
-              <span>Generate Narration with Guru {selectedVoice}</span>
+              <span>Start Audio Narration</span>
             </button>
           </div>
         )}

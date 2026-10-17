@@ -217,9 +217,9 @@ Perform two essential tasks across all pages:
 
         // Try gemini-3.8-flash for multimodal OCR
         try {
-          console.log(`[Vidya Step 1C] Extracting text & diagram meanings with Gemini 3.5 Flash-Lite...`);
+          console.log(`[Vidya Step 1C] Extracting text & diagram meanings with Gemini 2.5 Flash...`);
           const ocrPromise = ai.models.generateContent({
-            model: 'gemini-3.8-flash',
+            model: 'gemini-2.5-flash',
             contents: [
               {
                 inlineData: {
@@ -351,9 +351,9 @@ CRITICAL REQUIREMENTS:
 
     // Primary: Gemini 3.5 Flash-Lite as the Summariser
     try {
-      console.log(`[Vidya Step 2] Generating 5-minute chapter summary with Gemini 3.5 Flash-Lite...`);
+      console.log(`[Vidya Step 2] Generating 5-minute chapter summary with Gemini 2.5 Flash...`);
       const lite35Promise = ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents: [summarizerPrompt],
         config: {
           maxOutputTokens: 2048,
@@ -522,10 +522,9 @@ Do not sound like a newsreader, advertisement, meditation narrator, or fictional
 Pronounce all Indian names, Sanskrit terminology, and unfamiliar textbook vocabulary with accurate and strong Indian English pronunciation.`;
 
 const TTS_FALLBACK_MODELS = [
-  'gemini-3.8-flash-tts',          // 1. Primary: Gemini 3.8 Flash TTS
-  'gemini-3.8-flash-lite-tts',     // 2. First fallback: Gemini 3.8 Flash-Lite TTS
-  'gemini-3.1-flash-tts-preview',  // 3. Second fallback: Gemini 3.1 Flash TTS Preview
-  'gemini-2.5-flash-preview-tts',  // 4. Third fallback: Gemini 2.5 Flash Preview TTS
+  'gemini-2.5-flash',          // 1. Primary: Gemini 2.5 Flash
+  'gemini-2.5-flash-lite',     // 2. First fallback: Gemini 2.5 Flash-Lite
+  'gemini-1.5-flash',          // 3. Second fallback: Gemini 1.5 Flash
 ] as const;
 
 // Disk caching configuration (.cache/tts)
@@ -901,7 +900,7 @@ SAFEGUARDS & CORE BEHAVIOR RULES:
     // Primary: Gemini 3.5 Flash-Lite
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents,
         config: {
           systemInstruction,
@@ -989,7 +988,7 @@ Output format: Return ONLY a valid JSON object:
     try {
       const response = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-2.5-flash',
           contents: promptInstruction,
           config: {
             responseMimeType: 'application/json',
@@ -1108,7 +1107,7 @@ Return JSON in this exact structure:
     try {
       const geminiRes = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-2.5-flash',
           contents: promptText,
           config: {
             responseMimeType: 'application/json',
@@ -1201,7 +1200,7 @@ Return JSON in this exact structure:
     try {
       const response = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-2.5-flash',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
@@ -1376,7 +1375,7 @@ Return JSON in this exact structure:
     try {
       const response = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-2.5-flash',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',

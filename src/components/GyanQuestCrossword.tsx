@@ -1050,92 +1050,94 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-7 items-start">
                 {/* Left Column: Grid & Active Clue */}
                 <div
-                  className="lg:col-span-7 flex flex-col items-center justify-center p-4 sm:p-6 rounded-3xl border shadow-xs overflow-auto"
+                  className="lg:col-span-7 flex flex-col items-center justify-start p-4 sm:p-6 rounded-3xl border shadow-xs"
                   style={{
                     backgroundColor: 'var(--bg-card)',
                     borderColor: 'var(--border-warm)',
                   }}
                 >
-                  {/* The Interactive NxN Grid */}
-                  <div
-                    className="grid gap-[2px] p-2 rounded-2xl shadow-inner max-w-full overflow-auto"
-                    style={{
-                      gridTemplateColumns: `repeat(${puzzle.gridSize || 11}, minmax(0, 1fr))`,
-                      backgroundColor: 'var(--border-warm)',
-                    }}
-                  >
-                    {Array.from({ length: puzzle.gridSize || 11 }).map((_, r) =>
-                      Array.from({ length: puzzle.gridSize || 11 }).map((_, c) => {
-                        const active = isCellActive(r, c);
-                        const key = cellKey(r, c);
-                        const letter = userLetters[key] || '';
-                        const num = getCellNumber(r, c);
-                        const isSelected = selectedCell && selectedCell.row === r && selectedCell.col === c;
+                  <div className="w-full max-h-[550px] overflow-auto p-2 flex justify-center items-center">
+                    {/* The Interactive NxN Grid */}
+                    <div
+                      className="grid gap-[2px] p-3 rounded-2xl shadow-inner"
+                      style={{
+                        gridTemplateColumns: `repeat(${puzzle.gridSize || 11}, minmax(36px, 1fr))`,
+                        backgroundColor: 'var(--border-warm)',
+                      }}
+                    >
+                      {Array.from({ length: puzzle.gridSize || 11 }).map((_, r) =>
+                        Array.from({ length: puzzle.gridSize || 11 }).map((_, c) => {
+                          const active = isCellActive(r, c);
+                          const key = cellKey(r, c);
+                          const letter = userLetters[key] || '';
+                          const num = getCellNumber(r, c);
+                          const isSelected = selectedCell && selectedCell.row === r && selectedCell.col === c;
 
-                        let isInActiveWord = false;
-                        if (activeWord) {
-                          const wLen = (activeWord.answer || '').length;
-                          isInActiveWord =
-                            activeWord.direction === 'across'
-                              ? activeWord.row === r && c >= activeWord.col && c < activeWord.col + wLen
-                              : activeWord.col === c && r >= activeWord.row && r < activeWord.row + wLen;
-                        }
+                          let isInActiveWord = false;
+                          if (activeWord) {
+                            const wLen = (activeWord.answer || '').length;
+                            isInActiveWord =
+                              activeWord.direction === 'across'
+                                ? activeWord.row === r && c >= activeWord.col && c < activeWord.col + wLen
+                                : activeWord.col === c && r >= activeWord.row && r < activeWord.row + wLen;
+                          }
 
-                        const hasError = cellErrors[key];
+                          const hasError = cellErrors[key];
 
-                        return active ? (
-                          <div
-                            key={key}
-                            onClick={() => handleCellClick(r, c)}
-                            className={`w-7 h-7 sm:w-10 sm:h-10 relative flex items-center justify-center font-bold text-xs sm:text-base cursor-pointer transition select-none rounded-sm border ${
-                              isSelected
-                                ? 'shadow-md ring-2 ring-amber-400 dark:ring-amber-300 z-10 scale-105'
-                                : isInActiveWord
-                                ? 'shadow-2xs'
-                                : 'hover:opacity-90 shadow-2xs'
-                            }`}
-                            style={{
-                              backgroundColor: isSelected
-                                ? 'var(--accent-saffron)'
-                                : isInActiveWord
-                                ? 'var(--accent-saffron-light)'
-                                : 'var(--bg-main)',
-                              borderColor: isSelected
-                                ? 'var(--accent-saffron)'
-                                : isInActiveWord
-                                ? 'var(--accent-saffron)'
-                                : 'var(--border-warm)',
-                              color: isSelected
-                                ? '#FFFFFF'
-                                : isInActiveWord
-                                ? 'var(--accent-saffron-text)'
-                                : 'var(--text-primary)',
-                            }}
-                          >
-                            {num && (
-                              <span
-                                className="absolute top-0.5 left-0.5 text-[8px] sm:text-[10px] font-bold leading-none select-none"
-                                style={{
-                                  color: isSelected ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)',
-                                }}
-                              >
-                                {num}
-                              </span>
-                            )}
-                            <span className={hasError ? 'text-red-600 dark:text-red-400' : ''}>{letter}</span>
-                          </div>
-                        ) : (
-                          <div
-                            key={key}
-                            className="w-7 h-7 sm:w-10 sm:h-10 rounded-sm"
-                            style={{
-                              backgroundColor: 'var(--bg-card-subtle)',
-                              opacity: 0.6,
-                            }}
-                          />
-                        );
-                      })
-                    )}
+                          return active ? (
+                            <div
+                              key={key}
+                              onClick={() => handleCellClick(r, c)}
+                              className={`w-9 h-9 sm:w-10 sm:h-10 shrink-0 relative flex items-center justify-center font-bold text-xs sm:text-base cursor-pointer transition select-none rounded-sm border ${
+                                isSelected
+                                  ? 'shadow-md ring-2 ring-amber-400 dark:ring-amber-300 z-10 scale-105'
+                                  : isInActiveWord
+                                  ? 'shadow-2xs'
+                                  : 'hover:opacity-90 shadow-2xs'
+                              }`}
+                              style={{
+                                backgroundColor: isSelected
+                                  ? 'var(--accent-saffron)'
+                                  : isInActiveWord
+                                  ? 'var(--accent-saffron-light)'
+                                  : 'var(--bg-main)',
+                                borderColor: isSelected
+                                  ? 'var(--accent-saffron)'
+                                  : isInActiveWord
+                                  ? 'var(--accent-saffron)'
+                                  : 'var(--border-warm)',
+                                color: isSelected
+                                  ? '#FFFFFF'
+                                  : isInActiveWord
+                                  ? 'var(--accent-saffron-text)'
+                                  : 'var(--text-primary)',
+                              }}
+                            >
+                              {num && (
+                                <span
+                                  className="absolute top-0.5 left-0.5 text-[8px] sm:text-[10px] font-bold leading-none select-none"
+                                  style={{
+                                    color: isSelected ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)',
+                                  }}
+                                >
+                                  {num}
+                                </span>
+                              )}
+                              <span className={hasError ? 'text-red-600 dark:text-red-400' : ''}>{letter}</span>
+                            </div>
+                          ) : (
+                            <div
+                              key={key}
+                              className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-sm"
+                              style={{
+                                backgroundColor: 'var(--bg-card-subtle)',
+                                opacity: 0.6,
+                              }}
+                            />
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
 
                   {/* Active Clue Banner below grid */}
