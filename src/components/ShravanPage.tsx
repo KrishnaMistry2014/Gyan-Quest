@@ -170,9 +170,9 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [selectedVoice, setSelectedVoice] = useState<'Adinath' | 'Vidur' | 'Sumed'>('Adinath');
   const [ttsMeta, setTtsMeta] = useState<{ voice?: string; fromCache?: boolean } | null>(null);
   const [audioBase64, setAudioBase64] = useState<string | null>(chapter.audioBase64 || null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(scripture?.audioUrl || null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>(
-    scripture?.audioUrl || chapter.audioBase64 ? 'ready' : 'idle'
+    chapter.audioBase64 ? 'ready' : 'idle'
   );
   const [isWakingUp, setIsWakingUp] = useState<boolean>(false);
   const [chunkProgress, setChunkProgress] = useState<{ current: number; total: number } | null>(null);
@@ -399,12 +399,7 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       URL.revokeObjectURL(objectUrlRef.current);
       objectUrlRef.current = null;
     }
-    const currentScripture = getScriptureDefinition(chapter);
-    if (currentScripture?.audioUrl) {
-      setAudioUrl(currentScripture.audioUrl);
-      setStatus('ready');
-      setAudioBase64(null);
-    } else if (chapter.audioBase64 && selectedVoice === 'Adinath') {
+    if (chapter.audioBase64) {
       setAudioBase64(chapter.audioBase64);
       setAudioUrl(null);
       setStatus('ready');

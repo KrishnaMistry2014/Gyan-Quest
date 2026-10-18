@@ -10,7 +10,6 @@ export interface ScriptureImage {
 export interface ScriptureDefinition extends SavedChapter {
   scriptureKey: 'gita' | 'ramayana' | 'mahabharata';
   scriptureImages: ScriptureImage[];
-  audioUrl: string;
 }
 
 export const SCRIPTURES: Record<'gita' | 'ramayana' | 'mahabharata', ScriptureDefinition> = {
@@ -20,7 +19,6 @@ export const SCRIPTURES: Record<'gita' | 'ramayana' | 'mahabharata', ScriptureDe
     scriptureKey: 'gita',
     title: 'Bhagavad Gita: Dhyana Yoga (Verse 6.17)',
     fileName: 'Bhagavad_Gita_Chapter_6_Verse_17.pdf',
-    audioUrl: '/assets/audio/gita.wav',
     createdAt: new Date().toISOString(),
     summary: `# Bhagavad Gita for Students
 ## Become the Architect of Your Own Success Through Timeless Ancient Wisdom
@@ -79,7 +77,6 @@ Have you ever felt too busy or cluttered with homework, projects, classes, or st
     scriptureKey: 'ramayana',
     title: 'Ramayana: The Path of Truth, Courage, and Righteous Duty',
     fileName: 'Ramayana_Valmiki_Epic_Wisdom.pdf',
-    audioUrl: '/assets/audio/ramayana.wav',
     createdAt: new Date().toISOString(),
     summary: `# Ramayana: The Path of Truth, Courage, and Righteous Duty
 
@@ -121,7 +118,6 @@ True strength is built through quiet, daily choices. Just as Rama remained balan
     scriptureKey: 'mahabharata',
     title: 'Mahabharata: The Great Epic of Dharma & Kurukshetra',
     fileName: 'Mahabharata_Vyasa_Epic_Wisdom.pdf',
-    audioUrl: '/assets/audio/mahabharata.wav',
     createdAt: new Date().toISOString(),
     summary: `# Mahabharata: The Great Epic of Dharma & Kurukshetra
 
