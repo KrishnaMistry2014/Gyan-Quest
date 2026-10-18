@@ -81,24 +81,8 @@ const port = 3000;
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
-// CORS middleware for web clients (including Firebase Hosting domains)
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
-
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
 });
 
 function callWithTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -226,11 +210,11 @@ Perform two essential tasks across all pages:
      * Describe all visual elements (components, labeled parts, arrows, directions, states of matter, apparatus).
      * Explain the scientific mechanism, process, or conceptual principle depicted in the visual and what it demonstrates.`;
 
-        // Try gemini-3.8-flash for multimodal OCR
+        // Primary: gemini-3.5-flash-lite for multimodal OCR
         try {
-          console.log(`[Vidya Step 1C] Extracting text & diagram meanings with Gemini 2.5 Flash...`);
+          console.log(`[Vidya Step 1C] Extracting text & diagram meanings with Gemini 3.5 Flash-Lite...`);
           const ocrPromise = ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3.5-flash-lite',
             contents: [
               {
                 inlineData: {
@@ -251,11 +235,11 @@ Perform two essential tasks across all pages:
           }
         } catch (ocrErr: any) {
           console.warn('[Vidya Step 1C] Gemini 3.5 Flash-Lite OCR notice:', ocrErr?.message || ocrErr);
-          // Fallback to Gemini 3.1 Flash-Lite
+          // Fallback to Gemini 3.8 Flash
           try {
-            console.log(`[Vidya Step 1C Fallback] Retrying OCR with Gemini 3.1 Flash-Lite...`);
+            console.log(`[Vidya Step 1C Fallback] Retrying OCR with Gemini 3.8 Flash...`);
             const ocrLitePromise = ai.models.generateContent({
-              model: 'gemini-3.1-flash-lite',
+              model: 'gemini-3.8-flash',
               contents: [
                 {
                   inlineData: {
@@ -269,13 +253,13 @@ Perform two essential tasks across all pages:
                 maxOutputTokens: 8192,
               },
             });
-            const ocrLiteResponse = await callWithTimeout(ocrLitePromise, 45000, 'Gemini 3.1 Flash-Lite OCR');
+            const ocrLiteResponse = await callWithTimeout(ocrLitePromise, 45000, 'Gemini 3.8 Flash OCR');
             if (ocrLiteResponse.text && ocrLiteResponse.text.trim().length > 40) {
               extractedDetails = ocrLiteResponse.text.trim();
-              console.log(`[Vidya Step 1C Fallback] Gemini 3.1 Flash-Lite OCR successful (${extractedDetails.length} characters)`);
+              console.log(`[Vidya Step 1C Fallback] Gemini 3.8 Flash OCR successful (${extractedDetails.length} characters)`);
             }
           } catch (ocrLiteErr: any) {
-            console.warn('[Vidya Step 1C Fallback] Gemini 3.1 Flash-Lite OCR notice:', ocrLiteErr?.message || ocrLiteErr);
+            console.warn('[Vidya Step 1C Fallback] Gemini 3.8 Flash OCR notice:', ocrLiteErr?.message || ocrLiteErr);
           }
         }
       }
@@ -362,9 +346,9 @@ CRITICAL REQUIREMENTS:
 
     // Primary: Gemini 3.5 Flash-Lite as the Summariser
     try {
-      console.log(`[Vidya Step 2] Generating 5-minute chapter summary with Gemini 2.5 Flash...`);
+      console.log(`[Vidya Step 2] Generating 5-minute chapter summary with Gemini 3.5 Flash-Lite...`);
       const lite35Promise = ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.5-flash-lite',
         contents: [summarizerPrompt],
         config: {
           maxOutputTokens: 2048,
@@ -377,23 +361,23 @@ CRITICAL REQUIREMENTS:
       }
     } catch (lite35Err: any) {
       console.warn('[Vidya Step 2] Gemini 3.5 Flash-Lite notice:', lite35Err?.message || lite35Err);
-      // Fallback: Gemini 3.1 Flash-Lite
+      // Fallback: Gemini 3.8 Flash
       try {
-        console.log(`[Vidya Step 2 Fallback] Summarizing with Gemini 3.1 Flash-Lite...`);
+        console.log(`[Vidya Step 2 Fallback] Summarizing with Gemini 3.8 Flash...`);
         const litePromise = ai.models.generateContent({
-          model: 'gemini-3.1-flash-lite',
+          model: 'gemini-3.8-flash',
           contents: [summarizerPrompt],
           config: {
             maxOutputTokens: 2048,
           },
         });
-        const liteResponse = await callWithTimeout(litePromise, 40000, 'Gemini 3.1 Flash-Lite Summariser');
+        const liteResponse = await callWithTimeout(litePromise, 40000, 'Gemini 3.8 Flash Summariser');
         if (liteResponse.text && liteResponse.text.trim().length > 80) {
           summary = sanitizeVidya(liteResponse.text, fileName || 'Chapter Summary');
-          console.log(`[Vidya Step 2 Fallback] Gemini 3.1 Flash-Lite summarization successful (${summary.length} characters)!`);
+          console.log(`[Vidya Step 2 Fallback] Gemini 3.8 Flash summarization successful (${summary.length} characters)!`);
         }
       } catch (liteErr: any) {
-        console.error('[Vidya Step 2 Fallback] Gemini 3.1 Flash-Lite notice:', liteErr?.message || liteErr);
+        console.error('[Vidya Step 2 Fallback] Gemini 3.8 Flash notice:', liteErr?.message || liteErr);
       }
     }
 
@@ -513,11 +497,9 @@ function pcmToWav(pcmBuffer: Buffer, sampleRate = 24000, numChannels = 1, bitsPe
 
 // ============================================================================
 // Shravan TTS: Natural Indian Guru Voice Engine
-// 4-Model Fallback Chain:
+// Fallback Chain:
 //   1. Primary:        gemini-3.8-flash-tts
-//   2. First Fallback: gemini-3.8-flash-lite-tts
-//   3. Second Fallback: gemini-3.1-flash-tts-preview
-//   4. Third Fallback:  gemini-2.5-flash-preview-tts
+//   2. Fallback:       gemini-3.8-flash-lite-tts
 // ============================================================================
 
 const GURU_SPEECH_DIRECTION = `Speak in authentic, contemporary Indian English with a strong, distinctive Indian accent as a warm, knowledgeable Indian teacher explaining a school textbook chapter to a student. Sound friendly, confident, patient, and genuinely interested in the subject. Use clear, rich Indian English intonation and rhythm.
@@ -533,9 +515,8 @@ Do not sound like a newsreader, advertisement, meditation narrator, or fictional
 Pronounce all Indian names, Sanskrit terminology, and unfamiliar textbook vocabulary with accurate and strong Indian English pronunciation.`;
 
 const TTS_FALLBACK_MODELS = [
-  'gemini-2.5-flash',          // 1. Primary: Gemini 2.5 Flash
-  'gemini-2.5-flash-lite',     // 2. First fallback: Gemini 2.5 Flash-Lite
-  'gemini-1.5-flash',          // 3. Second fallback: Gemini 1.5 Flash
+  'gemini-3.8-flash-tts',          // 1. Primary: Gemini 3.8 Flash TTS
+  'gemini-3.8-flash-lite-tts',     // 2. Fallback: Gemini 3.8 Flash-Lite TTS
 ] as const;
 
 // Disk caching configuration (.cache/tts)
@@ -780,16 +761,55 @@ app.get('/api/tts/status', (req, res) => {
   });
 });
 
+// Dedicated /api/generate-tts endpoint
+app.post('/api/generate-tts', async (req, res) => {
+  try {
+    const { textToSpeak, voiceName } = req.body;
+    if (!textToSpeak) {
+      return res.status(400).json({ success: false, error: 'No text provided' });
+    }
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash-tts',
+      contents: [{
+        role: 'user',
+        parts: [{ text: textToSpeak }],
+      }],
+      config: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: voiceName || 'Kore'
+            }
+          }
+        }
+      }
+    });
+
+    const audioBase64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!audioBase64) {
+      throw new Error('TTS engine did not return valid audio data bytes');
+    }
+
+    return res.json({ success: true, audioData: audioBase64 });
+  } catch (error: any) {
+    console.error('[TTS Backend Crash]:', error.message || error);
+    return res.status(500).json({ success: false, error: error.message || 'Internal server audio generation error' });
+  }
+});
+
 // Shravan Indian Guru TTS Endpoint
 // Accepts POST { text, voice } and returns audio/wav directly or JSON
 app.post(['/api/tts', '/api/generate-audio'], async (req, res) => {
   try {
-    const { text, voice } = req.body;
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    const { text, voice, textToSpeak, voiceName } = req.body;
+    const inputText = text || textToSpeak;
+    if (!inputText || typeof inputText !== 'string' || inputText.trim().length === 0) {
       return res.status(400).json({ success: false, error: 'No text provided for audio narration.' });
     }
 
-    let cleanText = text.replace(/[*_#>`~]/g, '').trim();
+    let cleanText = inputText.replace(/[*_#>`~]/g, '').trim();
     // Strip any accidental instruction or prompt preamble
     cleanText = cleanText.replace(/^(Speak in|Please narrate|Instructions:|Prompt:|System:)[^\n]*(\n+|$)/gi, '').trim();
     const result = await synthesizeGuruSpeech(cleanText, voice);
@@ -911,7 +931,7 @@ SAFEGUARDS & CORE BEHAVIOR RULES:
     // Primary: Gemini 3.5 Flash-Lite
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.5-flash-lite',
         contents,
         config: {
           systemInstruction,
@@ -922,17 +942,22 @@ SAFEGUARDS & CORE BEHAVIOR RULES:
       responseText = response.text || '';
     } catch (err: any) {
       console.warn('[Guru Chat] Gemini 3.5 Flash-Lite notice, trying fallback:', err?.message || err);
-      // Fallback: Gemini 3.1 Flash-Lite
-      const fallbackResponse = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
-        contents,
-        config: {
-          systemInstruction,
-          maxOutputTokens: 1024,
-          temperature: 0.7,
-        },
-      });
-      responseText = fallbackResponse.text || '';
+      // Fallback: Gemini 3.8 Flash
+      try {
+        console.log(`[Guru Chat Fallback] Generating response with Gemini 3.8 Flash...`);
+        const fallbackResponse = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents,
+          config: {
+            systemInstruction,
+            maxOutputTokens: 1024,
+            temperature: 0.7,
+          },
+        });
+        responseText = fallbackResponse.text || '';
+      } catch (fbErr: any) {
+        console.error('[Guru Chat Fallback] Gemini 3.8 Flash notice:', fbErr?.message || fbErr);
+      }
     }
 
     if (!responseText) {
@@ -999,7 +1024,7 @@ Output format: Return ONLY a valid JSON object:
     try {
       const response = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.5-flash-lite',
           contents: promptInstruction,
           config: {
             responseMimeType: 'application/json',
@@ -1016,11 +1041,12 @@ Output format: Return ONLY a valid JSON object:
       }
     } catch (err: any) {
       console.warn('[Gemini 3.5 Prompt Synthesis notice]:', err?.message || err);
-      // Fallback to gemini-3.1-flash-lite
+      // Fallback to gemini-3.8-flash
       try {
+        console.log('[Gemini 3.8 Prompt Synthesis Fallback] Generating prompt with Gemini 3.8 Flash...');
         const fallbackRes = await callWithTimeout(
           ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
+            model: 'gemini-3.8-flash',
             contents: promptInstruction,
             config: {
               responseMimeType: 'application/json',
@@ -1029,14 +1055,14 @@ Output format: Return ONLY a valid JSON object:
             },
           }),
           12000,
-          'Gemini 3.1 Flash-Lite Prompt Synthesis'
+          'Gemini 3.8 Flash Prompt Synthesis'
         );
         const parsed = JSON.parse(fallbackRes.text || '{}');
         if (parsed.prompt && typeof parsed.prompt === 'string') {
           generatedPrompt = parsed.prompt.trim();
         }
       } catch (fbErr: any) {
-        console.warn('[Gemini 3.1 Prompt Synthesis notice]:', fbErr?.message || fbErr);
+        console.warn('[Gemini 3.8 Prompt Synthesis notice]:', fbErr?.message || fbErr);
       }
     }
 
@@ -1118,7 +1144,7 @@ Return JSON in this exact structure:
     try {
       const geminiRes = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.5-flash-lite',
           contents: promptText,
           config: {
             responseMimeType: 'application/json',
@@ -1130,11 +1156,12 @@ Return JSON in this exact structure:
       );
       parsedCrossword = JSON.parse(geminiRes.text || '{}');
     } catch (cwErr: any) {
-      console.warn('[Crossword] Gemini 3.5 Flash-Lite notice, retrying with Gemini 3.1 Flash-Lite:', cwErr?.message || cwErr);
+      console.warn('[Crossword] Gemini 3.5 Flash-Lite notice, retrying with Gemini 3.8 Flash:', cwErr?.message || cwErr);
       try {
+        console.log('[Crossword Fallback] Generating crossword with Gemini 3.8 Flash...');
         const fallbackRes = await callWithTimeout(
           ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
+            model: 'gemini-3.8-flash',
             contents: promptText,
             config: {
               responseMimeType: 'application/json',
@@ -1142,11 +1169,11 @@ Return JSON in this exact structure:
             },
           }),
           15000,
-          'Gemini 3.1 Flash-Lite Crossword Generation'
+          'Gemini 3.8 Flash Crossword Generation'
         );
         parsedCrossword = JSON.parse(fallbackRes.text || '{}');
       } catch (fbErr: any) {
-        console.error('[Crossword] Gemini 3.1 Flash-Lite notice:', fbErr?.message || fbErr);
+        console.error('[Crossword Fallback] Gemini 3.8 Flash notice:', fbErr?.message || fbErr);
       }
     }
 
@@ -1211,7 +1238,7 @@ Return JSON in this exact structure:
     try {
       const response = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.5-flash-lite',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
@@ -1223,11 +1250,12 @@ Return JSON in this exact structure:
       );
       parsedQuestions = JSON.parse(response.text || '{}');
     } catch (wErr: any) {
-      console.warn('[Wordle Questions] Gemini 3.5 Flash-Lite notice, retrying with Gemini 3.1 Flash-Lite:', wErr?.message || wErr);
+      console.warn('[Wordle Questions] Gemini 3.5 Flash-Lite notice, retrying with Gemini 3.8 Flash:', wErr?.message || wErr);
       try {
+        console.log('[Wordle Questions Fallback] Generating questions with Gemini 3.8 Flash...');
         const fbResponse = await callWithTimeout(
           ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
+            model: 'gemini-3.8-flash',
             contents: prompt,
             config: {
               responseMimeType: 'application/json',
@@ -1235,11 +1263,11 @@ Return JSON in this exact structure:
             },
           }),
           15000,
-          'Gemini 3.1 Flash-Lite Wordle Question Generation'
+          'Gemini 3.8 Flash Wordle Question Generation'
         );
         parsedQuestions = JSON.parse(fbResponse.text || '{}');
       } catch (fbErr: any) {
-        console.warn('[Wordle Questions] Gemini 3.1 Flash-Lite notice:', fbErr?.message || fbErr);
+        console.warn('[Wordle Questions Fallback] Gemini 3.8 Flash notice:', fbErr?.message || fbErr);
       }
     }
 
@@ -1386,7 +1414,7 @@ Return JSON in this exact structure:
     try {
       const response = await callWithTimeout(
         ai.models.generateContent({
-          model: 'gemini-2.5-flash',
+          model: 'gemini-3.5-flash-lite',
           contents: prompt,
           config: {
             responseMimeType: 'application/json',
@@ -1398,11 +1426,12 @@ Return JSON in this exact structure:
       );
       parsedData = JSON.parse(response.text || '{}');
     } catch (gErr: any) {
-      console.warn('[Pariksha API] Gemini 3.5 Flash-Lite notice, retrying with Gemini 3.1 Flash-Lite:', gErr?.message || gErr);
+      console.warn('[Pariksha API] Gemini 3.5 Flash-Lite notice, retrying with Gemini 3.8 Flash:', gErr?.message || gErr);
       try {
+        console.log('[Pariksha API Fallback] Generating exam with Gemini 3.8 Flash...');
         const fbResponse = await callWithTimeout(
           ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
+            model: 'gemini-3.8-flash',
             contents: prompt,
             config: {
               responseMimeType: 'application/json',
@@ -1410,11 +1439,11 @@ Return JSON in this exact structure:
             },
           }),
           30000,
-          'Gemini 3.1 Flash-Lite Pariksha Exam Generation'
+          'Gemini 3.8 Flash Pariksha Exam Generation'
         );
         parsedData = JSON.parse(fbResponse.text || '{}');
       } catch (fbErr: any) {
-        console.warn('[Pariksha API] Gemini 3.1 Flash-Lite notice:', fbErr?.message || fbErr);
+        console.warn('[Pariksha API Fallback] Gemini 3.8 Flash notice:', fbErr?.message || fbErr);
       }
     }
 

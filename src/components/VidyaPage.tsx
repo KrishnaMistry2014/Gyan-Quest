@@ -69,129 +69,15 @@ const extractVidyaTitle = (text: string, fallback: string): string => {
   return fallback.replace(/^Vidya:\s*/i, '').replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
 };
 
-const cleanTitleFromFilename = (fileName: string): string => {
-  return fileName
-    .replace(/^Vidya:\s*/i, '')
-    .replace(/\.[^/.]+$/, '')
-    .replace(/[-_]/g, ' ')
-    .replace(/\b([a-z])/g, (_, c) => c.toUpperCase())
-    .trim();
-};
-
-const generateClientVidyaSummary = (text: string, fileName: string): string => {
-  const fallbackTitle = cleanTitleFromFilename(fileName);
-  let title = fallbackTitle;
-
-  // Try to find a chapter title in text
-  const titleMatch = text.match(/(?:Chapter|Unit|Lesson)?\s*(\d+)?[:.\-\s]+([A-Z][A-Za-z\s]{3,40})/);
-  if (titleMatch && titleMatch[2]?.trim().length > 3) {
-    title = titleMatch[2].trim();
-  }
-
-  // Filter clean educational sentences
-  const rawSentences = text
-    .split(/(?<=[.!?])\s+/)
-    .map(s => s.trim())
-    .filter(s => s.length > 20 && s.length < 300 && /^[A-Z0-9]/.test(s));
-
-  const overview = rawSentences.slice(0, 3).join(' ') ||
-    `This chapter provides an essential academic study of ${title}. It introduces fundamental principles, core observational methodologies, and systematic concept frameworks necessary for comprehensive subject mastery.`;
-
-  const conceptSentences = rawSentences.slice(3, 12);
-  const concepts = conceptSentences.length > 0
-    ? conceptSentences.map(s => `- ${s}`).join('\n')
-    : `- Foundational investigation of ${title} across core physical and theoretical principles.\n- Detailed examination of essential mechanisms, operational causes, and observed outcomes.\n- Systematic breakdown of key academic subject pillars and structured examples.`;
-
-  const diagramSentences = rawSentences.filter(s => /diagram|figure|setup|apparatus|graph|chart|experiment|illustration|observe|circuit|flow/i.test(s)).slice(0, 3);
-  const diagrams = diagramSentences.length > 0
-    ? diagramSentences.map(s => `- ${s}`).join('\n')
-    : `- Primary conceptual schematic illustrating foundational apparatus setup, components, and directional flow.\n- Analytical diagram mapping variable relationships and experimental transformation stages.`;
-
-  const lawSentences = rawSentences.filter(s => /law|equation|defined|formula|principle|rule|called|known as|rate of|constant/i.test(s)).slice(0, 4);
-  const laws = lawSentences.length > 0
-    ? lawSentences.map(s => `* ${s}`).join('\n')
-    : `* Governing Principle: Fundamental scientific interactions and conservative laws governing ${title}.\n* Core Definition: Key terminology, quantitative relations, and classification criteria.`;
-
-  const takeaways = [
-    `Mastery of ${title} requires thorough comprehension of underlying mechanisms and practical observations.`,
-    `Theoretical concepts are directly applicable to real-world phenomena and experimental analysis.`,
-    `Regular contemplative review and problem practice solidify long-term intellectual retention.`
-  ].map(t => `* ${t}`).join('\n');
-
-  return `# ${title}\n\n## Chapter Overview\n${overview}\n\n## Core Concept Breakdown\n${concepts}\n\n## Key Diagrams & Visual Insights\n${diagrams}\n\n## Laws, Equations & Core Definitions\n${laws}\n\n## Summary Takeaways\n${takeaways}`;
-};
-
-const extractTextFromBuffer = async (buffer: ArrayBuffer): Promise<string> => {
+const extractTextFromBuffer = (buffer: ArrayBuffer): string => {
   try {
     const bytes = new Uint8Array(buffer);
+    const len = Math.min(bytes.length, 3 * 1024 * 1024);
     const decoder = new TextDecoder('latin1');
-    const str = decoder.decode(bytes);
+    const str = decoder.decode(bytes.subarray(0, len));
     const parts: string[] = [];
 
-    // 1. Scan and decompress FlateDecode zlib streams in the browser
-    if (typeof DecompressionStream !== 'undefined') {
-      let searchPos = 0;
-      let streamCount = 0;
-      while ((searchPos = str.indexOf('stream', searchPos)) !== -1 && streamCount < 30) {
-        let start = searchPos + 6;
-        if (bytes[start] === 13) start++; // \r
-        if (bytes[start] === 10) start++; // \n
-        const end = str.indexOf('endstream', start);
-        if (end === -1) break;
-
-        const streamBytes = bytes.subarray(start, end);
-        searchPos = end + 9;
-        streamCount++;
-
-        // Detect zlib stream header (0x78)
-        if (streamBytes.length > 10 && streamBytes[0] === 0x78) {
-          try {
-            const ds = new DecompressionStream('deflate');
-            const writer = ds.writable.getWriter();
-            writer.write(streamBytes);
-            writer.close();
-            const reader = ds.readable.getReader();
-            const chunks: Uint8Array[] = [];
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              if (value) chunks.push(value);
-            }
-            const totalLen = chunks.reduce((acc, c) => acc + c.length, 0);
-            const merged = new Uint8Array(totalLen);
-            let off = 0;
-            for (const c of chunks) {
-              merged.set(c, off);
-              off += c.length;
-            }
-            const decompressed = decoder.decode(merged);
-
-            // Extract (text) Tj or '
-            const tjMatches = decompressed.match(/\(([^()]{2,})\)\s*(?:Tj|\'|\")/g) || [];
-            for (const m of tjMatches) {
-              const cleaned = m.replace(/^\(/, '').replace(/\)\s*(?:Tj|\'|\")$/, '').trim();
-              if (cleaned.length > 1 && !/[^\x20-\x7E\s]/.test(cleaned)) {
-                parts.push(cleaned);
-              }
-            }
-
-            // Extract [(text) ...] TJ
-            const tjArrMatches = decompressed.match(/\[([^[\]]{3,})\]\s*TJ/g) || [];
-            for (const m of tjArrMatches) {
-              const inners = m.match(/\(([^()]+)\)/g) || [];
-              const combined = inners.map(t => t.slice(1, -1)).join(' ').trim();
-              if (combined.length > 1 && !/[^\x20-\x7E\s]/.test(combined)) {
-                parts.push(combined);
-              }
-            }
-          } catch (_) {
-            // Stream not zlib or decompression error, continue to next
-          }
-        }
-      }
-    }
-
-    // 2. Scan uncompressed Tj strings: (text) Tj
+    // 1. Match Tj strings: (text) Tj
     const tjMatches = str.match(/\(([^()]{2,})\)\s*(?:Tj|\'|\")/g) || [];
     for (const m of tjMatches) {
       const cleaned = m.replace(/^\(/, '').replace(/\)\s*(?:Tj|\'|\")$/, '').trim();
@@ -200,7 +86,7 @@ const extractTextFromBuffer = async (buffer: ArrayBuffer): Promise<string> => {
       }
     }
 
-    // 3. Scan uncompressed TJ array strings: [(text) 20 (more text)] TJ
+    // 2. Match TJ array strings: [(text) 20 (more text)] TJ
     const tjArrayMatches = str.match(/\[([^[\]]{4,})\]\s*TJ/g) || [];
     for (const m of tjArrayMatches) {
       const innerTexts = m.match(/\(([^()]+)\)/g) || [];
@@ -210,7 +96,7 @@ const extractTextFromBuffer = async (buffer: ArrayBuffer): Promise<string> => {
       }
     }
 
-    // 4. Scan hex strings: <48656C6C6F> Tj
+    // 3. Match hex strings in TJ or Tj: <48656C6C6F> Tj
     const hexMatches = str.match(/<([0-9A-Fa-f]{6,})>\s*(?:Tj|TJ)/g) || [];
     for (const m of hexMatches) {
       const hex = m.replace(/^</, '').replace(/>\s*(?:Tj|TJ)$/, '');
@@ -222,7 +108,7 @@ const extractTextFromBuffer = async (buffer: ArrayBuffer): Promise<string> => {
       if (decoded.length > 2) parts.push(decoded);
     }
 
-    return parts.join(' ').replace(/\s+/g, ' ').slice(0, 80000).trim();
+    return parts.join(' ').replace(/\s+/g, ' ').slice(0, 60000).trim();
   } catch {
     return '';
   }
@@ -361,7 +247,7 @@ export const VidyaPage: React.FC<VidyaPageProps> = ({
     try {
       // 1. Fast ArrayBuffer text extraction from the PDF directly in the browser
       const arrayBuffer = await file.arrayBuffer();
-      const extractedText = await extractTextFromBuffer(arrayBuffer);
+      const extractedText = extractTextFromBuffer(arrayBuffer);
 
       // 2. Prepare payload (if file is under 35MB, convert to base64 for multimodal analysis)
       let base64Data = '';
@@ -378,71 +264,27 @@ export const VidyaPage: React.FC<VidyaPageProps> = ({
         });
       }
 
-      const requestBody = JSON.stringify({
-        pdfBase64: base64Data,
-        fileName: file.name,
-        extractedText,
+      const response = await fetch('/api/extract-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          pdfBase64: base64Data,
+          fileName: file.name,
+          extractedText,
+        }),
       });
-
-      let data: any = null;
-
-      // Attempt 1: Local /api/extract-pdf
-      try {
-        const localResponse = await fetch('/api/extract-pdf', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          signal: controller.signal,
-          body: requestBody,
-        });
-
-        const contentType = localResponse.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          data = await localResponse.json().catch(() => null);
-        } else {
-          console.warn('/api/extract-pdf returned non-JSON content-type:', contentType);
-        }
-      } catch (localErr) {
-        console.warn('Local /api/extract-pdf fetch error:', localErr);
-      }
-
-      // Attempt 2: If local failed or returned HTML (e.g. Firebase Hosting static rewrite), try Cloud Run backend
-      if (!data || !data.success || !data.summary) {
-        const cloudEndpoints = [
-          'https://ais-dev-zdgluoxozyfyp75rmmq7js-491202296202.asia-southeast1.run.app/api/extract-pdf',
-          'https://ais-pre-zdgluoxozyfyp75rmmq7js-491202296202.asia-southeast1.run.app/api/extract-pdf',
-        ];
-
-        for (const cloudUrl of cloudEndpoints) {
-          if (controller.signal.aborted) break;
-          try {
-            console.log('Attempting PDF extraction via backend service:', cloudUrl);
-            const cloudResponse = await fetch(cloudUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              signal: controller.signal,
-              body: requestBody,
-            });
-            const contentType = cloudResponse.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-              const cloudData = await cloudResponse.json().catch(() => null);
-              if (cloudData && cloudData.success && cloudData.summary) {
-                data = cloudData;
-                break;
-              }
-            }
-          } catch (cloudErr) {
-            console.warn(`Extraction error from ${cloudUrl}:`, cloudErr);
-          }
-        }
-      }
 
       clearTimers();
 
-      // If server returned valid summary, apply it!
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = null;
+      if (contentType.includes('application/json')) {
+        data = await response.json().catch(() => null);
+      }
+
       if (data && data.success && data.summary) {
         const cleanSummary = sanitizeClientVidya(data.summary, file.name);
         const computedTitle = extractVidyaTitle(cleanSummary, file.name);
@@ -463,78 +305,30 @@ export const VidyaPage: React.FC<VidyaPageProps> = ({
         } catch (saveErr) {
           console.warn('Background chapter cloud save notice:', saveErr);
         }
-        return;
-      }
-
-      // Attempt 3: Client-side synthesis fallback from extracted textbook text
-      // Ensures the chapter is never blocked even if servers are completely down or in static hosting!
-      const availableText = extractedText || '';
-      if (availableText.trim().length > 30) {
-        console.log('Synthesizing structured Vidya chapter summary client-side from extracted text...');
-        const clientSummary = generateClientVidyaSummary(availableText, file.name);
-        const cleanSummary = sanitizeClientVidya(clientSummary, file.name);
-        const computedTitle = extractVidyaTitle(cleanSummary, file.name);
-
-        setStageMessage('Vidya ready!');
-        setDocTitle(computedTitle);
-        setSummary(cleanSummary);
-        setStatus('done');
-
-        try {
-          const saved = await saveChapter({
-            fileName: file.name,
-            title: computedTitle,
-            summary: cleanSummary,
-            fileSize: file.size,
-          });
-          setCurrentChapter(saved);
-        } catch (saveErr) {
-          console.warn('Background chapter cloud save notice:', saveErr);
+      } else {
+        let errMsg = data?.error;
+        if (!errMsg) {
+          if (response.status === 413) {
+            errMsg = 'This PDF file exceeds the maximum allowed upload size. Please select a chapter or handout under 35MB.';
+          } else if (response.status === 422) {
+            errMsg = 'Could not extract readable text or diagrams from this PDF. Please ensure the document is a readable chapter PDF.';
+          } else if (response.status === 504 || response.status === 408) {
+            errMsg = 'Processing timed out. Please try again or use a smaller chapter section.';
+          } else if (!contentType.includes('application/json')) {
+            errMsg = 'Unable to reach the document analysis service. Please try again in a few moments.';
+          } else {
+            errMsg = response.status !== 200 ? `Extraction failed (HTTP ${response.status}). Please try again.` : 'Could not generate chapter summary from this PDF.';
+          }
         }
-        return;
+        setStatus('error');
+        setErrorMessage(errMsg);
       }
-
-      // Only if no text could be extracted at all (e.g. empty or non-text PDF)
-      setStatus('error');
-      setErrorMessage(
-        data?.error ||
-        'Could not extract readable text from this PDF. Please ensure the document is a readable chapter PDF with selectable text.'
-      );
     } catch (err: any) {
       clearTimers();
       if (err.name === 'AbortError' && !lastProcessedKeyRef.current) {
         console.log('Extraction manually cancelled by user.');
         return;
       }
-
-      // Fast client-side recovery if an unexpected network error occurred
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const fallbackText = await extractTextFromBuffer(arrayBuffer);
-        if (fallbackText && fallbackText.trim().length > 30) {
-          console.log('Recovered via client-side PDF extraction after network error.');
-          const clientSummary = generateClientVidyaSummary(fallbackText, file.name);
-          const cleanSummary = sanitizeClientVidya(clientSummary, file.name);
-          const computedTitle = extractVidyaTitle(cleanSummary, file.name);
-
-          setStageMessage('Vidya ready!');
-          setDocTitle(computedTitle);
-          setSummary(cleanSummary);
-          setStatus('done');
-
-          try {
-            const saved = await saveChapter({
-              fileName: file.name,
-              title: computedTitle,
-              summary: cleanSummary,
-              fileSize: file.size,
-            });
-            setCurrentChapter(saved);
-          } catch (_) {}
-          return;
-        }
-      } catch (_) {}
-
       setStatus('error');
       const networkOrOther = err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')
         ? 'Could not connect to the document analysis service. Please verify your connection and try again.'
