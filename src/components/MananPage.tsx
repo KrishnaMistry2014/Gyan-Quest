@@ -18,13 +18,14 @@ import {
   ClipboardCheck,
   ArrowRight
 } from 'lucide-react';
-import { SavedChapter } from '../lib/chapters';
+import { SavedChapter, generateUniqueChapterCode } from '../lib/chapters';
 import { GyanQuestCrossword } from './GyanQuestCrossword';
 import { GyanQuestWordle } from './GyanQuestWordle';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
 import { playMindfulChime } from '../lib/chime';
+import { claimChapterStageReward } from '../lib/firebase';
 import {
   generateChapterImage,
   buildEducationalImagePrompt,
@@ -59,12 +60,87 @@ export const MananPage: React.FC<MananPageProps> = ({
 }) => {
   const scripture = getScriptureDefinition(chapter);
   const [selectedScriptureImageIdx, setSelectedScriptureImageIdx] = useState<number>(0);
-  const { isStreakActiveToday, recordStreakActivity } = useAuth();
+  const { user, profile, updateProfileXp, refreshUser, isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
   const { t } = useLanguage();
 
-  // Active contemplation activity: Jigsaw puzzle reflection, Wordle Quest, or AI Crossword
+  // Active contemplation activity in fixed guided flow: Jigsaw -> Wordle -> Crossword
   const [activeActivity, setActiveActivity] = useState<'jigsaw' | 'wordle' | 'crossword'>('jigsaw');
+  const [wordleCompleted, setWordleCompleted] = useState<boolean>(false);
+  const [crosswordCompleted, setCrosswordCompleted] = useState<boolean>(false);
+
+  const handleAdvanceToWordle = async () => {
+    let ch = { ...chapter };
+    if (!ch.uniqueCode || ch.uniqueCode.length !== 10) {
+      ch.uniqueCode = generateUniqueChapterCode();
+    }
+    try {
+      const reward = await claimChapterStageReward(ch, 'manan_jigsaw', user);
+      if (reward.awarded) {
+        updateProfileXp(reward.newTotal);
+        showToast({
+          title: '+5 XP Earned!',
+          message: 'Jigsaw reflection mastered • +5 XP added!',
+          type: 'xp',
+          xpAmount: 5,
+        });
+        refreshUser?.();
+      }
+    } catch (err) {
+      console.warn('Error claiming jigsaw reward:', err);
+    }
+    setActiveActivity('wordle');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAdvanceToCrossword = async () => {
+    let ch = { ...chapter };
+    if (!ch.uniqueCode || ch.uniqueCode.length !== 10) {
+      ch.uniqueCode = generateUniqueChapterCode();
+    }
+    try {
+      const reward = await claimChapterStageReward(ch, 'manan_wordle', user);
+      if (reward.awarded) {
+        updateProfileXp(reward.newTotal);
+        showToast({
+          title: '+5 XP Earned!',
+          message: 'Word Quest mastered • +5 XP added!',
+          type: 'xp',
+          xpAmount: 5,
+        });
+        refreshUser?.();
+      }
+    } catch (err) {
+      console.warn('Error claiming wordle reward:', err);
+    }
+    setActiveActivity('crossword');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleGoToPariksha = async () => {
+    let ch = { ...chapter };
+    if (!ch.uniqueCode || ch.uniqueCode.length !== 10) {
+      ch.uniqueCode = generateUniqueChapterCode();
+    }
+    try {
+      const reward = await claimChapterStageReward(ch, 'manan_crossword', user);
+      if (reward.awarded) {
+        updateProfileXp(reward.newTotal);
+        showToast({
+          title: '+5 XP Earned!',
+          message: 'Crossword contemplation mastered • +5 XP added!',
+          type: 'xp',
+          xpAmount: 5,
+        });
+        refreshUser?.();
+      }
+    } catch (err) {
+      console.warn('Error claiming crossword reward:', err);
+    }
+    if (onNavigatePariksha) {
+      onNavigatePariksha(ch);
+    }
+  };
 
   // Difficulty configuration (default 3x3 = 9 genuine jigsaw pieces)
   const [gridSize, setGridSize] = useState<3 | 4>(3);
@@ -603,13 +679,14 @@ export const MananPage: React.FC<MananPageProps> = ({
             </button>
           )}
 
-          {onNavigatePariksha && (
+          {/* Go to Pariksha button ONLY visible when all Manan activities are completed */}
+          {crosswordCompleted && onNavigatePariksha && (
             <button
               type="button"
               id="btn-header-go-to-pariksha"
               data-testid="btn-go-to-pariksha"
-              onClick={() => onNavigatePariksha(chapter)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+              onClick={handleGoToPariksha}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all hover:opacity-90 active:scale-95 cursor-pointer animate-bounce"
               style={{
                 backgroundColor: 'var(--accent-saffron)',
                 color: '#FFFFFF',
@@ -624,73 +701,92 @@ export const MananPage: React.FC<MananPageProps> = ({
         </div>
       </header>
 
-      {/* Activity Mode Selector: Jigsaw Reflection vs Wordle Quest vs Crossword Quest */}
+      {/* Guided Sequential Flow: Jigsaw > Wordle > Crossword */}
       <div className="flex items-center justify-between gap-4 flex-wrap border-b pb-4 pt-1" style={{ borderColor: 'var(--border-warm)' }}>
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl border shadow-2xs" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-warm)' }}>
-          <button
-            type="button"
-            onClick={() => setActiveActivity('jigsaw')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Activity 1: Jigsaw */}
+          <div
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all ${
               activeActivity === 'jigsaw'
                 ? 'shadow-xs'
-                : 'opacity-70 hover:opacity-100'
+                : isCompleted
+                ? 'opacity-90'
+                : 'opacity-60'
             }`}
             style={{
-              backgroundColor: activeActivity === 'jigsaw' ? 'var(--accent-saffron)' : 'transparent',
+              backgroundColor: activeActivity === 'jigsaw' ? 'var(--accent-saffron)' : 'var(--bg-card)',
               color: activeActivity === 'jigsaw' ? '#FFFFFF' : 'var(--text-primary)',
+              borderColor: 'var(--border-warm)',
             }}
           >
-            <Brain className="w-4 h-4" />
-            <span>{t.jigsawReflection}</span>
-          </button>
+            {isCompleted ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Brain className="w-4 h-4" />}
+            <span>1. Jigsaw Reflection</span>
+            {isCompleted && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+                100%
+              </span>
+            )}
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveActivity('wordle')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+          <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
+
+          {/* Activity 2: Wordle */}
+          <div
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all ${
               activeActivity === 'wordle'
                 ? 'shadow-xs'
-                : 'opacity-70 hover:opacity-100'
+                : wordleCompleted
+                ? 'opacity-90'
+                : 'opacity-60'
             }`}
             style={{
-              backgroundColor: activeActivity === 'wordle' ? 'var(--accent-saffron)' : 'transparent',
+              backgroundColor: activeActivity === 'wordle' ? 'var(--accent-saffron)' : 'var(--bg-card)',
               color: activeActivity === 'wordle' ? '#FFFFFF' : 'var(--text-primary)',
+              borderColor: 'var(--border-warm)',
             }}
           >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>{t.wordQuest}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30">
-              New
-            </span>
-          </button>
+            {wordleCompleted ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Sparkles className="w-4 h-4 text-amber-300" />}
+            <span>2. Word Quest</span>
+            {wordleCompleted && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+                100%
+              </span>
+            )}
+          </div>
 
-          <button
-            type="button"
-            onClick={() => setActiveActivity('crossword')}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+          <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
+
+          {/* Activity 3: Crossword */}
+          <div
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all ${
               activeActivity === 'crossword'
                 ? 'shadow-xs'
-                : 'opacity-70 hover:opacity-100'
+                : crosswordCompleted
+                ? 'opacity-90'
+                : 'opacity-60'
             }`}
             style={{
-              backgroundColor: activeActivity === 'crossword' ? 'var(--accent-saffron)' : 'transparent',
+              backgroundColor: activeActivity === 'crossword' ? 'var(--accent-saffron)' : 'var(--bg-card)',
               color: activeActivity === 'crossword' ? '#FFFFFF' : 'var(--text-primary)',
+              borderColor: 'var(--border-warm)',
             }}
           >
-            <LayoutGrid className="w-4 h-4" />
-            <span>{t.crosswordQuest}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
-              AI
-            </span>
-          </button>
+            {crosswordCompleted ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <LayoutGrid className="w-4 h-4" />}
+            <span>3. Crossword Quest</span>
+            {crosswordCompleted && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+                100%
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
           {activeActivity === 'jigsaw'
-            ? 'Assemble the concept illustration to internalize chapter teachings'
+            ? 'Assemble all puzzle pieces (100%) to unlock Next Activity'
             : activeActivity === 'wordle'
-            ? 'Inscribe 3 to 10 letter chapter answers against the sacred 30s countdown timer'
-            : 'Solve the interactive AI crossword puzzle derived directly from this chapter'}
+            ? 'Solve all words with 100% accuracy against the 60s timer to advance'
+            : 'Solve Crossword 100% correctly to unlock Stage 04: Pariksha'}
         </div>
       </div>
 
@@ -698,20 +794,46 @@ export const MananPage: React.FC<MananPageProps> = ({
         <div className="my-6">
           <GyanQuestCrossword
             initialChapter={chapter}
-            onExit={() => setActiveActivity('jigsaw')}
+            isPariksha={false}
+            onExit={() => onNavigateDashboard?.()}
+            onComplete={() => {
+              setCrosswordCompleted(true);
+            }}
+            onGoToPariksha={handleGoToPariksha}
           />
         </div>
       ) : activeActivity === 'wordle' ? (
-        <div className="my-6">
+        <div className="my-6 space-y-4">
           <GyanQuestWordle
             chapter={chapter}
-            onExit={() => setActiveActivity('jigsaw')}
+            onExit={() => onNavigateDashboard?.()}
             onCompleteChapter={() => {
+              setWordleCompleted(true);
               if (!isStreakActiveToday && recordStreakActivity) {
                 recordStreakActivity('manan').catch(() => {});
               }
             }}
+            onNextActivity={handleAdvanceToCrossword}
           />
+          {wordleCompleted && (
+            <div className="p-4 rounded-2xl border flex items-center justify-between gap-4" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-warm)' }}>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                <span className="text-xs sm:text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                  Word Quest 100% Solved! Ready for Crossword Quest.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleAdvanceToCrossword}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md text-white transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+                style={{ backgroundColor: 'var(--accent-saffron)' }}
+              >
+                <span>Next Activity: Crossword</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         /* Main Stage Content: Jigsaw */
@@ -1420,22 +1542,19 @@ export const MananPage: React.FC<MananPageProps> = ({
                   </button>
                 )}
 
-                {onNavigatePariksha && (
-                  <button
-                    type="button"
-                    onClick={() => onNavigatePariksha(chapter)}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
-                    style={{
-                      backgroundColor: 'var(--accent-saffron)',
-                      color: '#FFFFFF',
-                    }}
-                    title="Go to Stage 04: Pariksha"
-                  >
-                    <ClipboardCheck className="w-4 h-4" />
-                    <span>Go to Pariksha</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                )}
+                {/* Next Activity button after Jigsaw 100% complete */}
+                <button
+                  type="button"
+                  onClick={handleAdvanceToWordle}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all hover:opacity-90 active:scale-95 cursor-pointer text-white animate-pulse"
+                  style={{
+                    backgroundColor: 'var(--accent-saffron)',
+                  }}
+                  title="Next Activity: Word Quest"
+                >
+                  <span>Next Activity: Word Quest</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
 
                 <button
                   type="button"
@@ -1455,7 +1574,7 @@ export const MananPage: React.FC<MananPageProps> = ({
         </div>
       ))}
 
-      {/* Persistent Progression to Pariksha Footer Card */}
+      {/* Persistent Progression Footer Card (Strictly Flow-Driven) */}
       <div
         id="manan-to-pariksha-footer"
         className="p-6 sm:p-7 rounded-3xl border flex flex-col sm:flex-row items-center justify-between gap-5 transition-all shadow-sm mt-8"
@@ -1466,13 +1585,29 @@ export const MananPage: React.FC<MananPageProps> = ({
       >
         <div className="text-center sm:text-left space-y-1">
           <div className="flex items-center justify-center sm:justify-start gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                crosswordCompleted ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+              }`}
+            />
             <h4 className="text-base sm:text-lg font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-              Completed Manan Reflection?
+              {crosswordCompleted
+                ? 'All Manan Activities Completed!'
+                : activeActivity === 'jigsaw'
+                ? 'Step 1 of 3: Jigsaw Reflection'
+                : activeActivity === 'wordle'
+                ? 'Step 2 of 3: Word Quest (60s)'
+                : 'Step 3 of 3: Crossword Quest'}
             </h4>
           </div>
           <p className="text-xs sm:text-sm max-w-xl" style={{ color: 'var(--text-secondary)' }}>
-            Advance to Stage 04: Pariksha (परीक्षा) for the Crossword mastery exam, or continue reflecting with Word Quest and Crosswords.
+            {crosswordCompleted
+              ? 'You have mastered all three reflections (Jigsaw, Word Quest, and Crossword). Ready to advance to Stage 04: Pariksha!'
+              : activeActivity === 'jigsaw'
+              ? 'Assemble all puzzle pieces 100% to unlock the Next Activity (Word Quest).'
+              : activeActivity === 'wordle'
+              ? 'Solve all words with 100% accuracy to unlock the Crossword Quest.'
+              : 'Complete the Crossword with 100% accuracy to unlock Stage 04: Pariksha.'}
           </p>
         </div>
 
@@ -1492,16 +1627,45 @@ export const MananPage: React.FC<MananPageProps> = ({
             </button>
           )}
 
-          {onNavigatePariksha && (
+          {/* Conditional Advancement Buttons: Only visible when the current activity is 100% complete! */}
+          {activeActivity === 'jigsaw' && isCompleted && (
+            <button
+              type="button"
+              onClick={handleAdvanceToWordle}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all hover:opacity-90 active:scale-95 cursor-pointer text-white animate-pulse"
+              style={{
+                backgroundColor: 'var(--accent-saffron)',
+              }}
+            >
+              <span>Next Activity: Word Quest</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+
+          {activeActivity === 'wordle' && wordleCompleted && (
+            <button
+              type="button"
+              onClick={handleAdvanceToCrossword}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all hover:opacity-90 active:scale-95 cursor-pointer text-white animate-pulse"
+              style={{
+                backgroundColor: 'var(--accent-saffron)',
+              }}
+            >
+              <span>Next Activity: Crossword</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Go to Pariksha appears ONLY when Crossword is 100% complete! */}
+          {crosswordCompleted && onNavigatePariksha && (
             <button
               type="button"
               id="btn-footer-go-to-pariksha"
               data-testid="btn-footer-go-to-pariksha"
-              onClick={() => onNavigatePariksha(chapter)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:opacity-90 active:scale-95 cursor-pointer"
+              onClick={handleGoToPariksha}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md transition-all hover:opacity-90 active:scale-95 cursor-pointer text-white animate-bounce"
               style={{
                 backgroundColor: 'var(--accent-saffron)',
-                color: '#FFFFFF',
               }}
               title="Go to Pariksha 25-Question Examination"
             >

@@ -24,6 +24,10 @@ export interface SavedChapter {
   shravanCompleted?: boolean;
   shravanXpClaimed?: boolean;
   mananXpClaimed?: boolean;
+  manan_jigsawXpClaimed?: boolean;
+  manan_wordleXpClaimed?: boolean;
+  manan_crosswordXpClaimed?: boolean;
+  scriptureKey?: string;
   parikshaCompleted?: boolean;
   parikshaXpClaimed?: boolean;
   parikshaScore?: number;

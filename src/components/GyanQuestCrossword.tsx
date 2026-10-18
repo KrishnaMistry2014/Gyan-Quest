@@ -15,7 +15,9 @@ import {
   Play,
   Trophy,
   X,
-  Repeat
+  Repeat,
+  RotateCcw,
+  ClipboardCheck
 } from 'lucide-react';
 import { CrosswordData, CrosswordWord, CrosswordDifficulty } from '../types';
 import { SAMPLE_CROSSWORDS } from '../lib/sampleCrosswords';
@@ -27,12 +29,16 @@ interface GyanQuestCrosswordProps {
   initialChapter?: SavedChapter;
   onExit?: () => void;
   onComplete?: () => void;
+  isPariksha?: boolean;
+  onGoToPariksha?: () => void;
 }
 
 export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
   initialChapter,
   onExit,
   onComplete,
+  isPariksha = false,
+  onGoToPariksha,
 }) => {
   const { profile, updateProfileXp, recordStreakActivity } = useAuth();
   const rewardClaimedRef = useRef<boolean>(false);
@@ -47,6 +53,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
   const [gameStatus, setGameStatus] = useState<'playing' | 'won'>('playing');
   const [hintCount, setHintCount] = useState<number>(0);
   const [cellErrors, setCellErrors] = useState<Record<string, boolean>>({});
+  const [hasCheckedAnswers, setHasCheckedAnswers] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'game' | 'summary' | 'glossary'>('game');
   const [isLoading, setIsLoading] = useState<boolean>(Boolean(initialChapter));
   const [loadingMessage, setLoadingMessage] = useState<string>(
@@ -173,6 +180,8 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
       setIsTimerRunning(true);
       setGameStatus('playing');
       setHintCount(0);
+      setHasCheckedAnswers(false);
+      rewardClaimedRef.current = false;
       setIsLoading(false);
       setView('playing');
       setActiveTab('game');
@@ -364,12 +373,12 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
       setIsTimerRunning(false);
       if (!rewardClaimedRef.current) {
         rewardClaimedRef.current = true;
-        const totalXp = 50; // 25 words * 2 XP = 50 XP
-        const newXp = (profile?.xp || 0) + totalXp;
-        updateProfileXp(newXp);
-        recordStreakActivity('pariksha_mastery');
-        showToast('Crossword Mastered! +50 XP (25 words × 2 XP)', 'success');
-        onComplete?.();
+        if (isPariksha) {
+          showToast('Crossword Mastered! Pariksha examination complete.', 'success');
+          onComplete?.(solvedWordsCount);
+        } else {
+          showToast('Manan Crossword 100% Mastered! You may now advance to Pariksha.', 'success');
+        }
       }
       try {
         confetti({
@@ -456,6 +465,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
   // Action: Check Answers
   const handleCheckAnswers = () => {
     if (!puzzle || !puzzle.words) return;
+    setHasCheckedAnswers(true);
     const errors: Record<string, boolean> = {};
     let correctCount = 0;
 
@@ -909,6 +919,35 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                {/* Pariksha Complete Button (Only when >= 75%) */}
+                {isPariksha && progressPercent >= 75 && onComplete && (
+                  <button
+                    type="button"
+                    onClick={onComplete}
+                    className="px-4 py-2 text-xs sm:text-sm font-bold text-white rounded-xl shadow-md transition cursor-pointer hover:opacity-95 flex items-center gap-1.5 animate-pulse"
+                    style={{ backgroundColor: 'var(--accent-saffron)' }}
+                    title="Score is 75% or higher • Conclude Pariksha"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Complete Pariksha ({progressPercent}%)</span>
+                  </button>
+                )}
+
+                {/* Manan Go to Pariksha Button (Only when 100% correct) */}
+                {!isPariksha && progressPercent === 100 && onGoToPariksha && (
+                  <button
+                    type="button"
+                    onClick={onGoToPariksha}
+                    className="px-4 py-2 text-xs sm:text-sm font-bold text-white rounded-xl shadow-md transition cursor-pointer hover:opacity-95 flex items-center gap-1.5 animate-bounce"
+                    style={{ backgroundColor: 'var(--accent-saffron)' }}
+                    title="100% Correct! Advance to Stage 04: Pariksha"
+                  >
+                    <ClipboardCheck className="w-4 h-4" />
+                    <span>Go to Pariksha</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={handleCheckAnswers}
@@ -921,6 +960,26 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                 >
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   <span>Check Answers</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (initialChapter && (initialChapter.title || initialChapter.summary)) {
+                      handleGenerateTopic(initialChapter.title, initialChapter.summary);
+                    } else if (samples.length > 0) {
+                      initGame(samples[0]);
+                    }
+                  }}
+                  className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center gap-1.5 cursor-pointer"
+                  style={{
+                    backgroundColor: 'var(--bg-main)',
+                    borderColor: 'var(--border-warm)',
+                    color: 'var(--text-primary)',
+                  }}
+                  title="Regenerate puzzle from scratch"
+                >
+                  <RotateCcw className="w-4 h-4 text-amber-500" />
+                  <span>Retry Puzzle</span>
                 </button>
                 <button
                   type="button"
@@ -950,6 +1009,120 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Contextual Status / Feedback Banner */}
+            {isPariksha ? (
+              progressPercent >= 75 ? (
+                <div className="mb-5 p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                        Exam Passed! Score: {progressPercent}% (Above 75% threshold)
+                      </p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400">
+                        You have met the requirements to conclude this Pariksha exam and claim your +50 XP.
+                      </p>
+                    </div>
+                  </div>
+                  {onComplete && (
+                    <button
+                      type="button"
+                      onClick={onComplete}
+                      className="px-4 py-2 text-xs sm:text-sm font-bold text-white rounded-xl shadow-md transition cursor-pointer hover:opacity-95 flex items-center gap-1.5 shrink-0"
+                      style={{ backgroundColor: 'var(--accent-saffron)' }}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Complete Pariksha ({progressPercent}%)</span>
+                    </button>
+                  )}
+                </div>
+              ) : hasCheckedAnswers && progressPercent < 75 ? (
+                <div className="mb-5 p-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <RotateCcw className="w-5 h-5 text-rose-500 shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-rose-600 dark:text-rose-400">
+                        Score: {progressPercent}% (Below 75% passing threshold)
+                      </p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400">
+                        A minimum score of 75% is required in Pariksha. You can keep solving or Retry Puzzle to generate a fresh examination.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (initialChapter && (initialChapter.title || initialChapter.summary)) {
+                        handleGenerateTopic(initialChapter.title, initialChapter.summary);
+                      } else if (samples.length > 0) {
+                        initGame(samples[0]);
+                      }
+                    }}
+                    className="px-4 py-2 text-xs sm:text-sm font-bold rounded-xl border border-rose-500/40 bg-rose-500/20 text-rose-700 dark:text-rose-300 transition cursor-pointer hover:bg-rose-500/30 flex items-center gap-1.5 shrink-0"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Retry Puzzle</span>
+                  </button>
+                </div>
+              ) : null
+            ) : (
+              progressPercent === 100 ? (
+                <div className="mb-5 p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                        100% Correct! All Manan Contemplation Complete.
+                      </p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400">
+                        You have mastered all three Manan reflections (Jigsaw, Wordle, Crossword). Ready for Stage 04: Pariksha!
+                      </p>
+                    </div>
+                  </div>
+                  {onGoToPariksha && (
+                    <button
+                      type="button"
+                      onClick={onGoToPariksha}
+                      className="px-5 py-2 text-xs sm:text-sm font-bold text-white rounded-xl shadow-md transition cursor-pointer hover:opacity-95 flex items-center gap-1.5 shrink-0 animate-bounce"
+                      style={{ backgroundColor: 'var(--accent-saffron)' }}
+                    >
+                      <ClipboardCheck className="w-4 h-4" />
+                      <span>Go to Pariksha</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ) : hasCheckedAnswers && progressPercent < 100 ? (
+                <div className="mb-5 p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <RotateCcw className="w-5 h-5 text-amber-500 shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400">
+                        Contemplation Progress: {progressPercent}% (100% required in Manan)
+                      </p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400">
+                        Solve all words with 100% correctness to unlock Pariksha, or Retry Puzzle to generate a fresh crossword.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (initialChapter && (initialChapter.title || initialChapter.summary)) {
+                        handleGenerateTopic(initialChapter.title, initialChapter.summary);
+                      } else if (samples.length > 0) {
+                        initGame(samples[0]);
+                      }
+                    }}
+                    className="px-4 py-2 text-xs sm:text-sm font-bold rounded-xl border border-amber-500/40 bg-amber-500/20 text-amber-700 dark:text-amber-300 transition cursor-pointer hover:bg-amber-500/30 flex items-center gap-1.5 shrink-0"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Retry Puzzle</span>
+                  </button>
+                </div>
+              ) : null
+            )}
 
             {/* Navigation Tabs */}
             <div className="flex items-center gap-4 border-b mb-6" style={{ borderColor: 'var(--border-warm)' }}>
@@ -1470,7 +1643,30 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {!isPariksha && onGoToPariksha && (
+                    <button
+                      type="button"
+                      onClick={onGoToPariksha}
+                      className="flex-1 py-3 text-white font-bold rounded-xl transition text-xs sm:text-sm shadow-md cursor-pointer hover:opacity-95 flex items-center justify-center gap-1.5"
+                      style={{ backgroundColor: 'var(--accent-saffron)' }}
+                    >
+                      <ClipboardCheck className="w-4 h-4" />
+                      <span>Go to Pariksha</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+                  {isPariksha && onComplete && (
+                    <button
+                      type="button"
+                      onClick={() => onComplete(solvedWordsCount)}
+                      className="flex-1 py-3 text-white font-bold rounded-xl transition text-xs sm:text-sm shadow-md cursor-pointer hover:opacity-95 flex items-center justify-center gap-1.5"
+                      style={{ backgroundColor: 'var(--accent-saffron)' }}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Complete Pariksha</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -1480,22 +1676,15 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                         setView('welcome');
                       }
                     }}
-                    className="flex-1 py-3 font-semibold rounded-xl transition text-xs sm:text-sm border cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800"
+                    className="flex-1 py-3 font-semibold rounded-xl transition text-xs sm:text-sm border cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-center gap-1.5"
                     style={{
                       backgroundColor: 'var(--bg-main)',
                       borderColor: 'var(--border-warm)',
                       color: 'var(--text-primary)',
                     }}
                   >
-                    {initialChapter ? 'Regenerate' : 'New Puzzle'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setGameStatus('playing')}
-                    className="flex-1 py-3 text-white font-bold rounded-xl transition text-xs sm:text-sm shadow-xs cursor-pointer hover:opacity-95"
-                    style={{ backgroundColor: 'var(--accent-saffron)' }}
-                  >
-                    Review Grid
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Retry Puzzle</span>
                   </button>
                 </div>
               </motion.div>

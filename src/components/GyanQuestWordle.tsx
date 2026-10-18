@@ -75,12 +75,14 @@ interface GyanQuestWordleProps {
   chapter: SavedChapter;
   onExit?: () => void;
   onCompleteChapter?: () => void;
+  onNextActivity?: () => void;
 }
 
 export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
   chapter,
   onExit,
   onCompleteChapter,
+  onNextActivity,
 }) => {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -92,12 +94,14 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
   const [solvedIndices, setSolvedIndices] = useState<Set<number>>(new Set());
   const [attempts, setAttempts] = useState<number>(0);
   const [isHintRevealed, setIsHintRevealed] = useState<boolean>(false);
-  const [timerSeconds, setTimerSeconds] = useState<number>(30);
+  const [timerSeconds, setTimerSeconds] = useState<number>(60);
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
   const [isVictoryOpen, setIsVictoryOpen] = useState<boolean>(false);
+  const [isFailureOpen, setIsFailureOpen] = useState<boolean>(false);
+  const [missedCount, setMissedCount] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string>('Inscribe your answer & press ENTER');
   const [statusType, setStatusType] = useState<'neutral' | 'correct' | 'wrong'>('neutral');
   const [rowShake, setRowShake] = useState<boolean>(false);
@@ -203,6 +207,8 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
     setIsEvaluating(false);
     setSolvedIndices(new Set());
     setIsVictoryOpen(false);
+    setIsFailureOpen(false);
+    setMissedCount(0);
     setCurrentIdx(0);
     setAttempts(0);
     setIsHintRevealed(false);
@@ -222,7 +228,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
         if (data && Array.isArray(data.questions) && data.questions.length > 0) {
           setDeck(data.questions);
           setIsLoading(false);
-          setTimerSeconds(30);
+          setTimerSeconds(60);
           setIsTimerRunning(true);
           return;
         }
@@ -235,7 +241,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
       );
       setDeck(fallback);
       setIsLoading(false);
-      setTimerSeconds(30);
+      setTimerSeconds(60);
       setIsTimerRunning(true);
     }
   }, [chapter, generateFallbackQuestions]);
@@ -259,7 +265,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
     setTilesFeedback('none');
     setStatusMessage(`Inscribe a ${deck[idx]?.answer?.length || 5}-letter answer & press ENTER`);
     setStatusType('neutral');
-    setTimerSeconds(30);
+    setTimerSeconds(60);
     setIsTimerRunning(true);
   }, [deck, isEvaluating]);
 
@@ -280,7 +286,8 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
       return;
     }
 
-    let nextIdx = (currentIdx + 1) % deck.length;
+    // Check if there are any remaining unsolved questions
+    let nextIdx = -1;
     for (let i = 0; i < deck.length; i++) {
       const candidate = (currentIdx + 1 + i) % deck.length;
       if (!solvedIndices.has(candidate)) {
@@ -288,30 +295,39 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
         break;
       }
     }
-    selectQuestion(nextIdx);
+
+    if (nextIdx !== -1) {
+      selectQuestion(nextIdx);
+    } else {
+      // All questions attempted but not all solved -> less than 100% correct = fail
+      setIsTimerRunning(false);
+      setIsFailureOpen(true);
+    }
   }, [deck.length, solvedIndices, currentIdx, playSound, selectQuestion]);
 
-  // Handle timer countdown
+  // Handle timer countdown (60 seconds)
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isTimerRunning && !isEvaluating && !isLoading && !isVictoryOpen && deck.length > 0) {
+    if (isTimerRunning && !isEvaluating && !isLoading && !isVictoryOpen && !isFailureOpen && deck.length > 0) {
       interval = setInterval(() => {
         setTimerSeconds((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
-            // Time expired
+            // Time expired on this question -> marked as missed (less than 100%)
             setIsTimerRunning(false);
             playSound('wrong');
+            setMissedCount((c) => c + 1);
             setStatusMessage(`Time's up! The sacred answer was: ${targetAnswer}`);
             setStatusType('wrong');
             setTilesFeedback('wrong');
             setEnteredLetters(targetAnswer);
             setTimeout(() => {
-              advanceToNextQuestion();
+              // Less than 100% since time expired without solving
+              setIsFailureOpen(true);
             }, 1800);
             return 0;
           }
-          if (prev <= 6) {
+          if (prev <= 8) {
             playSound('tap');
           }
           return prev - 1;
@@ -448,10 +464,10 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [handleKey, isHelpOpen, isVictoryOpen]);
 
-  // Timer SVG math
+  // Timer SVG math (60 seconds)
   const circ = 91.1;
-  const strokeOffset = circ * (1 - Math.max(0, timerSeconds) / 30);
-  const isTimerUrgent = timerSeconds <= 5;
+  const strokeOffset = circ * (1 - Math.max(0, timerSeconds) / 60);
+  const isTimerUrgent = timerSeconds <= 8;
 
   return (
     <div
@@ -505,10 +521,11 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
           <button
             type="button"
             onClick={loadChapterDeck}
-            className="p-2 rounded-xl border border-amber-500/30 hover:border-amber-400 bg-black/40 text-amber-300 transition cursor-pointer hover:bg-amber-500/10"
-            title="Reset & Re-forge Quest"
+            className="px-3 py-2 rounded-xl border border-amber-500/30 hover:border-amber-400 bg-black/40 text-amber-300 transition cursor-pointer hover:bg-amber-500/10 flex items-center gap-1.5 text-xs font-bold"
+            title="Retry Puzzle & Regenerate Questions"
           >
             <RotateCcw className="w-4 h-4" />
+            <span className="hidden sm:inline">Retry Puzzle</span>
           </button>
           {onExit && (
             <button
@@ -606,12 +623,12 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
                   Skip ➔
                 </button>
 
-                {/* 30-Second Countdown Meter */}
+                {/* 60-Second Countdown Meter */}
                 <div
                   className={`relative w-9 h-9 flex items-center justify-center ${
                     isTimerUrgent ? 'animate-pulse' : ''
                   }`}
-                  title="30-second countdown"
+                  title="60-second countdown"
                 >
                   <svg className="w-9 h-9 -rotate-90" viewBox="0 0 36 36">
                     <circle
@@ -830,7 +847,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
               <p>3. <strong>Green for Truth</strong>: Inscribe the correct word to illuminate the tiles green and advance.</p>
               <p>4. <strong>Red to Re-inscribe</strong>: Incorrect attempts flash red and automatically erase so you can retype.</p>
               <p>5. <strong>Sage&apos;s Hint</strong>: Unlocks after 2 attempts, or click &ldquo;Reveal Hint&rdquo; at any time.</p>
-              <p>6. <strong>30-Second Timer</strong>: Contemplate swiftly before the sacred countdown expires.</p>
+              <p>6. <strong>60-Second Timer</strong>: Contemplate swiftly before the sacred countdown expires.</p>
             </div>
 
             <button
@@ -844,7 +861,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
         </div>
       )}
 
-      {/* VICTORY MODAL */}
+      {/* VICTORY MODAL (100% Correct) */}
       {isVictoryOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
           <div
@@ -858,8 +875,8 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
             <h3 className="text-2xl font-black text-amber-200 tracking-wide font-serif-heading">
               WISDOM MASTERED
             </h3>
-            <p className="text-xs uppercase tracking-widest text-amber-400 font-bold">
-              ALL CHAPTER QUESTIONS DECIPHERED
+            <p className="text-xs uppercase tracking-widest text-emerald-400 font-bold">
+              100% CORRECT • ALL QUESTIONS DECIPHERED
             </p>
             <p className="text-xs sm:text-sm italic text-stone-300 bg-black/40 p-3.5 rounded-2xl border border-amber-500/20">
               &ldquo;Through contemplation, discernment, and steadfast inquiry into {chapter.title}, the seeker unveils the light of wisdom.&rdquo;
@@ -871,28 +888,65 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
                 <span className="text-lg font-bold text-emerald-400">{deck.length} / {deck.length}</span>
               </div>
               <div className="p-3 rounded-xl bg-black/40 border border-amber-500/20">
-                <span className="text-[10px] text-stone-400 block uppercase font-bold">XP Awarded</span>
-                <span className="text-lg font-bold text-amber-300">+{deck.length * 15} XP</span>
+                <span className="text-[10px] text-stone-400 block uppercase font-bold">Accuracy</span>
+                <span className="text-lg font-bold text-amber-300">100%</span>
               </div>
             </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              {onNextActivity && (
+                <button
+                  type="button"
+                  onClick={onNextActivity}
+                  className="flex-1 py-3 px-4 rounded-xl text-white font-bold text-xs uppercase tracking-wider hover:brightness-110 cursor-pointer shadow-md flex items-center justify-center gap-1.5"
+                  style={{ backgroundColor: 'var(--accent-saffron)' }}
+                >
+                  <span>Next Activity: Crossword</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={loadChapterDeck}
+                className="py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 cursor-pointer shadow-md"
+              >
+                Retry Puzzle 🪷
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FAILURE MODAL (< 100% Correct) */}
+      {isFailureOpen && !isVictoryOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div
+            className="rounded-3xl border p-6 sm:p-8 max-w-md w-full text-center space-y-4 shadow-2xl relative"
+            style={{
+              backgroundColor: '#141722',
+              borderColor: '#ef444488',
+            }}
+          >
+            <div className="text-5xl">⏳</div>
+            <h3 className="text-2xl font-black text-rose-300 tracking-wide font-serif-heading">
+              CONTEMPLATION INCOMPLETE
+            </h3>
+            <p className="text-xs uppercase tracking-widest text-rose-400 font-bold">
+              100% ACCURACY REQUIRED TO ADVANCE
+            </p>
+            <p className="text-xs sm:text-sm text-stone-300 bg-black/40 p-3.5 rounded-2xl border border-rose-500/20 leading-relaxed">
+              You solved {solvedIndices.size} of {deck.length} questions ({deck.length > 0 ? Math.round((solvedIndices.size / deck.length) * 100) : 0}%). In Manan, 100% accuracy is required before advancing to the next activity.
+            </p>
 
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
                 onClick={loadChapterDeck}
-                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 cursor-pointer shadow-md"
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 cursor-pointer shadow-md flex items-center justify-center gap-2"
               >
-                Play Another Round 🪷
+                <RotateCcw className="w-4 h-4" />
+                <span>Retry Puzzle</span>
               </button>
-              {onExit && (
-                <button
-                  type="button"
-                  onClick={onExit}
-                  className="px-4 py-3 rounded-xl border border-amber-500/30 text-amber-300 text-xs font-bold hover:bg-white/5 cursor-pointer"
-                >
-                  Return to Manan
-                </button>
-              )}
             </div>
           </div>
         </div>

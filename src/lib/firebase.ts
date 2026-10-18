@@ -601,9 +601,18 @@ export interface ChapterRewardResult {
   message: string;
 }
 
+export type RewardStage =
+  | 'shravan'
+  | 'manan'
+  | 'pariksha'
+  | 'manan_jigsaw'
+  | 'manan_wordle'
+  | 'manan_crossword';
+
 /**
- * Claim stage XP reward (Shravan 10 XP, Manan 5 XP) for a chapter.
- * Enforces per-user separation and prevents duplicate rewards even across sessions and cache clears.
+ * Claim stage XP reward (Shravan 10 XP, Manan sub-activities 5 XP, Pariksha 50 XP).
+ * For PDF chapters: enforces 10-digit chapter code records and claimedRewards.
+ * For Scriptures: maintains a dedicated /users/{userId}/scriptures/{scriptureKey} record in Firebase.
  */
 export async function claimChapterStageReward(
   chapter: {
@@ -614,12 +623,26 @@ export async function claimChapterStageReward(
     shravanXpClaimed?: boolean;
     mananXpClaimed?: boolean;
     parikshaXpClaimed?: boolean;
+    [key: string]: any;
   },
-  stage: 'shravan' | 'manan' | 'pariksha',
-  user: User | null
+  stage: RewardStage,
+  user: User | null,
+  customXp?: number
 ): Promise<ChapterRewardResult> {
-  const xpToAdd = stage === 'shravan' ? 10 : stage === 'manan' ? 5 : 50;
-  const stageLabel = stage === 'shravan' ? 'Shravan (10 XP)' : stage === 'manan' ? 'Manan (5 XP)' : 'Pariksha (50 XP)';
+  const isMananSubActivity = stage === 'manan_jigsaw' || stage === 'manan_wordle' || stage === 'manan_crossword';
+  const xpToAdd = customXp !== undefined ? customXp : (stage === 'shravan' ? 10 : isMananSubActivity ? 5 : stage === 'manan' ? 5 : 50);
+  const stageLabel =
+    stage === 'shravan'
+      ? 'Shravan (10 XP)'
+      : stage === 'manan_jigsaw'
+      ? 'Jigsaw Reflection (5 XP)'
+      : stage === 'manan_wordle'
+      ? 'Word Quest (5 XP)'
+      : stage === 'manan_crossword'
+      ? 'Crossword Quest (5 XP)'
+      : stage === 'manan'
+      ? 'Manan (5 XP)'
+      : `Pariksha (${xpToAdd} XP)`;
 
   // Determine user identifier
   let effectiveUserId = user?.uid;
@@ -635,7 +658,138 @@ export async function claimChapterStageReward(
     }
   }
 
-  // Ensure chapter has a valid 10-digit uniqueCode (from 0000000000 to 9999999999)
+  const isScripture = Boolean(
+    chapter.id &&
+      (chapter.id.startsWith('gita_') ||
+        chapter.id.startsWith('epic_') ||
+        chapter.scriptureKey ||
+        chapter.fileName?.toLowerCase().includes('gita') ||
+        chapter.fileName?.toLowerCase().includes('ramayana') ||
+        chapter.fileName?.toLowerCase().includes('mahabharata'))
+  );
+
+  const scriptureKey =
+    chapter.scriptureKey ||
+    (chapter.id?.includes('gita')
+      ? 'gita'
+      : chapter.id?.includes('ramayana')
+      ? 'ramayana'
+      : chapter.id?.includes('mahabharata')
+      ? 'mahabharata'
+      : chapter.id || 'scripture_default');
+
+  // Handle Scripture reward workflow
+  if (isScripture) {
+    // 1. Fast local check
+    const localScriptureClaimKey = `gq_scripture_${effectiveUserId}_${scriptureKey}_${stage}`;
+    if (localStorage.getItem(localScriptureClaimKey) === 'true' || chapter[`${stage}XpClaimed`]) {
+      const local = effectiveUserId ? getLocalProfile(effectiveUserId) : getGuestProfile();
+      return {
+        awarded: false,
+        xpAdded: 0,
+        newTotal: local?.xp || 0,
+        message: `${stageLabel} has already been claimed for this scripture.`,
+      };
+    }
+
+    // 2. Cloud Firestore check on /users/{userId}/scriptures/{scriptureKey}
+    try {
+      const scriptureDocRef = doc(db, 'users', effectiveUserId, 'scriptures', scriptureKey);
+      const scriptureSnap = await getDoc(scriptureDocRef);
+      if (scriptureSnap.exists() && scriptureSnap.data()?.[stage] === true) {
+        chapter[`${stage}XpClaimed`] = true;
+        try {
+          localStorage.setItem(localScriptureClaimKey, 'true');
+        } catch (_) {}
+        const userDocSnap = await getDoc(doc(db, 'users', effectiveUserId));
+        const currentXp = userDocSnap.exists() && typeof userDocSnap.data()?.xp === 'number' ? userDocSnap.data().xp : 0;
+        return {
+          awarded: false,
+          xpAdded: 0,
+          newTotal: currentXp,
+          message: `${stageLabel} was already claimed for this scripture.`,
+        };
+      }
+    } catch (sErr) {
+      console.warn('Firestore scripture reward check notice:', sErr);
+    }
+
+    // 3. User is eligible for Scripture XP
+    let currentTotalXp = 0;
+    try {
+      const userDocRef = doc(db, 'users', effectiveUserId);
+      const userSnap = await getDoc(userDocRef);
+      if (userSnap.exists() && typeof userSnap.data()?.xp === 'number') {
+        currentTotalXp = userSnap.data().xp;
+      } else {
+        const local = getLocalProfile(effectiveUserId) || getGuestProfile();
+        currentTotalXp = typeof local?.xp === 'number' ? local.xp : 0;
+      }
+    } catch {
+      const local = getLocalProfile(effectiveUserId) || getGuestProfile();
+      currentTotalXp = typeof local?.xp === 'number' ? local.xp : 0;
+    }
+
+    const newTotal = currentTotalXp + xpToAdd;
+    chapter[`${stage}XpClaimed`] = true;
+
+    // Update local profile & storage
+    const localProf = getLocalProfile(effectiveUserId) || getGuestProfile();
+    const updatedProfile: UserProfileData = { ...localProf, xp: newTotal };
+    saveLocalProfile(effectiveUserId, updatedProfile);
+    if (effectiveUserId === 'guest_session') {
+      saveGuestProfile(updatedProfile);
+    }
+    try {
+      localStorage.setItem(localScriptureClaimKey, 'true');
+    } catch (_) {}
+
+    // Persist to Cloud Firestore:
+    try {
+      // Update user total XP
+      await setDoc(doc(db, 'users', effectiveUserId), { xp: newTotal }, { merge: true });
+
+      // Update dedicated scriptures document: /users/{userId}/scriptures/{scriptureKey}
+      await setDoc(
+        doc(db, 'users', effectiveUserId, 'scriptures', scriptureKey),
+        {
+          scriptureKey,
+          chapterId: chapter.id,
+          title: chapter.title || scriptureKey,
+          [stage]: true,
+          [`${stage}ClaimedAt`]: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      // Record in claimedRewards subcollection
+      await setDoc(
+        doc(db, 'users', effectiveUserId, 'claimedRewards', `scripture_${scriptureKey}_${stage}`),
+        {
+          scriptureKey,
+          chapterId: chapter.id,
+          stage,
+          xp: xpToAdd,
+          claimedAt: new Date().toISOString(),
+          userId: effectiveUserId,
+        },
+        { merge: true }
+      );
+      console.log(`[Firestore] Scripture reward persisted: +${xpToAdd} XP for ${stage} on ${scriptureKey}.`);
+    } catch (saveErr) {
+      console.warn('Failed to persist scripture reward to Firestore:', saveErr);
+    }
+
+    return {
+      awarded: true,
+      xpAdded: xpToAdd,
+      newTotal,
+      message: `+${xpToAdd} XP Earned for ${stageLabel}!`,
+    };
+  }
+
+  // Handle PDF Chapters workflow (10-digit code system)
   let uniqueCode = chapter.uniqueCode;
   if (!uniqueCode || typeof uniqueCode !== 'string' || uniqueCode.length !== 10) {
     let generated = '';
@@ -647,25 +801,7 @@ export async function claimChapterStageReward(
   }
 
   // 1. Fast check: in-memory state
-  if (stage === 'shravan' && chapter.shravanXpClaimed) {
-    const local = effectiveUserId ? getLocalProfile(effectiveUserId) : getGuestProfile();
-    return {
-      awarded: false,
-      xpAdded: 0,
-      newTotal: local?.xp || 0,
-      message: `${stageLabel} has already been claimed for this chapter.`,
-    };
-  }
-  if (stage === 'manan' && chapter.mananXpClaimed) {
-    const local = effectiveUserId ? getLocalProfile(effectiveUserId) : getGuestProfile();
-    return {
-      awarded: false,
-      xpAdded: 0,
-      newTotal: local?.xp || 0,
-      message: `${stageLabel} has already been claimed for this chapter.`,
-    };
-  }
-  if (stage === 'pariksha' && chapter.parikshaXpClaimed) {
+  if (chapter[`${stage}XpClaimed`]) {
     const local = effectiveUserId ? getLocalProfile(effectiveUserId) : getGuestProfile();
     return {
       awarded: false,
@@ -681,9 +817,7 @@ export async function claimChapterStageReward(
     const rewardDocRef = doc(db, 'users', effectiveUserId, 'claimedRewards', `${uniqueCode}_${stage}`);
     const rewardSnap = await getDoc(rewardDocRef);
     if (rewardSnap.exists()) {
-      if (stage === 'shravan') chapter.shravanXpClaimed = true;
-      if (stage === 'manan') chapter.mananXpClaimed = true;
-      if (stage === 'pariksha') chapter.parikshaXpClaimed = true;
+      chapter[`${stage}XpClaimed`] = true;
       const userDocSnap = await getDoc(doc(db, 'users', effectiveUserId));
       const currentXp = userDocSnap.exists() && typeof userDocSnap.data()?.xp === 'number' ? userDocSnap.data().xp : 0;
       return {
@@ -702,9 +836,7 @@ export async function claimChapterStageReward(
       const claimedArray = (data?.[`${stage}ClaimedBy`] as string[]) || [];
       const stageObj = data?.rewards?.[stage];
       if (claimedArray.includes(effectiveUserId) || (stageObj?.claimed && stageObj?.userId === effectiveUserId)) {
-        if (stage === 'shravan') chapter.shravanXpClaimed = true;
-        if (stage === 'manan') chapter.mananXpClaimed = true;
-        if (stage === 'pariksha') chapter.parikshaXpClaimed = true;
+        chapter[`${stage}XpClaimed`] = true;
         const userDocSnap = await getDoc(doc(db, 'users', effectiveUserId));
         const currentXp = userDocSnap.exists() && typeof userDocSnap.data()?.xp === 'number' ? userDocSnap.data().xp : 0;
         return {
@@ -738,8 +870,9 @@ export async function claimChapterStageReward(
   const newTotal = currentTotalXp + xpToAdd;
 
   // Mark chapter flags in memory
+  chapter[`${stage}XpClaimed`] = true;
   if (stage === 'shravan') chapter.shravanXpClaimed = true;
-  if (stage === 'manan') chapter.mananXpClaimed = true;
+  if (stage === 'manan' || isMananSubActivity) chapter.mananXpClaimed = true;
   if (stage === 'pariksha') chapter.parikshaXpClaimed = true;
 
   // Update local profile

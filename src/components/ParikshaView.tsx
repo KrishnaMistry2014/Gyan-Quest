@@ -9,11 +9,12 @@ import {
   CheckCircle2,
   Brain
 } from 'lucide-react';
-import { SavedChapter } from '../lib/chapters';
+import { SavedChapter, generateUniqueChapterCode } from '../lib/chapters';
 import { GyanQuestCrossword } from './GyanQuestCrossword';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
+import { claimChapterStageReward } from '../lib/firebase';
 
 interface ParikshaViewProps {
   chapter?: SavedChapter | null;
@@ -47,16 +48,39 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
   }, [chapter]);
 
   // When chapter test is completed
-  const handleParikshaCompleted = () => {
-    // Stage 04 Pariksha awards 50 XP (allowed per requirement 8: "Do not give Xp rewards over 15Xp in anything other than Pariksha and manan")
-    const newXp = (profile?.xp || 0) + 50;
-    updateProfileXp(newXp);
+  const handleParikshaCompleted = async (solvedCount = 25) => {
+    let ch = activeChapter ? { ...activeChapter } : null;
+    const earnedXp = Math.min(50, Math.max(2, solvedCount * 2));
+    if (ch) {
+      if (!ch.uniqueCode || ch.uniqueCode.length !== 10) {
+        ch.uniqueCode = generateUniqueChapterCode();
+      }
+      try {
+        const reward = await claimChapterStageReward(ch, 'pariksha', user, earnedXp);
+        if (reward.awarded) {
+          updateProfileXp(reward.newTotal);
+          recordStreakActivity('pariksha_mastery');
+          showToast({
+            title: language === 'hi' ? `परीक्षा उत्तीर्ण! +${earnedXp} XP` : `Pariksha Conquered! +${earnedXp} XP`,
+            message: language === 'hi'
+              ? `आपने ${ch.title || 'अध्याय'} की परीक्षा सफलतापूर्वक पूर्ण कर ली है!`
+              : `Congratulations! You mastered the chapter exam for ${ch.title || 'your chapter'}!`,
+            type: 'xp',
+            xpAmount: earnedXp,
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('Error claiming Pariksha reward:', err);
+      }
+    }
+    // Fallback or already claimed
     recordStreakActivity('pariksha_mastery');
     showToast({
-      title: language === 'hi' ? 'परीक्षा उत्तीर्ण! +50 XP' : 'Pariksha Conquered! +50 XP',
+      title: language === 'hi' ? 'परीक्षा पूर्ण!' : 'Pariksha Completed!',
       message: language === 'hi'
-        ? `आपने ${activeChapter?.title || 'अध्याय'} की परीक्षा सफलतापूर्वक पूर्ण कर ली है!`
-        : `Congratulations! You mastered the chapter exam for ${activeChapter?.title || 'your chapter'}!`,
+        ? `आपने परीक्षा सफलतापूर्वक पूर्ण कर ली है!`
+        : `Congratulations! You completed the Pariksha assessment.`,
       type: 'success',
     });
   };
@@ -150,6 +174,7 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
           initialChapter={activeChapter || undefined}
           onExit={onNavigateDashboard || onNavigateHome}
           onComplete={handleParikshaCompleted}
+          isPariksha={true}
         />
       </div>
     </div>
