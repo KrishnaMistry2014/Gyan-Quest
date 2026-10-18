@@ -249,29 +249,9 @@ const saveLocalProfile = (uid: string, data: UserProfileData) => {
  * - longestStreak
  * - activeDays
  */
-export async function checkAndResetDailyQuotas() {
-  try {
-    const quotaRef = doc(db, 'systemStatus', 'dailyQuotaStatus');
-    const today = getLocalDateString();
-    const snap = await getDoc(quotaRef);
-    if (!snap.exists() || snap.data()?.date !== today) {
-      await setDoc(quotaRef, {
-        date: today,
-        exceededModels: [],
-        resetAt: Date.now(),
-      });
-      console.log(`[Daily Quota Reset] Quota status sheet reset for today (${today}) by first student login.`);
-    }
-  } catch (err) {
-    console.warn('Error checking/resetting daily quotas:', err);
-  }
-}
-
 export async function syncUserAndStreak(user: User): Promise<UserProfileData> {
   const userRef = doc(db, 'users', user.uid);
   const today = getLocalDateString();
-
-  checkAndResetDailyQuotas().catch(() => {});
 
   const local = getLocalProfile(user.uid);
   const guest = getGuestProfile();

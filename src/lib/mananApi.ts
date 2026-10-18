@@ -508,10 +508,10 @@ export function getFallbackIllustrationUrl(chapter?: SavedChapter | null): strin
 }
 
 /**
- * Calls the image-generation pipeline and preloads the resulting image.
- * Uses Render API with seamless failover to direct Hugging Face Space.
- * NEVER masks errors with predefined placeholder images: always returns clear error codes
- * and transparent failure diagnostics when the backend fails.
+ * Calls the original Gyan Quest Render image-generation pipeline (gyanquest-image-api)
+ * and preloads the resulting image.
+ * Never calls Nano Banana, Gemini image models, or paid image APIs directly.
+ * If generation fails, throws a clear diagnostic error.
  */
 export async function generateChapterImage(
   prompt: string,
@@ -529,23 +529,8 @@ export async function generateChapterImage(
   }
 
   const cleanPrompt = prompt.trim();
-  // 1. Primary: Hugging Face Space of Krea 2 (krea-krea-2.hf.space)
-  try {
-    const gradioUrl = await generateViaDirectGradio(cleanPrompt, signal);
-    if (gradioUrl && typeof gradioUrl === 'string' && (gradioUrl.startsWith('http') || gradioUrl.startsWith('data:'))) {
-      await preloadImage(gradioUrl, 15000);
-      return {
-        imageUrl: gradioUrl,
-        isAiGenerated: true,
-        message: 'Generated via Hugging Face Space (Krea 2 Turbo)',
-      };
-    }
-  } catch (gradioErr: any) {
-    if (signal?.aborted) throw gradioErr;
-    console.warn('[Manan Image Service] Hugging Face Space notice, attempting Render API failover:', gradioErr?.message || gradioErr);
-  }
 
-  // 2. Failover: Render API (gyanquest-image-api)
+  // Call the existing Render backend at https://gyanquest-image-api.onrender.com/generate
   try {
     const res = await fetch(GYANQUEST_IMAGE_API_URL, {
       method: 'POST',
@@ -567,19 +552,51 @@ export async function generateChapterImage(
           isAiGenerated: true,
           message: 'Generated via Gyan Quest Image API',
         };
+      } else {
+        throw new MananImageError({
+          statusCode: res.status,
+          errorCode: 'ERR_INVALID_IMAGE_PAYLOAD',
+          message: 'Server returned HTTP 200 OK but response payload did not contain a valid image URL.',
+          backendMessage: JSON.stringify(data || 'Empty or invalid response body'),
+          endpoint: GYANQUEST_IMAGE_API_URL,
+          promptSent: cleanPrompt,
+        });
       }
+    } else {
+      let backendMsg = `HTTP ${res.status}: ${res.statusText}`;
+      try {
+        const errJson = await res.json();
+        backendMsg = errJson?.error || errJson?.message || errJson?.detail || backendMsg;
+      } catch (_) {
+        try {
+          const text = await res.text();
+          if (text) backendMsg = text.slice(0, 300);
+        } catch (_) {}
+      }
+
+      throw new MananImageError({
+        statusCode: res.status,
+        errorCode: `HTTP_${res.status}_RENDER_FAILED`,
+        message: `Image generation server error (${res.status}): ${backendMsg}`,
+        backendMessage: backendMsg,
+        endpoint: GYANQUEST_IMAGE_API_URL,
+        promptSent: cleanPrompt,
+      });
     }
   } catch (err: any) {
-    if (signal?.aborted) throw err;
-    console.warn('[Manan Image Service] Render failover notice:', err?.message || err);
+    if (signal?.aborted) {
+      throw err;
+    }
+    if (err instanceof MananImageError) {
+      throw err;
+    }
+    throw new MananImageError({
+      statusCode: 0,
+      errorCode: 'ERR_RENDER_CONNECT_FAILED',
+      message: err?.message || 'Failed to connect to primary image generation service.',
+      backendMessage: err?.message || 'Connection failed',
+      endpoint: GYANQUEST_IMAGE_API_URL,
+      promptSent: cleanPrompt,
+    });
   }
-
-  // 3. Fallback: Educational concept illustration
-  console.warn('[Manan Image Service] Using verified educational curriculum visual for uninterrupted jigsaw.');
-  const fallbackUrl = getFallbackIllustrationUrl(chapter);
-  return {
-    imageUrl: fallbackUrl,
-    isAiGenerated: false,
-    message: 'Educational concept illustration for chapter reflection',
-  };
 }

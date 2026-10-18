@@ -184,6 +184,10 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const [volume, setVolume] = useState<number>(1);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [hasPlayedFullAudio, setHasPlayedFullAudio] = useState<boolean>(Boolean(chapter.shravanCompleted));
+  const [isUsingWebSpeech, setIsUsingWebSpeech] = useState<boolean>(false);
+  const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const speechTextRef = useRef<string>('');
+  const speechTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
@@ -380,7 +384,19 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       if (err?.name === 'AbortError' || controller.signal.aborted) {
         return;
       }
-      console.error('[Shravan TTS error]:', err);
+      console.warn('[Shravan TTS] Server TTS unavailable, activating Web Speech API fallback:', err);
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        const plainText = stripMarkdownForSpeech(chapter.summary);
+        speechTextRef.current = plainText;
+        setIsUsingWebSpeech(true);
+        const words = plainText.split(/\s+/).filter(Boolean).length;
+        const estDuration = Math.max(15, Math.round(words / 2.3));
+        setDuration(estDuration);
+        setCurrentTime(0);
+        setStatus('ready');
+        setTtsMeta({ voice: 'Web Speech API (Teacher Voice Engine)', fromCache: false });
+        return;
+      }
       setStatus('error');
       setErrorMessage(
         err?.message || 'Unable to generate audio narration at this moment. The voice service may be experiencing temporary rate limits. Please retry in a few moments.'
@@ -506,6 +522,55 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   }, [status, audioUrl, audioBase64]);
 
   const handleTogglePlay = () => {
+    if (isUsingWebSpeech) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        if (isPlaying) {
+          window.speechSynthesis.pause();
+          setIsPlaying(false);
+          if (speechTimerRef.current) clearInterval(speechTimerRef.current);
+        } else {
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+            setIsPlaying(true);
+          } else {
+            window.speechSynthesis.cancel();
+            const utt = new SpeechSynthesisUtterance(speechTextRef.current);
+            const voices = window.speechSynthesis.getVoices();
+            const preferredVoice =
+              voices.find((v) => v.lang.includes('IN') || v.lang.includes('hi')) ||
+              voices.find((v) => v.lang.startsWith('en'));
+            if (preferredVoice) utt.voice = preferredVoice;
+            utt.rate = getTargetAudioSpeed();
+            utt.volume = volume;
+            utt.onend = () => {
+              setIsPlaying(false);
+              setHasPlayedFullAudio(true);
+              setCurrentTime(duration);
+              if (speechTimerRef.current) clearInterval(speechTimerRef.current);
+            };
+            utt.onerror = () => {
+              setIsPlaying(false);
+              if (speechTimerRef.current) clearInterval(speechTimerRef.current);
+            };
+            speechUtteranceRef.current = utt;
+            window.speechSynthesis.speak(utt);
+            setIsPlaying(true);
+          }
+          if (speechTimerRef.current) clearInterval(speechTimerRef.current);
+          speechTimerRef.current = setInterval(() => {
+            setCurrentTime((prev) => {
+              if (prev >= duration) {
+                if (speechTimerRef.current) clearInterval(speechTimerRef.current);
+                return duration;
+              }
+              return prev + 1;
+            });
+          }, 1000);
+        }
+      }
+      return;
+    }
+
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
@@ -564,6 +629,9 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     setVolume(val);
+    if (isUsingWebSpeech && speechUtteranceRef.current) {
+      speechUtteranceRef.current.volume = val;
+    }
     if (audioRef.current) {
       audioRef.current.volume = val;
       setIsMuted(val === 0);
@@ -583,6 +651,15 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   };
 
   const handleRepeat = () => {
+    if (isUsingWebSpeech) {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        setCurrentTime(0);
+        setIsPlaying(false);
+        setTimeout(() => handleTogglePlay(), 50);
+      }
+      return;
+    }
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       setCurrentTime(0);
@@ -594,6 +671,11 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
   };
 
   const handleSeekRelative = (seconds: number) => {
+    if (isUsingWebSpeech) {
+      const targetTime = Math.max(0, Math.min(duration, currentTime + seconds));
+      setCurrentTime(targetTime);
+      return;
+    }
     if (audioRef.current) {
       const maxDuration = duration || 10000;
       const targetTime = Math.max(0, Math.min(maxDuration, audioRef.current.currentTime + seconds));
