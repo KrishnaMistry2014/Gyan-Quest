@@ -94,7 +94,7 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !user) return null;
+  if (!isOpen) return null;
 
   const handleSendMessage = async (customText?: string) => {
     const textToSend = (customText !== undefined ? customText : inputText).trim();
@@ -112,7 +112,7 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
     setInputText('');
     setIsLoading(true);
 
-    // Save user message (only persists to Firestore if user signed in with Google/Email)
+    // Save user message (only persists to Firestore if user signed in with Google/Email; local cache for guests)
     saveGuruChatToFirestore(newMessages, user);
 
     try {
@@ -126,6 +126,11 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
           history: newMessages,
         }),
       });
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        throw new Error('Server warmup in progress. Please retry in a moment.');
+      }
 
       const data = await response.json().catch(() => null);
 
@@ -436,12 +441,9 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  if (e.ctrlKey || e.metaKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                  // Pressing only Enter allows the normal behavior of inserting a newline
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
                 }
               }}
               placeholder="Ask Guru anything"

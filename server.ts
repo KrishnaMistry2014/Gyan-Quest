@@ -368,13 +368,11 @@ CRITICAL REQUIREMENTS:
   // Shravan TTS: Exact fallback order required:
   // 1. gemini-3.8-flash-tts
   // 2. gemini-3.8-flash-lite-tts
-  // 3. gemini-3.1-flash-tts
-  // 4. Web Speech API (Client fallback on error)
+  // 3. Web Speech API (Client fallback on error)
   // ============================================================================
   const TTS_MODELS_ORDER = [
     'gemini-3.8-flash-tts',
     'gemini-3.8-flash-lite-tts',
-    'gemini-3.1-flash-tts',
   ] as const;
 
   const TTS_CACHE_DIR = path.join(process.cwd(), '.cache', 'tts');
@@ -407,7 +405,7 @@ CRITICAL REQUIREMENTS:
     for (let i = 0; i < TTS_MODELS_ORDER.length; i++) {
       const model = TTS_MODELS_ORDER[i];
       try {
-        console.log(`[TTS Tier ${i + 1}/3] Synthesizing with ${model} (Voice: ${voice})...`);
+        console.log(`[TTS Tier ${i + 1}/${TTS_MODELS_ORDER.length}] Synthesizing with ${model} (Voice: ${voice})...`);
         const ttsPromise = ai.models.generateContent({
           model,
           contents: [
@@ -417,7 +415,6 @@ CRITICAL REQUIREMENTS:
             },
           ] as any,
           config: {
-            systemInstruction: `You are a text-to-speech voice synthesizer. Speak strictly with a natural Indian English accent. Read only the user's text immediately without greetings or preambles.`,
             responseModalities: ['AUDIO'],
             speechConfig: {
               voiceConfig: {
@@ -438,7 +435,7 @@ CRITICAL REQUIREMENTS:
           return { audioBuffer: wavBuf, modelUsed: model, voiceUsed: voice, fromCache: false };
         }
       } catch (err: any) {
-        console.log(`[TTS Tier ${i + 1}/3] ${model} unavailable, trying next tier`);
+        console.log(`[TTS Tier ${i + 1}/${TTS_MODELS_ORDER.length}] ${model} unavailable:`, err?.message || err);
         errors.push(`${model}: ${err?.message || err}`);
       }
     }
@@ -477,8 +474,10 @@ CRITICAL REQUIREMENTS:
         audioBase64: result.audioBuffer.toString('base64'),
       });
     } catch (err: any) {
-      console.log('[Shravan TTS Notice] Returning fallbackToWebSpeech signal to client');
-      return res.status(503).json({
+      console.log('[Shravan TTS Notice] Returning fallbackToWebSpeech signal to client:', err?.message);
+      // NOTE: Do not return 502/503/504 because Nginx intercepts those and serves warmup.html.
+      // Return 200 with fallbackToWebSpeech flag so frontend cleanly uses Web Speech API.
+      return res.status(200).json({
         success: false,
         fallbackToWebSpeech: true,
         error: err?.message || 'Server voice engine busy. Switching to Web Speech API.',

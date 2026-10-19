@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
@@ -109,13 +109,15 @@ const MainAppContent: React.FC = () => {
     } catch (_) {}
   };
 
+  const prevUserRef = useRef(user);
+
   // When user logs in and is verified, automatically navigate to dashboard if on landing
   // When user signs out, immediately redirect back to landing page and clear active session states
   useEffect(() => {
     if (loading) return;
     if (user && !isEmailUnverified) {
       setCurrentView((prev) => (prev === 'landing' ? 'dashboard' : prev));
-    } else if (!user) {
+    } else if (prevUserRef.current && !user) {
       setIsGuruModalOpen(false);
       setCurrentView('landing');
       setSelectedChapter(null);
@@ -125,6 +127,7 @@ const MainAppContent: React.FC = () => {
       setUploadedPdf(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+    prevUserRef.current = user;
   }, [user, isEmailUnverified, loading]);
 
   const scrollToSection = (sectionId: string) => {
