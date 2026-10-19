@@ -12,6 +12,10 @@ import { getFirestore } from 'firebase/firestore';
 import { buildValidCrosswordLayout } from './src/lib/crosswordGenerator.ts';
 import { SAMPLE_CROSSWORDS } from './src/lib/sampleCrosswords.ts';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 dotenv.config();
 
 const serverFirebaseConfig = {
@@ -29,12 +33,9 @@ if (process.env.VITE_FIREBASE_API_KEY && !process.env.VITE_FIREBASE_API_KEY.star
   process.env.VITE_FIREBASE_API_KEY = 'AIzaSyDkCU1DHUqnRjuWvCiMi3m4Q8G2uJ6ECZU';
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 async function startServer() {
   const app = express();
-  const port = 3000;
+  const port = process.env.PORT || 3000;
 
   // Support large PDF payloads up to 100MB
   app.use(express.json({ limit: '100mb' }));
@@ -52,13 +53,18 @@ async function startServer() {
   });
 
   // Server-Side GoogleGenAI Client
+  const getGeminiApiKey = (): string => {
+    return (
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      process.env.API_KEY ||
+      process.env.VITE_GEMINI_API_KEY ||
+      ''
+    ).trim();
+  };
+
   const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
+    apiKey: getGeminiApiKey(),
   });
 
   function callWithTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -70,8 +76,8 @@ async function startServer() {
   }
 
   function isGeminiConfigured(): boolean {
-    const key = process.env.GEMINI_API_KEY;
-    return Boolean(key && typeof key === 'string' && key.trim().length > 5 && !key.toLowerCase().includes('placeholder'));
+    const key = getGeminiApiKey();
+    return Boolean(key && key.length > 5 && !key.toLowerCase().includes('placeholder'));
   }
 
   // Helper to extract ASCII streams from raw PDF buffer
@@ -368,11 +374,13 @@ CRITICAL REQUIREMENTS:
   // Shravan TTS: Exact fallback order required:
   // 1. gemini-3.8-flash-tts
   // 2. gemini-3.8-flash-lite-tts
-  // 3. Web Speech API (Client fallback on error)
+  // 3. gemini-3.1-flash-tts
+  // 4. Web Speech API (Client fallback on error)
   // ============================================================================
   const TTS_MODELS_ORDER = [
     'gemini-3.8-flash-tts',
     'gemini-3.8-flash-lite-tts',
+    'gemini-3.1-flash-tts',
   ] as const;
 
   const TTS_CACHE_DIR = path.join(process.cwd(), '.cache', 'tts');
@@ -405,7 +413,7 @@ CRITICAL REQUIREMENTS:
     for (let i = 0; i < TTS_MODELS_ORDER.length; i++) {
       const model = TTS_MODELS_ORDER[i];
       try {
-        console.log(`[TTS Tier ${i + 1}/${TTS_MODELS_ORDER.length}] Synthesizing with ${model} (Voice: ${voice})...`);
+        console.log(`[TTS Tier ${i + 1}/3] Synthesizing with ${model} (Voice: ${voice})...`);
         const ttsPromise = ai.models.generateContent({
           model,
           contents: [
@@ -415,6 +423,7 @@ CRITICAL REQUIREMENTS:
             },
           ] as any,
           config: {
+            systemInstruction: `You are a text-to-speech voice synthesizer. Speak strictly with a natural Indian English accent. Read only the user's text immediately without greetings or preambles.`,
             responseModalities: ['AUDIO'],
             speechConfig: {
               voiceConfig: {
@@ -435,7 +444,7 @@ CRITICAL REQUIREMENTS:
           return { audioBuffer: wavBuf, modelUsed: model, voiceUsed: voice, fromCache: false };
         }
       } catch (err: any) {
-        console.log(`[TTS Tier ${i + 1}/${TTS_MODELS_ORDER.length}] ${model} unavailable:`, err?.message || err);
+        console.log(`[TTS Tier ${i + 1}/3] ${model} unavailable, trying next tier`);
         errors.push(`${model}: ${err?.message || err}`);
       }
     }
@@ -474,10 +483,8 @@ CRITICAL REQUIREMENTS:
         audioBase64: result.audioBuffer.toString('base64'),
       });
     } catch (err: any) {
-      console.log('[Shravan TTS Notice] Returning fallbackToWebSpeech signal to client:', err?.message);
-      // NOTE: Do not return 502/503/504 because Nginx intercepts those and serves warmup.html.
-      // Return 200 with fallbackToWebSpeech flag so frontend cleanly uses Web Speech API.
-      return res.status(200).json({
+      console.log('[Shravan TTS Notice] Returning fallbackToWebSpeech signal to client');
+      return res.status(503).json({
         success: false,
         fallbackToWebSpeech: true,
         error: err?.message || 'Server voice engine busy. Switching to Web Speech API.',
@@ -519,29 +526,6 @@ CRITICAL REQUIREMENTS:
       } catch (_) {}
     }
 
-    const isGita = /gita|bhagavad/i.test(effectiveTopic + ' ' + effectiveContent);
-    const isRamayana = /ramayana/i.test(effectiveTopic + ' ' + effectiveContent);
-    const isMahabharata = /mahabharata/i.test(effectiveTopic + ' ' + effectiveContent) && !isGita;
-
-    let scriptureRules = '';
-    if (isGita) {
-      scriptureRules = `
-CRITICAL SCRIPTURE CONSISTENCY RULES:
-1. This puzzle is strictly based on the Bhagavad Gita. Use ONLY content, concepts, and vocabulary supported by the Bhagavad Gita (e.g. Chapter 6: Dhyana Yoga, Verse 6.17 on balanced living, ahara, yukta, karma, dhyana, yoga, self-mastery).
-2. Do NOT mix in or reference content from other scriptures such as the Ramayana (e.g. Rama, Sita, Lakshmana, Ravana) or unrelated Mahabharata war stories. Keep other scriptures separate.
-3. Every chapter or verse reference (e.g. Chapter 6, BG 6.17) must be 100% accurate. Do NOT invent answers, Sanskrit terms, verses, or chapter references.`;
-    } else if (isRamayana) {
-      scriptureRules = `
-CRITICAL SCRIPTURE CONSISTENCY RULES:
-1. This puzzle is strictly based on the Ramayana. Use ONLY content, characters, and virtues from Sage Valmiki's Ramayana (e.g. Sri Rama, Sita, Lakshmana, Hanuman, Dasharatha, Valmiki, Satya, Dharma).
-2. Do NOT mix in content, characters, or chapter references from the Bhagavad Gita or Mahabharata. Keep other scriptures separate.`;
-    } else if (isMahabharata) {
-      scriptureRules = `
-CRITICAL SCRIPTURE CONSISTENCY RULES:
-1. This puzzle is strictly based on the Mahabharata epic. Use ONLY content from the Mahabharata (e.g. Pandavas, Kurukshetra, Bhishma, Arjuna, Yudhisthira, Vyasa, Dharma).
-2. Do NOT mix in content or references from the Ramayana or external scriptures. Keep scriptures separate.`;
-    }
-
     const crosswordPrompt = `You are a curriculum crossword puzzle architect.
 Extract 35 to 40 essential, distinct vocabulary terms, key scientific concepts, and educational facts from the following material:
 ---
@@ -555,7 +539,7 @@ CRITICAL REQUIREMENTS:
 [
   { "answer": "ENERGY", "clue": "Capacity to do work" },
   { "answer": "CIRCUIT", "clue": "Continuous closed loop for current" }
-]${scriptureRules}`;
+]`;
 
     let candidateWords: { answer: string; clue: string }[] = [];
 
@@ -605,31 +589,8 @@ CRITICAL REQUIREMENTS:
       clue: `Core concept from ${effectiveTopic}`,
     }));
 
-    // Supplementary words ensuring 25 intersecting words are reachable while respecting scripture consistency
-    const GITA_SUPPLEMENTARY = [
-      { answer: 'YOGA', clue: 'Disciplined practice harmonizing mind, body, and action (BG Chapter 6)' },
-      { answer: 'DHYANA', clue: 'Deep meditation stilling restless mental fluctuations (BG Chapter 6)' },
-      { answer: 'YUKTA', clue: 'Balanced and regulated lifestyle in duties, sleep, and recreation (BG 6.17)' },
-      { answer: 'AHARA', clue: 'Nutritious diet fueling physical machine for clarity (BG 6.17)' },
-      { answer: 'KARMA', clue: 'Righteous duty performed with devotion and skill without attachment' },
-      { answer: 'BALANCE', clue: 'Equilibrium preventing extremes of exhaustion and idleness (BG 6.17)' },
-      { answer: 'MIND', clue: 'Subtle faculty to be stilled through dedicated discipline (BG 6.5)' },
-      { answer: 'SHANTI', clue: 'Profound peace and tranquility of the calm intellect' },
-      { answer: 'DUTY', clue: 'Dedicated discharge of academic and spiritual responsibilities' },
-      { answer: 'ACTION', clue: 'Conscious effort directed toward noble growth and learning' },
-      { answer: 'FOCUS', clue: 'Single-minded mental concentration without distractions' },
-      { answer: 'WISDOM', clue: 'Experiential understanding guiding noble life decisions' },
-      { answer: 'PEACE', clue: 'Equanimous state free from agitation, sorrow, and worry' },
-      { answer: 'REST', clue: 'Rejuvenation period restoring mental vigor and memory recall (BG 6.17)' },
-      { answer: 'SLEEP', clue: 'Restorative 8 to 10 hours of rest essential for cognitive sharpness (BG 6.17)' },
-      { answer: 'WORK', clue: 'Dedicated discharge of academic responsibilities and tasks (BG 6.17)' },
-      { answer: 'ROUTINE', clue: 'Daily scheduled practice fostering effortless consistency (BG 6.17)' },
-      { answer: 'HEALTH', clue: 'Wholeness of body and mental clarity through good habits' },
-      { answer: 'CALM', clue: 'Undisturbed emotional equilibrium in joy and sorrow' },
-      { answer: 'HABIT', clue: 'Behavior forged by repeating disciplined routines consistently' },
-    ];
-
-    const GENERAL_SUPPLEMENTARY_WORDS = [
+    // Supplementary words to ensure 25 intersecting words are always reachable
+    const SUPPLEMENTARY_WORDS = [
       { answer: 'KNOWLEDGE', clue: 'Understanding acquired through deep learning and study' },
       { answer: 'BALANCE', clue: 'Equilibrium in action, thought, and daily lifestyle' },
       { answer: 'ENERGY', clue: 'Vital force sustaining physical and cognitive activity' },
@@ -652,8 +613,7 @@ CRITICAL REQUIREMENTS:
       { answer: 'EFFORT', clue: 'Application of will and physical strength toward a goal' },
     ];
 
-    const activeSupplementary = isGita ? GITA_SUPPLEMENTARY : GENERAL_SUPPLEMENTARY_WORDS;
-    const mergedCandidates = [...candidateWords, ...contentCandidates, ...activeSupplementary];
+    const mergedCandidates = [...candidateWords, ...contentCandidates, ...SUPPLEMENTARY_WORDS];
     const puzzle = buildValidCrosswordLayout(mergedCandidates, {
       title: effectiveTopic,
       theme: '25-Word Chapter Examination (2 XP per word)',

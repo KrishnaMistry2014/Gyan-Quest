@@ -1,4 +1,4 @@
-import { CrosswordData } from '../types';
+import type { CrosswordData } from '../types.ts';
 
 export const SAMPLE_CROSSWORDS: CrosswordData[] = [
   {
@@ -838,7 +838,7 @@ export const SAMPLE_CROSSWORDS: CrosswordData[] = [
         "number": 17,
         "direction": "down",
         "answer": "KRISHNA",
-        "clue": "Divine avatar and charioteer guiding Arjuna on the battlefield of Kurukshetra",
+        "clue": "Divine avatar and charioteer who taught the Bhagavad Gita",
         "row": 15,
         "col": 11
       },
@@ -977,7 +977,7 @@ export const SAMPLE_CROSSWORDS: CrosswordData[] = [
       },
       {
         "term": "Krishna",
-        "definition": "Divine avatar and charioteer guiding Arjuna on the battlefield of Kurukshetra"
+        "definition": "Divine avatar and charioteer who taught the Bhagavad Gita"
       },
       {
         "term": "Discipline",

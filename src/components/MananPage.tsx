@@ -176,12 +176,6 @@ export const MananPage: React.FC<MananPageProps> = ({
   const isGeneratingRef = useRef<boolean>(false);
   const rewardClaimedRef = useRef<boolean>(false);
   const maxZIndexRef = useRef<number>(100);
-  const isMountedRef = useRef<boolean>(true);
-  const requestIdRef = useRef<number>(0);
-  const boardSizeRef = useRef<number>(boardSize);
-  boardSizeRef.current = boardSize;
-  const gridSizeRef = useRef<3 | 4>(gridSize);
-  gridSizeRef.current = gridSize;
 
   // Drag tracking state
   const dragInfoRef = useRef<{
@@ -211,34 +205,28 @@ export const MananPage: React.FC<MananPageProps> = ({
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
+  const isMountedRef = useRef<boolean>(true);
+
   // Initialize and load the puzzle image (reuses session cached image if present)
   const loadPuzzleImage = useCallback(async (forceNew = false) => {
-    // If a non-aborted request is actively generating and this is not a force-new/retry request, avoid duplicate calls
-    if (isGeneratingRef.current && !forceNew && abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
-      return;
-    }
+    // Prevent duplicate generation requests while one is already running
+    if (isGeneratingRef.current) return;
 
-    // Abort any existing in-flight controller before starting a replacement
     if (abortControllerRef.current) {
-      try {
-        abortControllerRef.current.abort('superseded');
-      } catch (_) {}
+      abortControllerRef.current.abort('superseded');
     }
     const controller = new AbortController();
     abortControllerRef.current = controller;
-    const currentRequestId = ++requestIdRef.current;
 
     // Check if chapter is a predefined scripture
     if (scripture && scripture.scriptureImages.length > 0) {
-      if (currentRequestId !== requestIdRef.current || !isMountedRef.current) return;
-      isGeneratingRef.current = false;
       const activeImg = scripture.scriptureImages[selectedScriptureImageIdx] || scripture.scriptureImages[0];
       setImageUrl(activeImg.url);
       setIsAiGenerated(false);
       setStatus('ready');
       setErrorMessage('');
       setErrorDetails(null);
-      initPuzzlePieces(activeImg.url, gridSizeRef.current, boardSizeRef.current);
+      initPuzzlePieces(activeImg.url, gridSize, boardSize);
       return;
     }
 
@@ -252,14 +240,12 @@ export const MananPage: React.FC<MananPageProps> = ({
     if (!forceNew) {
       const cachedUrl = sessionStorage.getItem(sessionCacheKey);
       if (cachedUrl) {
-        if (currentRequestId !== requestIdRef.current || !isMountedRef.current) return;
-        isGeneratingRef.current = false;
         setImageUrl(cachedUrl);
         setIsAiGenerated(true);
         setStatus('ready');
         setErrorMessage('');
         setErrorDetails(null);
-        initPuzzlePieces(cachedUrl, gridSizeRef.current, boardSizeRef.current);
+        initPuzzlePieces(cachedUrl, gridSize, boardSize);
         return;
       }
     }
@@ -270,7 +256,7 @@ export const MananPage: React.FC<MananPageProps> = ({
     setErrorDetails(null);
     setStatusMessage('Preparing chapter illustration for jigsaw puzzle...');
 
-    // 45-second reliable frontend request timeout
+    // 45-second frontend request timeout
     let timedOut = false;
     const timeoutTimer = setTimeout(() => {
       timedOut = true;
@@ -285,13 +271,13 @@ export const MananPage: React.FC<MananPageProps> = ({
     try {
       activePrompt = await buildEducationalImagePrompt(chapter, controller.signal);
 
-      if (currentRequestId !== requestIdRef.current || !isMountedRef.current) return;
+      if (!isMountedRef.current) return;
 
       setStatusMessage('Synthesizing puzzle illustration with AI...');
 
       const result = await generateChapterImage(activePrompt, controller.signal, chapter);
 
-      if (currentRequestId !== requestIdRef.current || !isMountedRef.current) return;
+      if (!isMountedRef.current) return;
 
       if (!result?.imageUrl) {
         throw new MananImageError({
@@ -312,18 +298,24 @@ export const MananPage: React.FC<MananPageProps> = ({
       setStatus('ready');
       setErrorMessage('');
       setErrorDetails(null);
-      initPuzzlePieces(result.imageUrl, gridSizeRef.current, boardSizeRef.current);
+      initPuzzlePieces(result.imageUrl, gridSize, boardSize);
     } catch (err: any) {
-      // If this request was superseded by a newer request or component unmounted, quietly exit
-      if (currentRequestId !== requestIdRef.current || !isMountedRef.current) {
-        return;
-      }
+      if (!isMountedRef.current) return;
 
       const isTimeout =
         timedOut ||
         (err instanceof MananImageError && err.statusCode === 408) ||
-        controller.signal.reason === 'timeout' ||
-        String(err?.message || '').toLowerCase().includes('timeout');
+        controller.signal.reason === 'timeout';
+
+      const isUserCancelled =
+        !isTimeout &&
+        (err?.name === 'AbortError' || controller.signal.aborted) &&
+        controller.signal.reason !== 'timeout';
+
+      if (isUserCancelled) {
+        // Legitimate user cancellation (e.g. unmounted or user triggered new load)
+        return;
+      }
 
       let errorObj: MananImageError;
       if (err instanceof MananImageError) {
@@ -354,11 +346,9 @@ export const MananPage: React.FC<MananPageProps> = ({
       setErrorDetails(errorObj);
     } finally {
       clearTimeout(timeoutTimer);
-      if (currentRequestId === requestIdRef.current) {
-        isGeneratingRef.current = false;
-      }
+      isGeneratingRef.current = false;
     }
-  }, [chapter, scripture, selectedScriptureImageIdx]);
+  }, [chapter, gridSize, boardSize]);
 
   // Manually re-check health of upstream services
   const handleCheckHealth = async () => {
@@ -403,20 +393,17 @@ export const MananPage: React.FC<MananPageProps> = ({
     }
   }, [boardSize, gridSize]);
 
-  // Initial load on mount & chapter changes with Strict Mode resilient cleanup
+  // Initial load on mount & cleanup
   useEffect(() => {
     isMountedRef.current = true;
     loadPuzzleImage(false);
     return () => {
       isMountedRef.current = false;
       if (abortControllerRef.current) {
-        try {
-          abortControllerRef.current.abort('unmount');
-        } catch (_) {}
+        abortControllerRef.current.abort('unmount');
       }
-      isGeneratingRef.current = false;
     };
-  }, [chapter.id, chapter.uniqueCode, loadPuzzleImage]);
+  }, []);
 
   // Completion check
   useEffect(() => {

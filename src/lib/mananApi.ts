@@ -244,16 +244,7 @@ export async function buildEducationalImagePrompt(
       }
     }
   } catch (err) {
-    if (signal?.aborted) {
-      throw err;
-    }
     console.warn('Server prompt synthesis unavailable, using smart local parser:', err);
-  }
-
-  if (signal?.aborted) {
-    const err = new Error('Aborted');
-    err.name = 'AbortError';
-    throw err;
   }
 
   // Fallback to domain-aware local prompt builder
@@ -269,15 +260,9 @@ export interface ChapterImageResult {
 /**
  * Preloads an image URL into browser cache to guarantee it renders instantly without blank flickers.
  */
-export function preloadImage(url: string, timeoutMs = 25000, signal?: AbortSignal): Promise<void> {
+export function preloadImage(url: string, timeoutMs = 25000): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (typeof Image === 'undefined' || signal?.aborted) {
-      if (signal?.aborted) {
-        const err = new Error('Aborted');
-        err.name = 'AbortError';
-        reject(err);
-        return;
-      }
+    if (typeof Image === 'undefined') {
       resolve();
       return;
     }
@@ -285,33 +270,9 @@ export function preloadImage(url: string, timeoutMs = 25000, signal?: AbortSigna
     const img = new Image();
     let settled = false;
 
-    const cleanup = () => {
-      if (signal) {
-        signal.removeEventListener('abort', onAbort);
-      }
-      clearTimeout(timer);
-    };
-
-    const onAbort = () => {
-      if (!settled) {
-        settled = true;
-        cleanup();
-        img.src = '';
-        const err = new Error('Aborted');
-        err.name = 'AbortError';
-        reject(err);
-      }
-    };
-
-    if (signal) {
-      signal.addEventListener('abort', onAbort, { once: true });
-    }
-
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
-        cleanup();
-        img.src = '';
         reject(
           new MananImageError({
             statusCode: 408,
@@ -327,7 +288,7 @@ export function preloadImage(url: string, timeoutMs = 25000, signal?: AbortSigna
     img.onload = () => {
       if (!settled) {
         settled = true;
-        cleanup();
+        clearTimeout(timer);
         resolve();
       }
     };
@@ -335,8 +296,7 @@ export function preloadImage(url: string, timeoutMs = 25000, signal?: AbortSigna
     img.onerror = () => {
       if (!settled) {
         settled = true;
-        cleanup();
-        img.src = '';
+        clearTimeout(timer);
         reject(
           new MananImageError({
             statusCode: 0,
@@ -586,7 +546,7 @@ export async function generateChapterImage(
       const data = await res.json().catch(() => null);
       if (data?.imageUrl && typeof data.imageUrl === 'string' && (data.imageUrl.startsWith('http') || data.imageUrl.startsWith('data:'))) {
         const imageUrl = data.imageUrl.trim();
-        await preloadImage(imageUrl, 15000, signal);
+        await preloadImage(imageUrl, 15000);
         return {
           imageUrl,
           isAiGenerated: true,
