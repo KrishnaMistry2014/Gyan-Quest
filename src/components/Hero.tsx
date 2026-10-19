@@ -30,7 +30,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
       title: 'Vidya',
       desc: t.heroVidyaDesc,
       icon: BookOpen,
-      xp: '10 XP',
+      xp: '15 XP',
     },
     {
       num: '02',
@@ -38,7 +38,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
       title: 'Shravan',
       desc: t.heroShravanDesc,
       icon: Headphones,
-      xp: '5 XP',
+      xp: '10 XP',
     },
     {
       num: '03',
@@ -46,7 +46,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
       title: 'Manan',
       desc: t.heroMananDesc,
       icon: Brain,
-      xp: '15 XP',
+      xp: '25 XP',
     },
     {
       num: '04',
@@ -187,7 +187,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
-                <span>80 XP Milestone Mastery</span>
+                <span>100 XP Milestone Mastery</span>
               </div>
             </div>
           </div>
@@ -212,7 +212,7 @@ export const Hero: React.FC<HeroProps> = ({ onStartQuest, onExplore, onPdfUpload
                   </h3>
                 </div>
                 <div className="text-xs font-mono font-semibold" style={{ color: 'var(--accent-saffron-text)' }}>
-                  80 Total XP
+                  100 Total XP
                 </div>
               </div>
 
