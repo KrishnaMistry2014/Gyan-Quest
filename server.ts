@@ -519,6 +519,29 @@ CRITICAL REQUIREMENTS:
       } catch (_) {}
     }
 
+    const isGita = /gita|bhagavad/i.test(effectiveTopic + ' ' + effectiveContent);
+    const isRamayana = /ramayana/i.test(effectiveTopic + ' ' + effectiveContent);
+    const isMahabharata = /mahabharata/i.test(effectiveTopic + ' ' + effectiveContent) && !isGita;
+
+    let scriptureRules = '';
+    if (isGita) {
+      scriptureRules = `
+CRITICAL SCRIPTURE CONSISTENCY RULES:
+1. This puzzle is strictly based on the Bhagavad Gita. Use ONLY content, concepts, and vocabulary supported by the Bhagavad Gita (e.g. Chapter 6: Dhyana Yoga, Verse 6.17 on balanced living, ahara, yukta, karma, dhyana, yoga, self-mastery).
+2. Do NOT mix in or reference content from other scriptures such as the Ramayana (e.g. Rama, Sita, Lakshmana, Ravana) or unrelated Mahabharata war stories. Keep other scriptures separate.
+3. Every chapter or verse reference (e.g. Chapter 6, BG 6.17) must be 100% accurate. Do NOT invent answers, Sanskrit terms, verses, or chapter references.`;
+    } else if (isRamayana) {
+      scriptureRules = `
+CRITICAL SCRIPTURE CONSISTENCY RULES:
+1. This puzzle is strictly based on the Ramayana. Use ONLY content, characters, and virtues from Sage Valmiki's Ramayana (e.g. Sri Rama, Sita, Lakshmana, Hanuman, Dasharatha, Valmiki, Satya, Dharma).
+2. Do NOT mix in content, characters, or chapter references from the Bhagavad Gita or Mahabharata. Keep other scriptures separate.`;
+    } else if (isMahabharata) {
+      scriptureRules = `
+CRITICAL SCRIPTURE CONSISTENCY RULES:
+1. This puzzle is strictly based on the Mahabharata epic. Use ONLY content from the Mahabharata (e.g. Pandavas, Kurukshetra, Bhishma, Arjuna, Yudhisthira, Vyasa, Dharma).
+2. Do NOT mix in content or references from the Ramayana or external scriptures. Keep scriptures separate.`;
+    }
+
     const crosswordPrompt = `You are a curriculum crossword puzzle architect.
 Extract 35 to 40 essential, distinct vocabulary terms, key scientific concepts, and educational facts from the following material:
 ---
@@ -532,7 +555,7 @@ CRITICAL REQUIREMENTS:
 [
   { "answer": "ENERGY", "clue": "Capacity to do work" },
   { "answer": "CIRCUIT", "clue": "Continuous closed loop for current" }
-]`;
+]${scriptureRules}`;
 
     let candidateWords: { answer: string; clue: string }[] = [];
 
@@ -582,8 +605,31 @@ CRITICAL REQUIREMENTS:
       clue: `Core concept from ${effectiveTopic}`,
     }));
 
-    // Supplementary words to ensure 25 intersecting words are always reachable
-    const SUPPLEMENTARY_WORDS = [
+    // Supplementary words ensuring 25 intersecting words are reachable while respecting scripture consistency
+    const GITA_SUPPLEMENTARY = [
+      { answer: 'YOGA', clue: 'Disciplined practice harmonizing mind, body, and action (BG Chapter 6)' },
+      { answer: 'DHYANA', clue: 'Deep meditation stilling restless mental fluctuations (BG Chapter 6)' },
+      { answer: 'YUKTA', clue: 'Balanced and regulated lifestyle in duties, sleep, and recreation (BG 6.17)' },
+      { answer: 'AHARA', clue: 'Nutritious diet fueling physical machine for clarity (BG 6.17)' },
+      { answer: 'KARMA', clue: 'Righteous duty performed with devotion and skill without attachment' },
+      { answer: 'BALANCE', clue: 'Equilibrium preventing extremes of exhaustion and idleness (BG 6.17)' },
+      { answer: 'MIND', clue: 'Subtle faculty to be stilled through dedicated discipline (BG 6.5)' },
+      { answer: 'SHANTI', clue: 'Profound peace and tranquility of the calm intellect' },
+      { answer: 'DUTY', clue: 'Dedicated discharge of academic and spiritual responsibilities' },
+      { answer: 'ACTION', clue: 'Conscious effort directed toward noble growth and learning' },
+      { answer: 'FOCUS', clue: 'Single-minded mental concentration without distractions' },
+      { answer: 'WISDOM', clue: 'Experiential understanding guiding noble life decisions' },
+      { answer: 'PEACE', clue: 'Equanimous state free from agitation, sorrow, and worry' },
+      { answer: 'REST', clue: 'Rejuvenation period restoring mental vigor and memory recall (BG 6.17)' },
+      { answer: 'SLEEP', clue: 'Restorative 8 to 10 hours of rest essential for cognitive sharpness (BG 6.17)' },
+      { answer: 'WORK', clue: 'Dedicated discharge of academic responsibilities and tasks (BG 6.17)' },
+      { answer: 'ROUTINE', clue: 'Daily scheduled practice fostering effortless consistency (BG 6.17)' },
+      { answer: 'HEALTH', clue: 'Wholeness of body and mental clarity through good habits' },
+      { answer: 'CALM', clue: 'Undisturbed emotional equilibrium in joy and sorrow' },
+      { answer: 'HABIT', clue: 'Behavior forged by repeating disciplined routines consistently' },
+    ];
+
+    const GENERAL_SUPPLEMENTARY_WORDS = [
       { answer: 'KNOWLEDGE', clue: 'Understanding acquired through deep learning and study' },
       { answer: 'BALANCE', clue: 'Equilibrium in action, thought, and daily lifestyle' },
       { answer: 'ENERGY', clue: 'Vital force sustaining physical and cognitive activity' },
@@ -606,7 +652,8 @@ CRITICAL REQUIREMENTS:
       { answer: 'EFFORT', clue: 'Application of will and physical strength toward a goal' },
     ];
 
-    const mergedCandidates = [...candidateWords, ...contentCandidates, ...SUPPLEMENTARY_WORDS];
+    const activeSupplementary = isGita ? GITA_SUPPLEMENTARY : GENERAL_SUPPLEMENTARY_WORDS;
+    const mergedCandidates = [...candidateWords, ...contentCandidates, ...activeSupplementary];
     const puzzle = buildValidCrosswordLayout(mergedCandidates, {
       title: effectiveTopic,
       theme: '25-Word Chapter Examination (2 XP per word)',

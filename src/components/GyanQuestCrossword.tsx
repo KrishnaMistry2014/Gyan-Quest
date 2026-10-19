@@ -108,6 +108,22 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
     }
   }, [initialChapter]);
 
+  // Ensure scripture consistency: match fallback puzzle strictly to the active scripture chapter
+  const getMatchingSample = (ch?: SavedChapter | null): CrosswordData => {
+    if (!ch) return samples[0] || SAMPLE_CROSSWORDS[0];
+    const key = `${ch.id || ''} ${ch.title || ''} ${ch.fileName || ''} ${ch.summary || ''}`.toLowerCase();
+    if (key.includes('ramayana')) {
+      return samples.find((s) => s.id.includes('ramayana')) || SAMPLE_CROSSWORDS[1];
+    }
+    if (key.includes('mahabharata')) {
+      return samples.find((s) => s.id.includes('mahabharata')) || SAMPLE_CROSSWORDS[2];
+    }
+    if (key.includes('gita')) {
+      return samples.find((s) => s.id.includes('gita')) || SAMPLE_CROSSWORDS[0];
+    }
+    return samples[0] || SAMPLE_CROSSWORDS[0];
+  };
+
   // Load and sanitize a crossword puzzle with guaranteed collision-free intersecting layout
   const initGame = (rawPuzzle: CrosswordData) => {
     try {
@@ -128,7 +144,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
         }));
 
       if (validWords.length === 0 && samples.length > 0) {
-        initGame(samples[0]);
+        initGame(getMatchingSample(initialChapter));
         showToast('Created puzzle using foundational knowledge template', 'info');
         return;
       }
@@ -194,7 +210,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
       console.error('Failed to initialize game:', err);
       setIsLoading(false);
       if (samples.length > 0) {
-        initGame(samples[0]);
+        initGame(getMatchingSample(initialChapter));
       } else {
         showToast('Failed to parse puzzle. Retrying...', 'error');
         if (!initialChapter) {
@@ -240,7 +256,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
       } catch (err: any) {
         console.error(err);
         showToast(err.message || 'Error generating crossword from PDF. Using instant fallback.', 'error');
-        if (samples.length > 0) initGame(samples[0]);
+        if (samples.length > 0) initGame(getMatchingSample(initialChapter));
         else setIsLoading(false);
       }
     };
@@ -273,7 +289,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
     } catch (err: any) {
       console.error(err);
       showToast(err.message || 'Error generating crossword. Using sample.', 'error');
-      if (samples.length > 0) initGame(samples[0]);
+      if (samples.length > 0) initGame(getMatchingSample(initialChapter));
       else setIsLoading(false);
     }
   };
@@ -967,7 +983,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                     if (initialChapter && (initialChapter.title || initialChapter.summary)) {
                       handleGenerateTopic(initialChapter.title, initialChapter.summary);
                     } else if (samples.length > 0) {
-                      initGame(samples[0]);
+                      initGame(getMatchingSample(initialChapter));
                     }
                   }}
                   className="px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-all hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center gap-1.5 cursor-pointer"
@@ -1056,7 +1072,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                       if (initialChapter && (initialChapter.title || initialChapter.summary)) {
                         handleGenerateTopic(initialChapter.title, initialChapter.summary);
                       } else if (samples.length > 0) {
-                        initGame(samples[0]);
+                        initGame(getMatchingSample(initialChapter));
                       }
                     }}
                     className="px-4 py-2 text-xs sm:text-sm font-bold rounded-xl border border-rose-500/40 bg-rose-500/20 text-rose-700 dark:text-rose-300 transition cursor-pointer hover:bg-rose-500/30 flex items-center gap-1.5 shrink-0"
@@ -1112,7 +1128,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                       if (initialChapter && (initialChapter.title || initialChapter.summary)) {
                         handleGenerateTopic(initialChapter.title, initialChapter.summary);
                       } else if (samples.length > 0) {
-                        initGame(samples[0]);
+                        initGame(getMatchingSample(initialChapter));
                       }
                     }}
                     className="px-4 py-2 text-xs sm:text-sm font-bold rounded-xl border border-amber-500/40 bg-amber-500/20 text-amber-700 dark:text-amber-300 transition cursor-pointer hover:bg-amber-500/30 flex items-center gap-1.5 shrink-0"

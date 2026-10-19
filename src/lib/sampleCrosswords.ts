@@ -838,7 +838,7 @@ export const SAMPLE_CROSSWORDS: CrosswordData[] = [
         "number": 17,
         "direction": "down",
         "answer": "KRISHNA",
-        "clue": "Divine avatar and charioteer who taught the Bhagavad Gita",
+        "clue": "Divine avatar and charioteer guiding Arjuna on the battlefield of Kurukshetra",
         "row": 15,
         "col": 11
       },
@@ -977,7 +977,7 @@ export const SAMPLE_CROSSWORDS: CrosswordData[] = [
       },
       {
         "term": "Krishna",
-        "definition": "Divine avatar and charioteer who taught the Bhagavad Gita"
+        "definition": "Divine avatar and charioteer guiding Arjuna on the battlefield of Kurukshetra"
       },
       {
         "term": "Discipline",

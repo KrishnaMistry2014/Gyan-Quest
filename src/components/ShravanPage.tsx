@@ -244,10 +244,21 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       return;
     }
 
+    // Prevent overlapping playback: stop any ongoing audio or speech before new synthesis
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsPlaying(false);
+
+    // Wait for Vidya to finish generating its complete response
     if (!chapter.summary || typeof chapter.summary !== 'string' || chapter.summary.trim().length === 0) {
       setStatus('error');
       setIsWakingUp(false);
-      setErrorMessage('No chapter summary available to narrate. Please open or generate a chapter summary first.');
+      setErrorMessage('No chapter summary available to narrate. Please open or generate a complete Vidya summary first.');
       return;
     }
 
@@ -265,12 +276,15 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     setIsWakingUp(false);
 
     try {
+      // Accumulate the full text and submit it in one single TTS request
       const plainText = stripMarkdownForSpeech(chapter.summary);
       const wordsCount = plainText.split(/\s+/).length;
 
-      // For standard summaries (under 250 words), synthesize in a single fast request
-      if (wordsCount <= 250) {
-        setChunkProgress({ current: 1, total: 1 });
+      // Complete Vidya responses (up to 3,000 words) are submitted in one single TTS request
+      const MAX_SINGLE_REQUEST_WORDS = 3000;
+
+      if (wordsCount <= MAX_SINGLE_REQUEST_WORDS) {
+        setChunkProgress(null);
         const response = await fetch('/api/tts', {
           method: 'POST',
           headers: { 
@@ -324,8 +338,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
         return;
       }
 
-      // For long summaries (> 250 words), divide into ~180 word sections for fast synthesis
-      const chunks = chunkTextForTTS(plainText, 180);
+      // For extraordinarily long texts (> 3,000 words), partition into large sections without silent truncation
+      const chunks = chunkTextForTTS(plainText, 1500);
       setChunkProgress({ current: 0, total: chunks.length });
 
       const audioBlobs: Blob[] = [];
