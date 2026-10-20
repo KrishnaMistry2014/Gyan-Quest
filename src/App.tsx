@@ -36,6 +36,26 @@ const RAMAYANA_CHAPTER: SavedChapter = SCRIPTURES.ramayana;
 const GITA_CHAPTER: SavedChapter = SCRIPTURES.gita;
 const MAHABHARATA_CHAPTER: SavedChapter = SCRIPTURES.mahabharata;
 
+const MAHABHARATA_CHAPTER: SavedChapter = {
+  id: 'epic_mahabharata_dharma',
+  uniqueCode: '9182736455',
+  title: 'Mahabharata: The Epic of Righteousness, Duty, and Wisdom',
+  fileName: 'Mahabharata_Vyasa_Epic_Wisdom.pdf',
+  summary: `# Mahabharata: The Epic of Righteousness, Duty, and Wisdom
+
+Composed by Sage Vyasa, the Mahabharata is an immortal epic exploring human nature, ethical dilemmas, statecraft, and the supreme triumph of Dharma over Adharma.
+
+## Core Pillars for Young Scholars (Grades 4–8):
+1. **Dharma-Sankat (Moral Clarity)**: Making principled choices when faced with complex life dilemmas.
+2. **Nishkama Karma (Selfless Effort)**: Performing your duty with dedication without anxious obsession over rewards.
+3. **Friendship & Loyalty**: The enduring bond of Krishna and Arjuna, and Karnas loyalty.
+4. **Mind Mastery**: Controlling the inner senses and mastering emotional equilibrium.
+
+## Student Wisdom:
+Life presents many tests of character. By holding fast to truth, respecting elders, and acting with noble intentions, you navigate every challenge successfully.`,
+  createdAt: new Date().toISOString(),
+};
+
 const pathToView = (path: string): AppView => {
   const cleanPath = path.replace(/\/$/, '');
   switch (cleanPath) {
@@ -569,6 +589,12 @@ const MainAppContent: React.FC = () => {
           setSelectedChapter(MAHABHARATA_CHAPTER);
           setUploadedPdf(null);
           setCurrentView('vidya');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onSelectMahabharata={() => {
+          setSelectedChapter(MAHABHARATA_CHAPTER);
+          setUploadedPdf(null);
+          setCurrentView('blank');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onUploadCustomPdf={() => {
