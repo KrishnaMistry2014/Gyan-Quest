@@ -121,6 +121,8 @@ async function startServer() {
         .trim();
       cleaned = `# ${fallbackTitle}\n\n` + cleaned;
     }
+    // 6. Remove all markdown asterisks
+    cleaned = cleaned.replace(/\*/g, '');
     return cleaned.trim();
   };
 
@@ -526,15 +528,15 @@ CRITICAL REQUIREMENTS:
       } catch (_) {}
     }
 
-    const crosswordPrompt = `You are a curriculum crossword puzzle architect.
-Extract 35 to 40 essential, distinct vocabulary terms, key scientific concepts, and educational facts from the following material:
+    const crosswordPrompt = `You are an expert curriculum crossword puzzle architect.
+Extract exactly 6 essential, distinct vocabulary terms, key scientific concepts, and educational facts from the following material:
 ---
 ${effectiveContent.slice(0, 30000)}
 ---
 
 CRITICAL REQUIREMENTS:
-1. Provide 35 to 40 words with concise, informative clues so that a valid 25-word intersecting grid can be built.
-2. Words must contain ONLY English alphabets A-Z (length 3 to 12 letters). NO spaces, hyphens, or numbers.
+1. Provide exactly 6 words. Each clue must be a proper, well-phrased, engaging educational question or definition (e.g. "Capacity to do work" or "Subtle faculty of thought and intellect"). Never return vague or placeholder clues.
+2. Words must contain ONLY English alphabets A-Z (length 3 to 10 letters). NO spaces, hyphens, or numbers.
 3. Return STRICTLY valid JSON with no preamble or codeblock markers:
 [
   { "answer": "ENERGY", "clue": "Capacity to do work" },
@@ -581,15 +583,29 @@ CRITICAL REQUIREMENTS:
     const contentWords = (effectiveContent + ' ' + effectiveTopic)
       .replace(/[^A-Za-z\s]/g, ' ')
       .split(/\s+/)
-      .filter((w) => w.length >= 4 && w.length <= 11)
+      .filter((w) => w.length >= 4 && w.length <= 10)
       .map((w) => w.toUpperCase());
-    const uniqueContentWords = Array.from(new Set(contentWords)).slice(0, 20);
+    const uniqueContentWords = Array.from(new Set(contentWords)).slice(0, 15);
+
+    const defaultClues: Record<string, string> = {
+      FOCUS: 'Undivided attention anchored on the task at hand',
+      HABIT: 'Automatic positive routine built through consistency',
+      ENERGY: 'Vital force sustaining physical and cognitive activity',
+      WISDOM: 'Discerning judgment applied to life situations',
+      ACTION: 'Conscious effort directed toward noble growth',
+      STUDY: 'Dedicated exploration of academic and spiritual truth',
+      TRUTH: 'Adherence to factual reality and moral rectitude',
+      PEACE: 'Tranquil calm free from disturbance and agitation',
+      MIND: 'Subtle faculty that can be a friend or foe through discipline',
+      DIET: 'Sattvic food intake nourishing clarity and vitality',
+    };
+
     const contentCandidates = uniqueContentWords.map((w) => ({
       answer: w,
-      clue: `Core concept from ${effectiveTopic}`,
+      clue: defaultClues[w] || `Core educational concept and principle discussed in ${effectiveTopic}`,
     }));
 
-    // Supplementary words to ensure 25 intersecting words are always reachable
+    // Supplementary words to ensure 6 intersecting words are always reachable
     const SUPPLEMENTARY_WORDS = [
       { answer: 'KNOWLEDGE', clue: 'Understanding acquired through deep learning and study' },
       { answer: 'BALANCE', clue: 'Equilibrium in action, thought, and daily lifestyle' },
@@ -598,25 +614,15 @@ CRITICAL REQUIREMENTS:
       { answer: 'PURPOSE', clue: 'Guiding objective behind dedication and study' },
       { answer: 'DISCIPLINE', clue: 'Consistent self-regulation in daily habits' },
       { answer: 'HARMONY', clue: 'Peaceful alignment of mind, intellect, and action' },
-      { answer: 'INSIGHT', clue: 'Profound comprehension gained through deep contemplation' },
       { answer: 'WISDOM', clue: 'Discerning judgment applied to life situations' },
-      { answer: 'ACTION', clue: 'Conscious effort directed toward noble growth' },
       { answer: 'FOCUS', clue: 'Undivided attention anchored on the task at hand' },
-      { answer: 'MEMORY', clue: 'Retention and retrieval of studied facts and principles' },
-      { answer: 'HABIT', clue: 'Automatic positive routine built through consistency' },
-      { answer: 'STUDY', clue: 'Dedicated exploration of academic and spiritual truth' },
       { answer: 'TRUTH', clue: 'Adherence to factual reality and moral rectitude' },
-      { answer: 'METHOD', clue: 'Systematic approach to problem solving and learning' },
-      { answer: 'HEALTH', clue: 'Physical vitality and mental sound condition' },
-      { answer: 'PEACE', clue: 'Tranquil calm free from disturbance and agitation' },
-      { answer: 'REASON', clue: 'Logical intellect capable of deductive analysis' },
-      { answer: 'EFFORT', clue: 'Application of will and physical strength toward a goal' },
     ];
 
     const mergedCandidates = [...candidateWords, ...contentCandidates, ...SUPPLEMENTARY_WORDS];
     const puzzle = buildValidCrosswordLayout(mergedCandidates, {
       title: effectiveTopic,
-      theme: '25-Word Chapter Examination (2 XP per word)',
+      theme: '6-Word Chapter Examination (8 XP per word)',
       summary: effectiveContent.slice(0, 300),
     });
 
@@ -759,17 +765,19 @@ Return only the single descriptive visual prompt string under 60 words. No intro
       const chapterTitle = (title || 'Chapter Concepts').trim();
       const effectiveContent = (text || summary || '').slice(0, 15000).trim();
 
-      const prompt = `Generate 5 chapter questions for a 60-second learning Wordle quest based on:
+      const prompt = `Generate 5 very easy, direct, and straightforward educational questions for a Wordle quest based on:
 Title: ${chapterTitle}
 Summary: ${effectiveContent}
+
+CRITICAL: Each question must be a proper, complete, engaging question asking about a key term in the text (e.g. "What 6-letter word represents...?" or "According to the text, what..."). Never return generic placeholder questions.
 
 Return strictly JSON:
 {
   "questions": [
-    { "id": 1, "question": "Clear educational clue", "answer": "WORDS", "hint": "Helpful hint" }
+    { "id": 1, "question": "What 6-letter word represents...", "answer": "ENERGY", "hint": "Starts with E and ends with Y" }
   ]
 }
-Answers must be single uppercase English words between 4 and 9 letters without spaces.`;
+Answers must be single uppercase English words between 4 and 6 letters without spaces.`;
 
       let questions: any[] = [];
       if (isGeminiConfigured()) {
@@ -825,12 +833,29 @@ Answers must be single uppercase English words between 4 and 9 letters without s
             uniqueWords.push(defWord);
           }
         }
-        questions = uniqueWords.map((word, idx) => ({
-          id: idx + 1,
-          question: `Key concept from ${chapterTitle}: [${word.length} letters]`,
-          answer: word,
-          hint: `Starts with ${word[0]} and ends with ${word[word.length - 1]}`,
-        }));
+
+        const defaultMap: Record<string, { q: string; hint: string }> = {
+          FOCUS: { q: "What 5-letter mental faculty means single-minded concentration without distractions?", hint: "Starts with F and ends with S (5 letters)" },
+          HABIT: { q: "What 5-letter word describes a regular practice or behavior repeated for consistency?", hint: "Starts with H and ends with T (5 letters)" },
+          ENERGY: { q: "What 6-letter word represents the capacity to do work or vital power?", hint: "Starts with E and ends with Y (6 letters)" },
+          WISDOM: { q: "What 6-letter word signifies deep understanding and sound judgment?", hint: "Starts with W and ends with M (6 letters)" },
+          ACTION: { q: "What 6-letter word denotes purposeful deeds and righteous effort?", hint: "Starts with A and ends with N (6 letters)" },
+          STUDY: { q: "What 5-letter word means dedicated learning and exploration of a subject?", hint: "Starts with S and ends with Y (5 letters)" },
+          TRUTH: { q: "What 5-letter word represents alignment with reality and honesty?", hint: "Starts with T and ends with H (5 letters)" },
+        };
+
+        questions = uniqueWords.map((word, idx) => {
+          const info = defaultMap[word] || {
+            q: `What ${word.length}-letter key principle or concept is emphasized in this chapter?`,
+            hint: `Starts with ${word[0]} and ends with ${word[word.length - 1]} (${word.length} letters)`
+          };
+          return {
+            id: idx + 1,
+            question: info.q,
+            answer: word,
+            hint: info.hint,
+          };
+        });
       }
 
       return res.json({ success: true, questions });

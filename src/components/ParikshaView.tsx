@@ -117,7 +117,7 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
                 color: 'var(--text-muted)',
               }}
             >
-              {language === 'hi' ? '२५ शब्द • प्रति शब्द २ XP (कुल ५० XP)' : '25 Words • 2 XP per Word (50 XP Total)'}
+              {language === 'hi' ? '६ शब्द • प्रति शब्द ८ XP (कुल ५० XP)' : '6 Words • 8 XP per Word (50 XP Total)'}
             </span>
           </div>
 
@@ -127,8 +127,8 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
 
           <p className="text-xs sm:text-sm max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
             {language === 'hi'
-              ? 'अध्याय के २५ प्रश्नों के उत्तर क्रॉसवर्ड में लिखें। प्रत्येक सही शब्द पर २ XP प्राप्त होंगे (कुल ५० XP)।'
-              : 'Conquer the 25-word chapter assessment crossword. Each solved word carries a weightage of 2 XP, awarding up to 50 XP upon completion.'}
+              ? 'अध्याय के ६ प्रश्नों के उत्तर क्रॉसवर्ड में लिखें। प्रत्येक सही शब्द पर ८ XP प्राप्त होंगे।'
+              : 'Conquer the 6-word chapter assessment crossword. Each solved word carries a weightage of 8 XP, awarding up to 50 XP upon completion.'}
           </p>
         </div>
 

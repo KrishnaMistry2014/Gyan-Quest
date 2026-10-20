@@ -99,6 +99,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
+  const [isReadLessonOpen, setIsReadLessonOpen] = useState<boolean>(false);
   const [isVictoryOpen, setIsVictoryOpen] = useState<boolean>(false);
   const [isFailureOpen, setIsFailureOpen] = useState<boolean>(false);
   const [missedCount, setMissedCount] = useState<number>(0);
@@ -508,8 +509,17 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
           </h2>
         </div>
 
-        {/* Right Actions: Rules & Exit */}
+        {/* Right Actions: Read Lesson, Rules & Exit */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsReadLessonOpen(true)}
+            className="px-3 py-2 rounded-xl border border-amber-500/30 hover:border-amber-400 bg-black/40 text-amber-300 transition cursor-pointer hover:bg-amber-500/10 flex items-center gap-1.5 text-xs font-bold"
+            title="Read Chapter Lesson"
+          >
+            <BookOpen className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">Read Lesson</span>
+          </button>
           <button
             type="button"
             onClick={() => setIsHelpOpen(true)}
@@ -856,6 +866,50 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
               className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 cursor-pointer shadow-md"
             >
               Begin Quest
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* READ LESSON MODAL */}
+      {isReadLessonOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div
+            className="rounded-3xl border p-6 max-w-lg w-full space-y-4 shadow-2xl relative max-h-[80vh] flex flex-col"
+            style={{
+              backgroundColor: '#161921',
+              borderColor: '#d4af3766',
+            }}
+          >
+            <div className="flex items-center justify-between border-b border-amber-500/20 pb-3">
+              <h3 className="text-base font-bold text-amber-300 flex items-center gap-2 font-serif-heading">
+                <BookOpen className="w-5 h-5 text-amber-400" />
+                <span>Chapter Lesson: {chapter.title}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsReadLessonOpen(false)}
+                className="text-stone-400 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="text-xs sm:text-sm text-stone-300 space-y-3 leading-relaxed overflow-y-auto pr-1">
+              <div className="p-3 rounded-xl bg-black/40 border border-amber-500/20 text-amber-200/90 font-medium">
+                {chapter.fileName || chapter.title}
+              </div>
+              <div className="whitespace-pre-line text-stone-200">
+                {chapter.summary || 'Review the core concepts, definitions, and principles of this chapter to help you solve the Word Quest.'}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsReadLessonOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-stone-950 font-bold text-xs uppercase tracking-wider hover:brightness-110 cursor-pointer shadow-md"
+            >
+              Resume Word Quest
             </button>
           </div>
         </div>

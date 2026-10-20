@@ -1231,86 +1231,113 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                 >
                   <div className="w-full max-h-[550px] overflow-auto p-2 flex justify-center items-center">
                     {/* The Interactive NxN Grid */}
-                    <div
-                      className="grid gap-[2px] p-3 rounded-2xl shadow-inner"
-                      style={{
-                        gridTemplateColumns: `repeat(${puzzle.gridSize || 11}, minmax(36px, 1fr))`,
-                        backgroundColor: 'var(--border-warm)',
-                      }}
-                    >
-                      {Array.from({ length: puzzle.gridSize || 11 }).map((_, r) =>
-                        Array.from({ length: puzzle.gridSize || 11 }).map((_, c) => {
-                          const active = isCellActive(r, c);
-                          const key = cellKey(r, c);
-                          const letter = userLetters[key] || '';
-                          const num = getCellNumber(r, c);
-                          const isSelected = selectedCell && selectedCell.row === r && selectedCell.col === c;
+                    {(() => {
+                      let minR = 0, maxR = (puzzle.gridSize || 11) - 1, minC = 0, maxC = (puzzle.gridSize || 11) - 1;
+                      if (puzzle && puzzle.words && puzzle.words.length > 0) {
+                        minR = Infinity; maxR = -Infinity; minC = Infinity; maxC = -Infinity;
+                        for (const w of puzzle.words) {
+                          const wLen = (w.answer || '').length;
+                          const endR = w.direction === 'down' ? w.row + wLen - 1 : w.row;
+                          const endC = w.direction === 'across' ? w.col + wLen - 1 : w.col;
+                          minR = Math.min(minR, w.row);
+                          maxR = Math.max(maxR, endR);
+                          minC = Math.min(minC, w.col);
+                          maxC = Math.max(maxC, endC);
+                        }
+                        const pad = 1;
+                        minR = Math.max(0, minR - pad);
+                        maxR = maxR + pad;
+                        minC = Math.max(0, minC - pad);
+                        maxC = maxC + pad;
+                      }
+                      const rowCount = maxR - minR + 1;
+                      const colCount = maxC - minC + 1;
 
-                          let isInActiveWord = false;
-                          if (activeWord) {
-                            const wLen = (activeWord.answer || '').length;
-                            isInActiveWord =
-                              activeWord.direction === 'across'
-                                ? activeWord.row === r && c >= activeWord.col && c < activeWord.col + wLen
-                                : activeWord.col === c && r >= activeWord.row && r < activeWord.row + wLen;
-                          }
+                      return (
+                        <div
+                          className="grid gap-[2px] p-3 rounded-2xl shadow-inner"
+                          style={{
+                            gridTemplateColumns: `repeat(${colCount}, minmax(36px, 1fr))`,
+                            backgroundColor: 'var(--border-warm)',
+                          }}
+                        >
+                          {Array.from({ length: rowCount }).map((_, ri) => {
+                            const r = minR + ri;
+                            return Array.from({ length: colCount }).map((_, ci) => {
+                              const c = minC + ci;
+                              const active = isCellActive(r, c);
+                              const key = cellKey(r, c);
+                              const letter = userLetters[key] || '';
+                              const num = getCellNumber(r, c);
+                              const isSelected = selectedCell && selectedCell.row === r && selectedCell.col === c;
 
-                          const hasError = cellErrors[key];
+                              let isInActiveWord = false;
+                              if (activeWord) {
+                                const wLen = (activeWord.answer || '').length;
+                                isInActiveWord =
+                                  activeWord.direction === 'across'
+                                    ? activeWord.row === r && c >= activeWord.col && c < activeWord.col + wLen
+                                    : activeWord.col === c && r >= activeWord.row && r < activeWord.row + wLen;
+                              }
 
-                          return active ? (
-                            <div
-                              key={key}
-                              onClick={() => handleCellClick(r, c)}
-                              className={`w-9 h-9 sm:w-10 sm:h-10 shrink-0 relative flex items-center justify-center font-bold text-xs sm:text-base cursor-pointer transition select-none rounded-sm border ${
-                                isSelected
-                                  ? 'shadow-md ring-2 ring-amber-400 dark:ring-amber-300 z-10 scale-105'
-                                  : isInActiveWord
-                                  ? 'shadow-2xs'
-                                  : 'hover:opacity-90 shadow-2xs'
-                              }`}
-                              style={{
-                                backgroundColor: isSelected
-                                  ? 'var(--accent-saffron)'
-                                  : isInActiveWord
-                                  ? 'var(--accent-saffron-light)'
-                                  : 'var(--bg-main)',
-                                borderColor: isSelected
-                                  ? 'var(--accent-saffron)'
-                                  : isInActiveWord
-                                  ? 'var(--accent-saffron)'
-                                  : 'var(--border-warm)',
-                                color: isSelected
-                                  ? '#FFFFFF'
-                                  : isInActiveWord
-                                  ? 'var(--accent-saffron-text)'
-                                  : 'var(--text-primary)',
-                              }}
-                            >
-                              {num && (
-                                <span
-                                  className="absolute top-0.5 left-0.5 text-[8px] sm:text-[10px] font-bold leading-none select-none"
+                              const hasError = cellErrors[key];
+
+                              return active ? (
+                                <div
+                                  key={key}
+                                  onClick={() => handleCellClick(r, c)}
+                                  className={`w-9 h-9 sm:w-10 sm:h-10 shrink-0 relative flex items-center justify-center font-bold text-xs sm:text-base cursor-pointer transition select-none rounded-sm border ${
+                                    isSelected
+                                      ? 'shadow-md ring-2 ring-amber-400 dark:ring-amber-300 z-10 scale-105'
+                                      : isInActiveWord
+                                      ? 'shadow-2xs'
+                                      : 'hover:opacity-90 shadow-2xs'
+                                  }`}
                                   style={{
-                                    color: isSelected ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)',
+                                    backgroundColor: isSelected
+                                      ? 'var(--accent-saffron)'
+                                      : isInActiveWord
+                                      ? 'var(--accent-saffron-light)'
+                                      : 'var(--bg-main)',
+                                    borderColor: isSelected
+                                      ? 'var(--accent-saffron)'
+                                      : isInActiveWord
+                                      ? 'var(--accent-saffron)'
+                                      : 'var(--border-warm)',
+                                    color: isSelected
+                                      ? '#FFFFFF'
+                                      : isInActiveWord
+                                      ? 'var(--accent-saffron-text)'
+                                      : 'var(--text-primary)',
                                   }}
                                 >
-                                  {num}
-                                </span>
-                              )}
-                              <span className={hasError ? 'text-red-600 dark:text-red-400' : ''}>{letter}</span>
-                            </div>
-                          ) : (
-                            <div
-                              key={key}
-                              className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-sm"
-                              style={{
-                                backgroundColor: 'var(--bg-card-subtle)',
-                                opacity: 0.6,
-                              }}
-                            />
-                          );
-                        })
-                      )}
-                    </div>
+                                  {num && (
+                                    <span
+                                      className="absolute top-0.5 left-0.5 text-[8px] sm:text-[10px] font-bold leading-none select-none"
+                                      style={{
+                                        color: isSelected ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)',
+                                      }}
+                                    >
+                                      {num}
+                                    </span>
+                                  )}
+                                  <span className={hasError ? 'text-red-600 dark:text-red-400' : ''}>{letter}</span>
+                                </div>
+                              ) : (
+                                <div
+                                  key={key}
+                                  className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-sm"
+                                  style={{
+                                    backgroundColor: 'var(--bg-card-subtle)',
+                                    opacity: 0.6,
+                                  }}
+                                />
+                              );
+                            });
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Active Clue Banner below grid */}

@@ -37,7 +37,8 @@ export function buildValidCrosswordLayout(
   // Sort by length descending so long words establish the puzzle anchor
   const candidates: { answer: string; clue: string }[] = Array.from(cleanMap.entries())
     .map(([answer, clue]) => ({ answer, clue }))
-    .sort((a, b) => b.answer.length - a.answer.length);
+    .sort((a, b) => b.answer.length - a.answer.length)
+    .slice(0, 6);
 
   if (candidates.length === 0) {
     // Return empty fallback
@@ -178,7 +179,7 @@ export function buildValidCrosswordLayout(
 
   // 1.5 If fewer than target words were placed, attempt to safely place remaining candidate words
   // with at least 1-cell border spacing from existing cells
-  const targetWordCount = 25;
+  const targetWordCount = 6;
   if (placedWords.length < targetWordCount && candidates.length > placedWords.length) {
     const placedSet = new Set(placedWords.map((pw) => pw.answer));
     const unplaced = candidates.filter((c) => !placedSet.has(c.answer));
