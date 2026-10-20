@@ -94,7 +94,7 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen || !user) return null;
+  if (!isOpen) return null;
 
   const handleSendMessage = async (customText?: string) => {
     const textToSend = (customText !== undefined ? customText : inputText).trim();
@@ -112,88 +112,32 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
     setInputText('');
     setIsLoading(true);
 
-    // Save user message (only persists to Firestore if user signed in with Google/Email)
+    // Save user message (only persists to Firestore if user signed in with Google/Email; local cache for guests)
     saveGuruChatToFirestore(newMessages, user);
 
     try {
-      let replyText = '';
+      const response = await fetch('/api/guru-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: textToSend,
+          history: newMessages,
+        }),
+      });
 
-      // 1. Primary path: Call the existing Express server route in AI Studio Preview
-      try {
-        const response = await fetch('/api/guru-chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: textToSend,
-            history: newMessages,
-          }),
-        });
-
-        const contentType = response.headers.get('content-type') || '';
-        // In Firebase Hosting, static rewrite returns index.html (text/html) instead of json
-        if (response.ok && contentType.includes('application/json')) {
-          const data = await response.json().catch(() => null);
-          if (data?.reply && typeof data.reply === 'string') {
-            replyText = data.reply;
-          }
-        }
-      } catch (serverErr) {
-        console.warn('[Guru Chat] Server route unavailable:', serverErr);
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        throw new Error('Server warmup in progress. Please retry in a moment.');
       }
 
-      // 2. Fallback path: If server endpoint failed or returned HTML (Firebase Hosting static),
-      // call Gemini Flash-Lite directly from browser using dedicated client key VITE_GURU_GEMINI_API_KEY
-      if (!replyText) {
-        const clientApiKey = (import.meta.env.VITE_GURU_GEMINI_API_KEY as string | undefined)?.trim();
-        if (clientApiKey) {
-          try {
-            const systemInstruction = `You are Guru, a revered, warm, wise, scholarly educational mentor on Gyan Quest.
-Answer academic, scientific, Indian culture, Sanskrit, and epic questions with deep knowledge and warmth.
-STRICT PLAIN TEXT ONLY. NO markdown asterisks, hashes, backticks, or LaTeX math dollar signs.`;
+      const data = await response.json().catch(() => null);
 
-            const contents: any[] = [];
-            for (const turn of newMessages.slice(-8)) {
-              if (turn.sender === 'user' && turn.text) {
-                contents.push({ role: 'user', parts: [{ text: turn.text }] });
-              } else if (turn.sender === 'guru' && turn.text) {
-                contents.push({ role: 'model', parts: [{ text: turn.text }] });
-              }
-            }
-
-            const restUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${encodeURIComponent(clientApiKey)}`;
-            const res = await fetch(restUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                system_instruction: { parts: [{ text: systemInstruction }] },
-                contents,
-                generationConfig: {
-                  maxOutputTokens: 1024,
-                  temperature: 0.7,
-                },
-              }),
-            });
-
-            if (res.ok) {
-              const resData = await res.json();
-              const candidateText = resData?.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (candidateText && typeof candidateText === 'string') {
-                replyText = candidateText;
-              }
-            } else {
-              const errBody = await res.json().catch(() => null);
-              console.warn('[Guru Browser Fallback API Error]:', errBody || res.status);
-            }
-          } catch (clientErr) {
-            console.error('[Guru Browser Fallback Error]:', clientErr);
-          }
-        }
-      }
-
-      if (!replyText) {
+      let replyText = data?.reply;
+      if (!replyText || typeof replyText !== 'string') {
         replyText =
+          data?.error ||
           'I am reflecting on your question. Let us return to your studies: what concept can we review together?';
       }
 
@@ -497,12 +441,9 @@ STRICT PLAIN TEXT ONLY. NO markdown asterisks, hashes, backticks, or LaTeX math 
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  if (e.ctrlKey || e.metaKey) {
-                    e.preventDefault();
-                    handleSendMessage();
-                  }
-                  // Pressing only Enter allows the normal behavior of inserting a newline
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
                 }
               }}
               placeholder="Ask Guru anything"

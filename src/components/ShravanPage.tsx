@@ -268,8 +268,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
       const plainText = stripMarkdownForSpeech(chapter.summary);
       const wordsCount = plainText.split(/\s+/).length;
 
-      // For standard summaries (under 2000 words), synthesize in a single fast request
-      if (wordsCount <= 2000) {
+      // For standard summaries (under 250 words), synthesize in a single fast request
+      if (wordsCount <= 250) {
         setChunkProgress({ current: 1, total: 1 });
         const response = await fetch('/api/tts', {
           method: 'POST',
@@ -284,6 +284,18 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
           signal: controller.signal,
         });
 
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const errData = await response.json().catch(() => null);
+          if (errData?.fallbackToWebSpeech || !errData?.success) {
+            throw new Error(errData?.error || 'TTS voice engine busy. Switching to Web Speech API.');
+          }
+        }
+
+        if (contentType.includes('text/html')) {
+          throw new Error('TTS voice server is warming up. Activating Web Speech API fallback.');
+        }
+
         if (!response.ok) {
           const errData = await response.json().catch(() => null);
           throw new Error(errData?.error || `TTS voice server returned HTTP ${response.status}`);
@@ -294,8 +306,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
         setTtsMeta({ voice: voiceUsed, fromCache });
 
         const blob = await response.blob();
-        if (!blob || blob.size === 0) {
-          throw new Error('Received empty audio narration response.');
+        if (!blob || blob.size === 0 || blob.type.includes('text/html')) {
+          throw new Error('Received invalid audio response.');
         }
 
         if (controller.signal.aborted) return;
@@ -312,8 +324,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
         return;
       }
 
-      // For extra-long summaries (> 750 words), divide into ~500 word sections
-      const chunks = chunkTextForTTS(plainText, 500);
+      // For long summaries (> 250 words), divide into ~180 word sections for fast synthesis
+      const chunks = chunkTextForTTS(plainText, 180);
       setChunkProgress({ current: 0, total: chunks.length });
 
       const audioBlobs: Blob[] = [];
@@ -341,6 +353,18 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
             signal: chunkController.signal,
           });
 
+          const chunkContentType = response.headers.get('content-type') || '';
+          if (chunkContentType.includes('application/json')) {
+            const errData = await response.json().catch(() => null);
+            if (errData?.fallbackToWebSpeech || !errData?.success) {
+              throw new Error(errData?.error || 'TTS voice engine busy. Switching to Web Speech API.');
+            }
+          }
+
+          if (chunkContentType.includes('text/html')) {
+            throw new Error('TTS voice server is warming up. Activating Web Speech API fallback.');
+          }
+
           if (!response.ok) {
             const errData = await response.json().catch(() => null);
             throw new Error(errData?.error || `TTS voice server returned HTTP ${response.status}`);
@@ -351,8 +375,8 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
           setTtsMeta({ voice: voiceUsed, fromCache });
 
           const blob = await response.blob();
-          if (!blob || blob.size === 0) {
-            throw new Error('Received empty audio section response.');
+          if (!blob || blob.size === 0 || blob.type.includes('text/html')) {
+            throw new Error('Received invalid audio section response.');
           }
 
           audioBlobs.push(blob);
@@ -833,18 +857,20 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
         )}
 
         {/* READY / AUDIO PLAYER STATE */}
-        {status === 'ready' && (audioUrl || audioBase64) && (
+        {status === 'ready' && (audioUrl || audioBase64 || isUsingWebSpeech) && (
           <div className="space-y-8 max-w-2xl mx-auto">
-            <audio
-              ref={audioRef}
-              src={audioUrl || (audioBase64 ? resolveAudioSrc(audioBase64) : undefined)}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onEnded={() => {
-                setIsPlaying(false);
-                setHasPlayedFullAudio(true);
-              }}
-            />
+            {!isUsingWebSpeech && (
+              <audio
+                ref={audioRef}
+                src={audioUrl || (audioBase64 ? resolveAudioSrc(audioBase64) : undefined)}
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+                onEnded={() => {
+                  setIsPlaying(false);
+                  setHasPlayedFullAudio(true);
+                }}
+              />
+            )}
 
             {/* Visual Equalizer / Waveform Graphic */}
             <div

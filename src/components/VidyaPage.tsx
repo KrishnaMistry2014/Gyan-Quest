@@ -58,9 +58,6 @@ const sanitizeClientVidya = (raw: string, defaultTitle: string): string => {
     cleaned = `# ${fallbackTitle}\n\n` + cleaned;
   }
 
-  // 6. Remove all markdown asterisks
-  cleaned = cleaned.replace(/\*/g, '');
-
   return cleaned.trim();
 };
 

@@ -12,10 +12,6 @@ import { getFirestore } from 'firebase/firestore';
 import { buildValidCrosswordLayout } from './src/lib/crosswordGenerator.ts';
 import { SAMPLE_CROSSWORDS } from './src/lib/sampleCrosswords.ts';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: path.resolve(__dirname, '.env') });
 dotenv.config();
 
 const serverFirebaseConfig = {
@@ -33,9 +29,12 @@ if (process.env.VITE_FIREBASE_API_KEY && !process.env.VITE_FIREBASE_API_KEY.star
   process.env.VITE_FIREBASE_API_KEY = 'AIzaSyDkCU1DHUqnRjuWvCiMi3m4Q8G2uJ6ECZU';
 }
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 async function startServer() {
   const app = express();
-  const port = process.env.PORT || 3000;
+  const port = 3000;
 
   // Support large PDF payloads up to 100MB
   app.use(express.json({ limit: '100mb' }));
@@ -53,18 +52,13 @@ async function startServer() {
   });
 
   // Server-Side GoogleGenAI Client
-  const getGeminiApiKey = (): string => {
-    return (
-      process.env.GEMINI_API_KEY ||
-      process.env.GOOGLE_API_KEY ||
-      process.env.API_KEY ||
-      process.env.VITE_GEMINI_API_KEY ||
-      ''
-    ).trim();
-  };
-
   const ai = new GoogleGenAI({
-    apiKey: getGeminiApiKey(),
+    apiKey: process.env.GEMINI_API_KEY,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
   });
 
   function callWithTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
@@ -76,8 +70,8 @@ async function startServer() {
   }
 
   function isGeminiConfigured(): boolean {
-    const key = getGeminiApiKey();
-    return Boolean(key && key.length > 5 && !key.toLowerCase().includes('placeholder'));
+    const key = process.env.GEMINI_API_KEY;
+    return Boolean(key && typeof key === 'string' && key.trim().length > 5 && !key.toLowerCase().includes('placeholder'));
   }
 
   // Helper to extract ASCII streams from raw PDF buffer
@@ -121,8 +115,6 @@ async function startServer() {
         .trim();
       cleaned = `# ${fallbackTitle}\n\n` + cleaned;
     }
-    // 6. Remove all markdown asterisks
-    cleaned = cleaned.replace(/\*/g, '');
     return cleaned.trim();
   };
 
@@ -376,13 +368,11 @@ CRITICAL REQUIREMENTS:
   // Shravan TTS: Exact fallback order required:
   // 1. gemini-3.8-flash-tts
   // 2. gemini-3.8-flash-lite-tts
-  // 3. gemini-3.1-flash-tts
-  // 4. Web Speech API (Client fallback on error)
+  // 3. Web Speech API (Client fallback on error)
   // ============================================================================
   const TTS_MODELS_ORDER = [
     'gemini-3.8-flash-tts',
     'gemini-3.8-flash-lite-tts',
-    'gemini-3.1-flash-tts',
   ] as const;
 
   const TTS_CACHE_DIR = path.join(process.cwd(), '.cache', 'tts');
@@ -415,7 +405,7 @@ CRITICAL REQUIREMENTS:
     for (let i = 0; i < TTS_MODELS_ORDER.length; i++) {
       const model = TTS_MODELS_ORDER[i];
       try {
-        console.log(`[TTS Tier ${i + 1}/3] Synthesizing with ${model} (Voice: ${voice})...`);
+        console.log(`[TTS Tier ${i + 1}/${TTS_MODELS_ORDER.length}] Synthesizing with ${model} (Voice: ${voice})...`);
         const ttsPromise = ai.models.generateContent({
           model,
           contents: [
@@ -425,7 +415,6 @@ CRITICAL REQUIREMENTS:
             },
           ] as any,
           config: {
-            systemInstruction: `You are a text-to-speech voice synthesizer. Speak strictly with a natural Indian English accent. Read only the user's text immediately without greetings or preambles.`,
             responseModalities: ['AUDIO'],
             speechConfig: {
               voiceConfig: {
@@ -446,7 +435,7 @@ CRITICAL REQUIREMENTS:
           return { audioBuffer: wavBuf, modelUsed: model, voiceUsed: voice, fromCache: false };
         }
       } catch (err: any) {
-        console.log(`[TTS Tier ${i + 1}/3] ${model} unavailable, trying next tier`);
+        console.log(`[TTS Tier ${i + 1}/${TTS_MODELS_ORDER.length}] ${model} unavailable:`, err?.message || err);
         errors.push(`${model}: ${err?.message || err}`);
       }
     }
@@ -485,8 +474,10 @@ CRITICAL REQUIREMENTS:
         audioBase64: result.audioBuffer.toString('base64'),
       });
     } catch (err: any) {
-      console.log('[Shravan TTS Notice] Returning fallbackToWebSpeech signal to client');
-      return res.status(503).json({
+      console.log('[Shravan TTS Notice] Returning fallbackToWebSpeech signal to client:', err?.message);
+      // NOTE: Do not return 502/503/504 because Nginx intercepts those and serves warmup.html.
+      // Return 200 with fallbackToWebSpeech flag so frontend cleanly uses Web Speech API.
+      return res.status(200).json({
         success: false,
         fallbackToWebSpeech: true,
         error: err?.message || 'Server voice engine busy. Switching to Web Speech API.',

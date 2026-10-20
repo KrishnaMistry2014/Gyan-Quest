@@ -1,4 +1,4 @@
-import type { CrosswordData } from '../types.ts';
+import { CrosswordData } from '../types';
 
 export const SAMPLE_CROSSWORDS: CrosswordData[] = [
   {
