@@ -133,7 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Automatically close mobile drawer
     setIsMobileOpen(false);
 
-    if (!user && id !== 'home') {
+    if (!user && id !== 'home' && id !== 'about') {
       openAuthModal();
       return;
     }
@@ -208,15 +208,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         break;
 
       case 'about':
-        if (!isUserActive) {
-          openAuthModal();
+        if (currentView !== 'landing') {
+          onNavigateView('landing');
+          setTimeout(() => onNavigateSection('about'), 100);
         } else {
-          if (currentView !== 'landing') {
-            onNavigateView('landing');
-            setTimeout(() => onNavigateSection('about'), 100);
-          } else {
-            onNavigateSection('about');
-          }
+          onNavigateSection('about');
         }
         break;
 
@@ -401,95 +397,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      {/* 2. Scrollable Navigation Menu Groups */}
-      <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-6">
-        {/* GROUP 1: MAIN NAVIGATION */}
-        <div className="space-y-1">
-          {!isCollapsed ? (
-            <div
-              className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider select-none"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {t.groupMainNav}
-            </div>
-          ) : (
-            <div className="my-2 border-t" style={{ borderColor: 'var(--border-warm)' }} />
-          )}
-
-          {renderNavItem('home', t.navHome, Home, isHomeActive)}
-          {renderNavItem('bhagavad-gita', t.navLearnScriptures, Scroll, isGitaActive)}
-          {renderNavItem(
-            'guru-ai',
-            t.navGuruAi,
-            Sparkles,
-            false,
-            <span
-              className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
-              style={{
-                backgroundColor: 'var(--accent-saffron)',
-                color: '#FFFFFF',
-              }}
-            >
-              AI
-            </span>
-          )}
-        </div>
-
-        {/* GROUP 2: LEARNING AND PROGRESS */}
-        <div className="space-y-1">
-          {!isCollapsed ? (
-            <div
-              className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider select-none"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {t.groupLearnProgress}
-            </div>
-          ) : (
-            <div className="my-2 border-t" style={{ borderColor: 'var(--border-warm)' }} />
-          )}
-
-          {renderNavItem('focus-mode', t.navFocusMode, Clock, isFocusActive)}
-          {renderNavItem(
-            'my-books',
-            t.navMyBooks,
-            BookOpen,
-            isMyBooksActive
-          )}
-          {renderNavItem(
-            'streaks',
-            t.navStreaks,
-            Flame,
-            isStreakActive,
-            <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tabular-nums flex items-center gap-0.5"
-              style={{
-                backgroundColor: 'var(--accent-saffron-light)',
-                color: 'var(--accent-saffron-text)',
-              }}
-            >
-              <Flame className="w-3 h-3 text-amber-500 fill-current" />
-              <span>{streak}d</span>
-            </span>
-          )}
-        </div>
-
-        {/* GROUP 3: SYSTEM & PREFERENCES */}
-        <div className="space-y-1">
-          {!isCollapsed ? (
-            <div
-              className="px-3 pb-1.5 text-[11px] font-bold uppercase tracking-wider select-none"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              Settings & Info
-            </div>
-          ) : (
-            <div className="my-2 border-t" style={{ borderColor: 'var(--border-warm)' }} />
-          )}
-
-          {renderNavItem('settings', t.navSettings, Settings, isSettingsModalOpen)}
-          {isUserActive && renderNavItem('about', t.navAbout, Info, isAboutActive)}
-        </div>
-
+      {/* 2. Scrollable Navigation Menu Items */}
+      <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-1">
+        {renderNavItem('home', t.navHome, Home, isHomeActive)}
+        {renderNavItem('bhagavad-gita', t.navLearnScriptures, Scroll, isGitaActive)}
+        {renderNavItem(
+          'guru-ai',
+          t.navGuruAi,
+          Sparkles,
+          false,
+          <span
+            className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+            style={{
+              backgroundColor: 'var(--accent-saffron)',
+              color: '#FFFFFF',
+            }}
+          >
+            AI
+          </span>
+        )}
+        {renderNavItem('focus-mode', t.navFocusMode, Clock, isFocusActive)}
+        {renderNavItem(
+          'my-books',
+          t.navMyBooks,
+          BookOpen,
+          isMyBooksActive
+        )}
+        {renderNavItem(
+          'streaks',
+          t.navStreaks,
+          Flame,
+          isStreakActive,
+          <span
+            className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono tabular-nums flex items-center gap-0.5"
+            style={{
+              backgroundColor: 'var(--accent-saffron-light)',
+              color: 'var(--accent-saffron-text)',
+            }}
+          >
+            <Flame className="w-3 h-3 text-amber-500 fill-current" />
+            <span>{streak}d</span>
+          </span>
+        )}
+        {renderNavItem('settings', t.navSettings, Settings, isSettingsModalOpen)}
+        {renderNavItem('about', t.navAbout, Info, isAboutActive)}
       </div>
 
       {/* 3. Account / Status Footer */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Sparkles,
@@ -7,17 +7,18 @@ import {
   Volume2,
   VolumeX,
   Lightbulb,
-  CheckCircle2,
-  AlertCircle,
-  Trophy,
   ArrowRight,
   BookOpen,
   X,
-  HelpCircle,
 } from 'lucide-react';
 import { SavedChapter } from '../lib/chapters';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import {
+  generateWordleQuestionsForChapter,
+  SCRIPTURE_WORDLE_DECKS,
+} from '../lib/geminiClient';
+import { getScriptureDefinition } from '../lib/scriptureData';
 
 export interface WordleQuestion {
   question: string;
@@ -26,49 +27,54 @@ export interface WordleQuestion {
   lore?: string;
 }
 
-const DEFAULT_QUESTION_DECK: WordleQuestion[] = [
-  {
-    question: "What 5-letter vital breath is celebrated in ancient scripture as the invisible life current animating mortal vessels?",
-    answer: "PRANA",
-    hint: "Directly relates to breath and vital life energy (Pranayama) — begins with P and ends with A (5 letters).",
-    lore: "In Yogic philosophy, prana flows through 72,000 nadis, sustaining the cosmic heartbeat."
-  },
-  {
-    question: "What 6-letter universal law of cosmic duty, righteousness, and moral order sustains the entire cosmos?",
-    answer: "DHARMA",
-    hint: "Directly relates to universal duty and ethical conduct — begins with D and ends with A (6 letters).",
-    lore: "Dharma upholds cosmic harmony, aligning individual conduct with universal order."
-  },
-  {
-    question: "What 4-letter primordial sacrificial flame acts as the divine messenger between earth and cosmic realms?",
-    answer: "AGNI",
-    hint: "Directly relates to the holy transformative fire honored in Rigveda — begins with A and ends with I (4 letters).",
-    lore: "Agni represents divine illumination and the transformation of worldly matter into energy."
-  },
-  {
-    question: "What 6-letter state of supreme inner peace and tranquility calms the restless student mind?",
-    answer: "SHANTI",
-    hint: "Directly relates to peace recited three times at the close of sacred mantras — begins with S and ends with I (6 letters).",
-    lore: "Shanti establishes peaceful equilibrium across body, mind, and cosmic surroundings."
-  },
-  {
-    question: "What 7-letter supreme state of meditative absorption dissolves all duality in transcendent stillness?",
-    answer: "SAMADHI",
-    hint: "Directly relates to the highest limb of Raja Yoga meditation — begins with S and ends with I (7 letters).",
-    lore: "In Patanjali's Yoga Sutras, Samadhi is the pinnacle of spiritual stillness."
-  },
-  {
-    question: "What 5-letter universal law of action and consequence teaches that every intention shapes mortal destiny?",
-    answer: "KARMA",
-    hint: "Directly relates to the cosmic principle of cause and effect — begins with K and ends with A (5 letters).",
-    lore: "Nishkama Karma guides the seeker to act selflessly without clinging to outcomes."
+export type LetterFeedbackState = 'correct' | 'present' | 'absent';
+
+export interface GuessEntry {
+  word: string;
+  states: LetterFeedbackState[];
+}
+
+/**
+ * Standard Wordle two-pass letter evaluation:
+ * - 'correct' (Green): Letter is in the word and in the exact position.
+ * - 'present' (Yellow): Letter is in the word but in a different position.
+ * - 'absent'  (Gray): Letter is not in the word in any remaining position.
+ */
+export function evaluateWordleGuess(guess: string, target: string): LetterFeedbackState[] {
+  const len = target.length;
+  const states: LetterFeedbackState[] = Array(len).fill('absent');
+  const remainingCounts: Record<string, number> = {};
+
+  // Pass 1: Identify exact matches (Green) and count unmatched target letters
+  for (let i = 0; i < len; i++) {
+    const tChar = target[i];
+    const gChar = guess[i];
+    if (gChar === tChar) {
+      states[i] = 'correct';
+    } else {
+      remainingCounts[tChar] = (remainingCounts[tChar] || 0) + 1;
+    }
   }
-];
+
+  // Pass 2: Identify misplaced matches (Yellow) vs absent (Gray)
+  for (let i = 0; i < len; i++) {
+    if (states[i] === 'correct') continue;
+    const gChar = guess[i];
+    if (remainingCounts[gChar] && remainingCounts[gChar] > 0) {
+      states[i] = 'present';
+      remainingCounts[gChar] -= 1;
+    } else {
+      states[i] = 'absent';
+    }
+  }
+
+  return states;
+}
 
 const KB_ROWS = [
   ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
   ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L'],
-  ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'BACKSPACE']
+  ['ENTER', 'Z', 'X', 'C', 'V', 'B', 'N', 'M', 'BACKSPACE'],
 ];
 
 interface GyanQuestWordleProps {
@@ -86,10 +92,12 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
 }) => {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const scripture = getScriptureDefinition(chapter);
 
   const [deck, setDeck] = useState<WordleQuestion[]>([]);
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [enteredLetters, setEnteredLetters] = useState<string>('');
+  const [guessHistory, setGuessHistory] = useState<GuessEntry[]>([]);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
   const [solvedIndices, setSolvedIndices] = useState<Set<number>>(new Set());
   const [attempts, setAttempts] = useState<number>(0);
@@ -106,105 +114,71 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
   const [statusMessage, setStatusMessage] = useState<string>('Inscribe your answer & press ENTER');
   const [statusType, setStatusType] = useState<'neutral' | 'correct' | 'wrong'>('neutral');
   const [rowShake, setRowShake] = useState<boolean>(false);
-  const [tilesFeedback, setTilesFeedback] = useState<'none' | 'correct' | 'wrong'>('none');
 
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   // Web Audio feedback
-  const playSound = useCallback((type: 'tap' | 'correct' | 'wrong') => {
-    if (!soundEnabled) return;
-    try {
-      if (!audioCtxRef.current) {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) audioCtxRef.current = new AudioCtx();
-      }
-      const ctx = audioCtxRef.current;
-      if (!ctx) return;
-      if (ctx.state === 'suspended') ctx.resume();
+  const playSound = useCallback(
+    (type: 'tap' | 'correct' | 'wrong') => {
+      if (!soundEnabled) return;
+      try {
+        if (!audioCtxRef.current) {
+          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioCtx) audioCtxRef.current = new AudioCtx();
+        }
+        const ctx = audioCtxRef.current;
+        if (!ctx) return;
+        if (ctx.state === 'suspended') ctx.resume();
 
-      const now = ctx.currentTime;
-      if (type === 'tap') {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(480, now);
-        osc.frequency.exponentialRampToValueAtTime(240, now + 0.05);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-        osc.start(now);
-        osc.stop(now + 0.05);
-      } else if (type === 'correct') {
-        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
-          const bell = ctx.createOscillator();
-          const bellGain = ctx.createGain();
-          bell.type = 'sine';
-          bell.frequency.setValueAtTime(freq, now + idx * 0.06);
-          bellGain.gain.setValueAtTime(0.18, now + idx * 0.06);
-          bellGain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.06 + 1.0);
-          bell.connect(bellGain);
-          bellGain.connect(ctx.destination);
-          bell.start(now + idx * 0.06);
-          bell.stop(now + idx * 0.06 + 1.0);
-        });
-      } else if (type === 'wrong') {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(160, now);
-        osc.frequency.exponentialRampToValueAtTime(90, now + 0.35);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-        osc.start(now);
-        osc.stop(now + 0.35);
-      }
-    } catch (_) {}
-  }, [soundEnabled]);
+        const now = ctx.currentTime;
+        if (type === 'tap') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(480, now);
+          osc.frequency.exponentialRampToValueAtTime(240, now + 0.05);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.start(now);
+          osc.stop(now + 0.05);
+        } else if (type === 'correct') {
+          [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+            const bell = ctx.createOscillator();
+            const bellGain = ctx.createGain();
+            bell.type = 'sine';
+            bell.frequency.setValueAtTime(freq, now + idx * 0.06);
+            bellGain.gain.setValueAtTime(0.18, now + idx * 0.06);
+            bellGain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.06 + 1.0);
+            bell.connect(bellGain);
+            bellGain.connect(ctx.destination);
+            bell.start(now + idx * 0.06);
+            bell.stop(now + idx * 0.06 + 1.0);
+          });
+        } else if (type === 'wrong') {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.exponentialRampToValueAtTime(90, now + 0.35);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc.start(now);
+          osc.stop(now + 0.35);
+        }
+      } catch (_) {}
+    },
+    [soundEnabled]
+  );
 
-  // Fallback client question generator from chapter summary
-  const generateFallbackQuestions = useCallback((text: string, title: string): WordleQuestion[] => {
-    const words = text.toUpperCase().replace(/[^A-Z\s]/g, ' ').split(/\s+/);
-    const stopwords = new Set([
-      'THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'ANY', 'CAN', 'HAD', 'HER', 'WAS', 'ONE', 'OUR',
-      'OUT', 'DAY', 'GET', 'HAS', 'HIM', 'HIS', 'HOW', 'MAN', 'NEW', 'NOW', 'OLD', 'SEE', 'TWO', 'WAY', 'WHO',
-      'BOY', 'DID', 'ITS', 'LET', 'PUT', 'SAY', 'SHE', 'TOO', 'USE', 'THAT', 'WITH', 'HAVE', 'THIS', 'FROM',
-      'THEY', 'WENT', 'WERE', 'WHAT', 'WHEN', 'SOME', 'THEM', 'THEN', 'LIKE', 'TIME', 'JUST', 'KNOW', 'TAKE',
-      'INTO', 'YEAR', 'YOUR', 'GOOD', 'COULD', 'WOULD', 'THERE', 'THESE', 'OTHER', 'AFTER', 'FIRST', 'ABOUT',
-      'THEIR', 'WHICH', 'WHERE', 'EVERY', 'BECAUSE', 'THROUGH', 'BEFORE', 'SHOULD', 'PEOPLE', 'LITTLE', 'WILL',
-      'OVER', 'SUCH', 'EVEN', 'MOST', 'MADE', 'ALSO', 'BACK', 'WELL', 'MUCH', 'ONLY', 'VERY', 'SOME'
-    ]);
-    const candidates = [...new Set(words.filter((w) => w.length >= 3 && w.length <= 10 && !stopwords.has(w)))];
-    const templates = [
-      (len: number) => `What ${len}-letter core concept highlighted in this chapter represents a foundational principle?`,
-      (len: number) => `According to this chapter, which ${len}-letter keyword signifies a key insight or truth?`,
-      (len: number) => `What ${len}-letter term in the passage guides the reader toward greater understanding?`,
-      (len: number) => `Which ${len}-letter essential term is emphasized as central in this text?`,
-      (len: number) => `What ${len}-letter principle embodies the deeper focus discussed in this chapter?`,
-    ];
-
-    if (candidates.length >= 3) {
-      const shuffled = [...candidates].sort(() => 0.5 - Math.random());
-      const selected = shuffled.slice(0, 6);
-      return selected.map((word, idx) => {
-        const len = word.length;
-        return {
-          question: templates[idx % templates.length](len),
-          answer: word,
-          hint: `Directly related to chapter — begins with '${word[0]}' and ends with '${word[len - 1]}' (${len} letters).`,
-          lore: `A foundational keyword identified within "${title}".`
-        };
-      });
-    }
-    return DEFAULT_QUESTION_DECK;
-  }, []);
-
-  // Fetch or generate questions strictly for uploaded chapter
+  // Fetch or generate questions strictly for the active chapter / scripture using Browser API keys & Gemini 3.5 Flash Lite
   const loadChapterDeck = useCallback(async () => {
     setIsLoading(true);
     setEnteredLetters('');
+    setGuessHistory([]);
     setIsEvaluating(false);
     setSolvedIndices(new Set());
     setIsVictoryOpen(false);
@@ -215,37 +189,29 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
     setIsHintRevealed(false);
 
     try {
-      const response = await fetch('/api/generate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: (chapter.summary || '') + '\n\n' + (chapter.title || ''),
-          title: chapter.title || 'Uploaded Chapter',
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data && Array.isArray(data.questions) && data.questions.length > 0) {
-          setDeck(data.questions);
-          setIsLoading(false);
-          setTimerSeconds(60);
-          setIsTimerRunning(true);
-          return;
-        }
+      const generated = await generateWordleQuestionsForChapter(chapter);
+      if (generated && generated.length > 0) {
+        setDeck(generated);
+        setIsLoading(false);
+        setTimerSeconds(60);
+        setIsTimerRunning(true);
+        setStatusMessage(`Inscribe a ${generated[0]?.answer?.length || 5}-letter answer & press ENTER`);
+        setStatusType('neutral');
+        return;
       }
       throw new Error('Fallback required');
-    } catch (err) {
-      const fallback = generateFallbackQuestions(
-        (chapter.summary || '') + ' ' + (chapter.title || ''),
-        chapter.title || 'Chapter'
-      );
+    } catch (_) {
+      const fallback = scripture
+        ? SCRIPTURE_WORDLE_DECKS[scripture.scriptureKey]
+        : SCRIPTURE_WORDLE_DECKS.gita;
       setDeck(fallback);
       setIsLoading(false);
       setTimerSeconds(60);
       setIsTimerRunning(true);
+      setStatusMessage(`Inscribe a ${fallback[0]?.answer?.length || 5}-letter answer & press ENTER`);
+      setStatusType('neutral');
     }
-  }, [chapter, generateFallbackQuestions]);
+  }, [chapter, scripture]);
 
   useEffect(() => {
     loadChapterDeck();
@@ -256,19 +222,44 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
   const targetAnswer = currentQuestion?.answer?.trim()?.toUpperCase()?.replace(/[^A-Z]/g, '') || '';
   const targetLen = targetAnswer.length;
 
+  // Compute keyboard letter states from guessHistory (correct > present > absent)
+  const keyboardLetterStates = useMemo(() => {
+    const map: Record<string, LetterFeedbackState> = {};
+    const priority: Record<LetterFeedbackState, number> = {
+      correct: 3,
+      present: 2,
+      absent: 1,
+    };
+
+    for (const entry of guessHistory) {
+      for (let i = 0; i < entry.word.length; i++) {
+        const ch = entry.word[i];
+        const st = entry.states[i];
+        const existing = map[ch];
+        if (!existing || priority[st] > priority[existing]) {
+          map[ch] = st;
+        }
+      }
+    }
+    return map;
+  }, [guessHistory]);
+
   // Reset inputs when switching questions
-  const selectQuestion = useCallback((idx: number) => {
-    if (isEvaluating) return;
-    setCurrentIdx(idx);
-    setEnteredLetters('');
-    setAttempts(0);
-    setIsHintRevealed(false);
-    setTilesFeedback('none');
-    setStatusMessage(`Inscribe a ${deck[idx]?.answer?.length || 5}-letter answer & press ENTER`);
-    setStatusType('neutral');
-    setTimerSeconds(60);
-    setIsTimerRunning(true);
-  }, [deck, isEvaluating]);
+  const selectQuestion = useCallback(
+    (idx: number) => {
+      if (isEvaluating) return;
+      setCurrentIdx(idx);
+      setEnteredLetters('');
+      setGuessHistory([]);
+      setAttempts(0);
+      setIsHintRevealed(false);
+      setStatusMessage(`Inscribe a ${deck[idx]?.answer?.length || 5}-letter answer & press ENTER`);
+      setStatusType('neutral');
+      setTimerSeconds(60);
+      setIsTimerRunning(true);
+    },
+    [deck, isEvaluating]
+  );
 
   // Advance to next unsolved question
   const advanceToNextQuestion = useCallback(() => {
@@ -281,13 +272,12 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
         confetti({
           particleCount: 80,
           spread: 70,
-          origin: { y: 0.6 }
+          origin: { y: 0.6 },
         });
       } catch (_) {}
       return;
     }
 
-    // Check if there are any remaining unsolved questions
     let nextIdx = -1;
     for (let i = 0; i < deck.length; i++) {
       const candidate = (currentIdx + 1 + i) % deck.length;
@@ -300,7 +290,6 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
     if (nextIdx !== -1) {
       selectQuestion(nextIdx);
     } else {
-      // All questions attempted but not all solved -> less than 100% correct = fail
       setIsTimerRunning(false);
       setIsFailureOpen(true);
     }
@@ -309,21 +298,26 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
   // Handle timer countdown (60 seconds)
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isTimerRunning && !isEvaluating && !isLoading && !isVictoryOpen && !isFailureOpen && deck.length > 0) {
+    if (
+      isTimerRunning &&
+      !isEvaluating &&
+      !isLoading &&
+      !isVictoryOpen &&
+      !isFailureOpen &&
+      !isReadLessonOpen &&
+      !isHelpOpen &&
+      deck.length > 0
+    ) {
       interval = setInterval(() => {
         setTimerSeconds((prev) => {
           if (prev <= 1) {
             clearInterval(interval);
-            // Time expired on this question -> marked as missed (less than 100%)
             setIsTimerRunning(false);
             playSound('wrong');
             setMissedCount((c) => c + 1);
             setStatusMessage(`Time's up! The sacred answer was: ${targetAnswer}`);
             setStatusType('wrong');
-            setTilesFeedback('wrong');
-            setEnteredLetters(targetAnswer);
             setTimeout(() => {
-              // Less than 100% since time expired without solving
               setIsFailureOpen(true);
             }, 1800);
             return 0;
@@ -336,9 +330,20 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isTimerRunning, isEvaluating, isLoading, isVictoryOpen, deck.length, targetAnswer, playSound, advanceToNextQuestion]);
+  }, [
+    isTimerRunning,
+    isEvaluating,
+    isLoading,
+    isVictoryOpen,
+    isFailureOpen,
+    isReadLessonOpen,
+    isHelpOpen,
+    deck.length,
+    targetAnswer,
+    playSound,
+  ]);
 
-  // Submit Answer
+  // Submit Answer with full Wordle Green / Yellow / Gray feedback
   const submitAnswer = useCallback(() => {
     if (isEvaluating || !currentQuestion || isLoading || isVictoryOpen) return;
 
@@ -350,13 +355,18 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
     }
 
     setIsEvaluating(true);
+    const guessWord = enteredLetters.toUpperCase();
+    const states = evaluateWordleGuess(guessWord, targetAnswer);
+    const newEntry: GuessEntry = { word: guessWord, states };
 
-    if (enteredLetters === targetAnswer) {
-      // 🟢 CORRECT ANSWER
+    setGuessHistory((prev) => [...prev, newEntry]);
+    setEnteredLetters('');
+
+    if (guessWord === targetAnswer) {
+      // 🟢 ALL GREEN — CORRECT ANSWER
       playSound('correct');
-      setStatusMessage(`Correct! "${targetAnswer}" is the sacred answer.`);
+      setStatusMessage(`All Green! "${targetAnswer}" is the sacred answer.`);
       setStatusType('correct');
-      setTilesFeedback('correct');
       setIsTimerRunning(false);
 
       const nextSolved = new Set(solvedIndices);
@@ -378,16 +388,21 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
         setTimeout(() => {
           setIsEvaluating(false);
           advanceToNextQuestion();
-        }, 1100);
+        }, 1200);
       }
     } else {
-      // 🔴 WRONG ANSWER
+      // 🟩🟨⬛ PARTIAL / WRONG ATTEMPT — Keep color-coded row visible & allow next guess
       playSound('wrong');
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
-      setStatusMessage(`Incorrect inscription (${newAttempts} attempt${newAttempts > 1 ? 's' : ''})`);
+
+      const greenCount = states.filter((s) => s === 'correct').length;
+      const yellowCount = states.filter((s) => s === 'present').length;
+
+      setStatusMessage(
+        `Attempt #${newAttempts}: ${greenCount} Green (exact spot), ${yellowCount} Yellow (wrong spot). Try your next guess below!`
+      );
       setStatusType('wrong');
-      setTilesFeedback('wrong');
       setRowShake(true);
       setTimeout(() => setRowShake(false), 450);
 
@@ -395,14 +410,9 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
         setIsHintRevealed(true);
       }
 
-      // Erase tiles after flash so user can retype immediately
       setTimeout(() => {
-        setEnteredLetters('');
-        setTilesFeedback('none');
-        setStatusMessage(`Answer erased. Inscribe your ${targetLen}-letter attempt:`);
-        setStatusType('neutral');
         setIsEvaluating(false);
-      }, 750);
+      }, 300);
     }
   }, [
     isEvaluating,
@@ -423,29 +433,32 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
   ]);
 
   // Key press handler
-  const handleKey = useCallback((key: string) => {
-    if (isEvaluating || isLoading || isVictoryOpen || !targetLen) return;
+  const handleKey = useCallback(
+    (key: string) => {
+      if (isEvaluating || isLoading || isVictoryOpen || !targetLen) return;
 
-    if (key === 'ENTER') {
-      submitAnswer();
-    } else if (key === 'BACKSPACE') {
-      if (enteredLetters.length > 0) {
-        setEnteredLetters((prev) => prev.slice(0, -1));
-        playSound('tap');
+      if (key === 'ENTER') {
+        submitAnswer();
+      } else if (key === 'BACKSPACE') {
+        if (enteredLetters.length > 0) {
+          setEnteredLetters((prev) => prev.slice(0, -1));
+          playSound('tap');
+        }
+      } else if (/^[A-Z]$/.test(key)) {
+        if (enteredLetters.length < targetLen) {
+          setEnteredLetters((prev) => prev + key);
+          playSound('tap');
+        }
       }
-    } else if (/^[A-Z]$/.test(key)) {
-      if (enteredLetters.length < targetLen) {
-        setEnteredLetters((prev) => prev + key);
-        playSound('tap');
-      }
-    }
-  }, [isEvaluating, isLoading, isVictoryOpen, targetLen, submitAnswer, enteredLetters.length, playSound]);
+    },
+    [isEvaluating, isLoading, isVictoryOpen, targetLen, submitAnswer, enteredLetters.length, playSound]
+  );
 
   // Physical keyboard listener
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (isHelpOpen || isVictoryOpen) return;
+      if (isHelpOpen || isVictoryOpen || isReadLessonOpen) return;
 
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -463,12 +476,38 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleKey, isHelpOpen, isVictoryOpen]);
+  }, [handleKey, isHelpOpen, isVictoryOpen, isReadLessonOpen]);
 
   // Timer SVG math (60 seconds)
   const circ = 91.1;
   const strokeOffset = circ * (1 - Math.max(0, timerSeconds) / 60);
   const isTimerUrgent = timerSeconds <= 8;
+  const isCurrentQuestionSolved = solvedIndices.has(currentIdx);
+
+  const getTileStyle = (state: LetterFeedbackState) => {
+    if (state === 'correct') {
+      // Green (Original Wordle exact match)
+      return {
+        backgroundColor: '#16a34a',
+        borderColor: '#22c55e',
+        color: '#ffffff',
+      };
+    }
+    if (state === 'present') {
+      // Yellow (Original Wordle wrong spot)
+      return {
+        backgroundColor: '#ca8a04',
+        borderColor: '#eab308',
+        color: '#ffffff',
+      };
+    }
+    // Gray (Original Wordle not in word)
+    return {
+      backgroundColor: '#334155',
+      borderColor: '#475569',
+      color: '#e2e8f0',
+    };
+  };
 
   return (
     <div
@@ -504,7 +543,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
           <h2 className="text-lg sm:text-2xl font-extrabold text-white tracking-tight flex items-center justify-center gap-2 font-serif-heading">
             <span>WORD QUEST</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-              Chapter Edition
+              {scripture ? 'Scripture Edition' : 'Chapter Edition'}
             </span>
           </h2>
         </div>
@@ -550,18 +589,18 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
         </div>
       </header>
 
-      {/* ACTIVE CHAPTER MANUSCRIPT BAR (Strictly tied to the uploaded chapter) */}
+      {/* ACTIVE CHAPTER MANUSCRIPT BAR */}
       <div className="mb-5 p-3 sm:p-4 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-950/20 via-black/40 to-slate-900/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative z-10">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 shrink-0">
-            CHAPTER
+            {scripture ? 'SCRIPTURE' : 'CHAPTER'}
           </span>
           <div className="truncate">
             <span className="text-xs sm:text-sm font-bold text-white block truncate">
               {chapter.title}
             </span>
             <span className="text-[10px] text-amber-200/60 block truncate">
-              {chapter.fileName || 'Uploaded PDF'} · Vocabulary quest generated from chapter concepts only
+              {chapter.fileName || 'Sacred Manuscript'} · Powered by Gemini 3.5 Flash Lite
             </span>
           </div>
         </div>
@@ -586,7 +625,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
           <div>
             <h4 className="text-base font-bold text-white">Consulting Chapter Manuscript...</h4>
             <p className="text-xs text-amber-200/70 max-w-sm mt-1">
-              Guru AI is reading &ldquo;{chapter.title}&rdquo; to forge your 3-to-10 letter reflection questions.
+              Guru AI (Gemini 3.5 Flash Lite) is reading &ldquo;{chapter.title}&rdquo; to forge your chapter-specific Word Quest.
             </p>
           </div>
         </div>
@@ -603,7 +642,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
         </div>
       ) : (
         /* ACTIVE QUEST INTERFACE */
-        <div className="space-y-4 sm:space-y-6 relative z-10">
+        <div className="space-y-4 sm:space-y-5 relative z-10">
           {/* QUESTION CARD */}
           <div
             className="rounded-2xl border p-4 sm:p-5 relative shadow-xl flex flex-col gap-3.5"
@@ -674,7 +713,7 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
             </div>
 
             {/* Question Prompt / Riddle */}
-            <div className="min-h-[50px] flex items-center text-sm sm:text-base font-medium text-white leading-relaxed">
+            <div className="min-h-[46px] flex items-center text-sm sm:text-base font-medium text-white leading-relaxed">
               {currentQuestion?.question}
             </div>
 
@@ -740,59 +779,96 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
             </div>
           </div>
 
-          {/* ANSWER TILES ROW (Dynamic 3 to 10 letter boxes) */}
-          <div className="flex flex-col items-center gap-3">
-            <div
-              className={`flex items-center justify-center gap-2 sm:gap-3 w-full max-w-lg transition-transform ${
-                rowShake ? 'animate-bounce' : ''
-              }`}
-            >
-              {Array.from({ length: targetLen }).map((_, i) => {
-                const letter = enteredLetters[i] || '';
-                const isFilled = i < enteredLetters.length;
-                const isNextInput = i === enteredLetters.length;
+          {/* WORDLE COLOR LEGEND BAR */}
+          <div className="flex flex-wrap items-center justify-center gap-4 text-[11px] font-semibold text-stone-300 bg-black/30 py-2 px-4 rounded-xl border border-amber-500/15">
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded-sm bg-[#16a34a] border border-[#22c55e] inline-block" />
+              <span>Green: Exact Spot</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded-sm bg-[#ca8a04] border border-[#eab308] inline-block" />
+              <span>Yellow: In Word, Wrong Spot</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded-sm bg-[#334155] border border-[#475569] inline-block" />
+              <span>Gray: Not in Word</span>
+            </span>
+          </div>
 
-                let tileBg = 'rgba(28, 33, 45, 0.9)';
-                let tileBorder = 'rgba(212, 175, 55, 0.25)';
-                let tileColor = '#f5e6a3';
+          {/* WORDLE GUESS GRID (Submitted color-coded rows + Active input row) */}
+          <div className="flex flex-col items-center gap-2.5">
+            {/* Previous Submitted Attempts with Green, Yellow, and Gray tiles */}
+            {guessHistory.map((entry, gIdx) => (
+              <div
+                key={gIdx}
+                className="flex items-center justify-center gap-2 sm:gap-2.5 w-full max-w-lg animate-in fade-in duration-200"
+              >
+                {Array.from({ length: targetLen }).map((_, i) => {
+                  const ch = entry.word[i] || '';
+                  const st = entry.states[i] || 'absent';
+                  const styleObj = getTileStyle(st);
+                  return (
+                    <div
+                      key={i}
+                      className="w-11 h-11 sm:w-13 sm:h-13 rounded-xl border-2 flex items-center justify-center text-lg sm:text-2xl font-black font-mono uppercase shadow-md transition-all"
+                      style={styleObj}
+                      title={
+                        st === 'correct'
+                          ? `${ch}: Correct spot (Green)`
+                          : st === 'present'
+                          ? `${ch}: In word, wrong spot (Yellow)`
+                          : `${ch}: Not in word (Gray)`
+                      }
+                    >
+                      {ch}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
 
-                if (tilesFeedback === 'correct') {
-                  tileBg = '#2ec076';
-                  tileBorder = '#2ec076';
-                  tileColor = '#ffffff';
-                } else if (tilesFeedback === 'wrong') {
-                  tileBg = '#ef4444';
-                  tileBorder = '#ef4444';
-                  tileColor = '#ffffff';
-                } else if (isNextInput) {
-                  tileBorder = '#d4af37';
-                }
+            {/* Active Input Row (shown while question is not yet solved) */}
+            {!isCurrentQuestionSolved && (
+              <div
+                className={`flex items-center justify-center gap-2 sm:gap-2.5 w-full max-w-lg transition-transform ${
+                  rowShake ? 'animate-bounce' : ''
+                }`}
+              >
+                {Array.from({ length: targetLen }).map((_, i) => {
+                  const letter = enteredLetters[i] || '';
+                  const isFilled = i < enteredLetters.length;
+                  const isNextInput = i === enteredLetters.length;
 
-                return (
-                  <div
-                    key={i}
-                    className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl border-2 flex items-center justify-center text-lg sm:text-2xl font-black font-mono uppercase transition-all shadow-inner ${
-                      isFilled ? 'scale-105 shadow-md' : ''
-                    } ${isNextInput ? 'ring-2 ring-amber-400/40' : ''}`}
-                    style={{
-                      backgroundColor: tileBg,
-                      borderColor: tileBorder,
-                      color: tileColor,
-                    }}
-                  >
-                    {letter}
-                  </div>
-                );
-              })}
-            </div>
+                  const tileBg = 'rgba(28, 33, 45, 0.9)';
+                  const tileBorder = isNextInput ? '#d4af37' : 'rgba(212, 175, 55, 0.25)';
+                  const tileColor = '#f5e6a3';
+
+                  return (
+                    <div
+                      key={i}
+                      className={`w-11 h-11 sm:w-13 sm:h-13 rounded-xl border-2 flex items-center justify-center text-lg sm:text-2xl font-black font-mono uppercase transition-all shadow-inner ${
+                        isFilled ? 'scale-105 shadow-md' : ''
+                      } ${isNextInput ? 'ring-2 ring-amber-400/40' : ''}`}
+                      style={{
+                        backgroundColor: tileBg,
+                        borderColor: tileBorder,
+                        color: tileColor,
+                      }}
+                    >
+                      {letter}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Status Feedback Bar */}
             <div
-              className={`text-xs sm:text-sm font-semibold tracking-wide min-h-[22px] transition-colors ${
+              className={`text-xs sm:text-sm font-semibold tracking-wide min-h-[22px] text-center transition-colors ${
                 statusType === 'correct'
                   ? 'text-emerald-400 font-bold'
                   : statusType === 'wrong'
-                  ? 'text-red-400 font-bold'
+                  ? 'text-amber-300 font-bold'
                   : 'text-amber-200/70'
               }`}
             >
@@ -800,22 +876,33 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
             </div>
           </div>
 
-          {/* VIRTUAL KEYBOARD */}
-          <div className="flex flex-col gap-1.5 sm:gap-2 max-w-xl mx-auto pt-2">
+          {/* VIRTUAL KEYBOARD WITH GREEN / YELLOW / GRAY FEEDBACK */}
+          <div className="flex flex-col gap-1.5 sm:gap-2 max-w-xl mx-auto pt-1">
             {KB_ROWS.map((row, rIdx) => (
               <div key={rIdx} className="flex items-center justify-center gap-1 sm:gap-1.5 w-full">
                 {row.map((key) => {
                   const isAction = key === 'ENTER' || key === 'BACKSPACE';
+                  const kState = !isAction ? keyboardLetterStates[key] : undefined;
+
+                  let keyStyle: React.CSSProperties | undefined;
+                  let keyClass =
+                    'flex-1 bg-slate-900/90 border-slate-800 text-slate-100 hover:border-amber-500/40 hover:bg-slate-800';
+
+                  if (isAction) {
+                    keyClass =
+                      'flex-[1.5] bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30';
+                  } else if (kState) {
+                    keyStyle = getTileStyle(kState);
+                    keyClass = 'flex-1 hover:brightness-110';
+                  }
+
                   return (
                     <button
                       key={key}
                       type="button"
                       onClick={() => handleKey(key)}
-                      className={`h-11 sm:h-12 rounded-lg font-bold text-xs sm:text-sm transition active:scale-95 flex items-center justify-center cursor-pointer border select-none ${
-                        isAction
-                          ? 'flex-[1.5] bg-amber-500/20 border-amber-500/40 text-amber-300 hover:bg-amber-500/30'
-                          : 'flex-1 bg-slate-900/90 border-slate-800 text-slate-100 hover:border-amber-500/40 hover:bg-slate-800'
-                      }`}
+                      style={keyStyle}
+                      className={`h-11 sm:h-12 rounded-lg font-bold text-xs sm:text-sm transition active:scale-95 flex items-center justify-center cursor-pointer border select-none ${keyClass}`}
                     >
                       {key === 'BACKSPACE' ? '⌫' : key}
                     </button>
@@ -852,12 +939,15 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
             </div>
 
             <div className="text-xs sm:text-sm text-stone-300 space-y-2.5 leading-relaxed">
-              <p>1. <strong>Chapter-Specific</strong>: Every question is formulated strictly from this uploaded chapter&apos;s concepts.</p>
-              <p>2. <strong>3 to 10 Letters</strong>: Each answer corresponds to the exact letter boxes shown.</p>
-              <p>3. <strong>Green for Truth</strong>: Inscribe the correct word to illuminate the tiles green and advance.</p>
-              <p>4. <strong>Red to Re-inscribe</strong>: Incorrect attempts flash red and automatically erase so you can retype.</p>
-              <p>5. <strong>Sage&apos;s Hint</strong>: Unlocks after 2 attempts, or click &ldquo;Reveal Hint&rdquo; at any time.</p>
-              <p>6. <strong>60-Second Timer</strong>: Contemplate swiftly before the sacred countdown expires.</p>
+              <p>1. <strong>Lesson-Specific</strong>: Every question is formulated strictly from this scripture or chapter&apos;s concepts.</p>
+              <p>2. <strong>Wordle Color Feedback</strong>: After each ENTER submission, tiles and keyboard keys light up:</p>
+              <ul className="pl-4 space-y-1">
+                <li>🟩 <strong className="text-emerald-400">Green</strong>: Correct letter in the exact right position.</li>
+                <li>🟨 <strong className="text-yellow-400">Yellow</strong>: Letter is in the word, but in a different spot.</li>
+                <li>⬛ <strong className="text-slate-400">Gray</strong>: Letter is not in the target word.</li>
+              </ul>
+              <p>3. <strong>Read Lesson Anytime</strong>: Click &ldquo;Read Lesson&rdquo; in the top bar to review the chapter summary.</p>
+              <p>4. <strong>Sage&apos;s Hint</strong>: Unlocks after 2 attempts, or click &ldquo;Reveal Hint&rdquo; at any time.</p>
             </div>
 
             <button
@@ -900,7 +990,9 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
                 {chapter.fileName || chapter.title}
               </div>
               <div className="whitespace-pre-line text-stone-200">
-                {chapter.summary || 'Review the core concepts, definitions, and principles of this chapter to help you solve the Word Quest.'}
+                {chapter.summary ||
+                  scripture?.summary ||
+                  'Review the core concepts, definitions, and principles of this chapter to help you solve the Word Quest.'}
               </div>
             </div>
 
@@ -939,7 +1031,9 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
             <div className="grid grid-cols-2 gap-3 pt-2">
               <div className="p-3 rounded-xl bg-black/40 border border-amber-500/20">
                 <span className="text-[10px] text-stone-400 block uppercase font-bold">Questions Solved</span>
-                <span className="text-lg font-bold text-emerald-400">{deck.length} / {deck.length}</span>
+                <span className="text-lg font-bold text-emerald-400">
+                  {deck.length} / {deck.length}
+                </span>
               </div>
               <div className="p-3 rounded-xl bg-black/40 border border-amber-500/20">
                 <span className="text-[10px] text-stone-400 block uppercase font-bold">Accuracy</span>
@@ -989,7 +1083,8 @@ export const GyanQuestWordle: React.FC<GyanQuestWordleProps> = ({
               100% ACCURACY REQUIRED TO ADVANCE
             </p>
             <p className="text-xs sm:text-sm text-stone-300 bg-black/40 p-3.5 rounded-2xl border border-rose-500/20 leading-relaxed">
-              You solved {solvedIndices.size} of {deck.length} questions ({deck.length > 0 ? Math.round((solvedIndices.size / deck.length) * 100) : 0}%). In Manan, 100% accuracy is required before advancing to the next activity.
+              You solved {solvedIndices.size} of {deck.length} questions (
+              {deck.length > 0 ? Math.round((solvedIndices.size / deck.length) * 100) : 0}%). In Manan, 100% accuracy is required before advancing to the next activity.
             </p>
 
             <div className="flex gap-2 pt-2">

@@ -51,9 +51,15 @@ async function startServer() {
     next();
   });
 
+  const resolvedServerApiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.VITE_GURU_GEMINI_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    '';
+
   // Server-Side GoogleGenAI Client
   const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
+    apiKey: resolvedServerApiKey,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -70,7 +76,7 @@ async function startServer() {
   }
 
   function isGeminiConfigured(): boolean {
-    const key = process.env.GEMINI_API_KEY;
+    const key = resolvedServerApiKey;
     return Boolean(key && typeof key === 'string' && key.trim().length > 5 && !key.toLowerCase().includes('placeholder'));
   }
 
@@ -520,15 +526,17 @@ CRITICAL REQUIREMENTS:
     }
 
     const crosswordPrompt = `You are an expert curriculum crossword puzzle architect.
-Extract exactly 6 essential, distinct vocabulary terms, key scientific concepts, and educational facts from the following material:
+Extract 10 to 12 essential, distinct vocabulary terms, key scientific concepts, and educational facts STRICTLY from the following material:
+Topic: ${effectiveTopic}
 ---
 ${effectiveContent.slice(0, 30000)}
 ---
 
 CRITICAL REQUIREMENTS:
-1. Provide exactly 6 words. Each clue must be a proper, well-phrased, engaging educational question or definition (e.g. "Capacity to do work" or "Subtle faculty of thought and intellect"). Never return vague or placeholder clues.
-2. Words must contain ONLY English alphabets A-Z (length 3 to 10 letters). NO spaces, hyphens, or numbers.
-3. Return STRICTLY valid JSON with no preamble or codeblock markers:
+1. Every word MUST be directly from or central to "${effectiveTopic}" and the text above. Do NOT generate unrelated filler words.
+2. Each clue must be a proper, well-phrased, specific educational question or definition from the material.
+3. Words must contain ONLY English alphabets A-Z (length 3 to 10 letters). NO spaces, hyphens, or numbers.
+4. Return STRICTLY valid JSON array:
 [
   { "answer": "ENERGY", "clue": "Capacity to do work" },
   { "answer": "CIRCUIT", "clue": "Continuous closed loop for current" }
@@ -570,52 +578,68 @@ CRITICAL REQUIREMENTS:
       }
     }
 
-    // Extract any capitalized vocabulary from content as additional candidates
-    const contentWords = (effectiveContent + ' ' + effectiveTopic)
-      .replace(/[^A-Za-z\s]/g, ' ')
-      .split(/\s+/)
-      .filter((w) => w.length >= 4 && w.length <= 10)
-      .map((w) => w.toUpperCase());
-    const uniqueContentWords = Array.from(new Set(contentWords)).slice(0, 15);
+    // Check if topic matches one of the 3 scriptures when candidateWords is empty
+    const lowerTopic = (effectiveTopic + ' ' + effectiveContent.slice(0, 200)).toLowerCase();
+    if (!candidateWords || candidateWords.length < 4) {
+      if (lowerTopic.includes('gita') || lowerTopic.includes('dhyana')) {
+        const gitaSample = SAMPLE_CROSSWORDS.find((s) => s.id === 'gita-6-17');
+        if (gitaSample) return res.json({ ...gitaSample, puzzle: gitaSample, success: true });
+      }
+      if (lowerTopic.includes('ramayana') || lowerTopic.includes('valmiki')) {
+        const ramSample = SAMPLE_CROSSWORDS.find((s) => s.id === 'ramayana-dharma');
+        if (ramSample) return res.json({ ...ramSample, puzzle: ramSample, success: true });
+      }
+      if (lowerTopic.includes('mahabharata') || lowerTopic.includes('vyasa') || lowerTopic.includes('kurukshetra')) {
+        const mahaSample = SAMPLE_CROSSWORDS.find((s) => s.id === 'mahabharata-dharma');
+        if (mahaSample) return res.json({ ...mahaSample, puzzle: mahaSample, success: true });
+      }
+    }
 
-    const defaultClues: Record<string, string> = {
-      FOCUS: 'Undivided attention anchored on the task at hand',
-      HABIT: 'Automatic positive routine built through consistency',
-      ENERGY: 'Vital force sustaining physical and cognitive activity',
-      WISDOM: 'Discerning judgment applied to life situations',
-      ACTION: 'Conscious effort directed toward noble growth',
-      STUDY: 'Dedicated exploration of academic and spiritual truth',
-      TRUTH: 'Adherence to factual reality and moral rectitude',
-      PEACE: 'Tranquil calm free from disturbance and agitation',
-      MIND: 'Subtle faculty that can be a friend or foe through discipline',
-      DIET: 'Sattvic food intake nourishing clarity and vitality',
-    };
+    // If Gemini returned valid chapter words, build the 6-word crossword strictly from those words!
+    if (Array.isArray(candidateWords) && candidateWords.length >= 6) {
+      const puzzle = buildValidCrosswordLayout(candidateWords, {
+        title: effectiveTopic,
+        theme: '6-Word Chapter Examination (8 XP per word)',
+        summary: effectiveContent.slice(0, 300),
+      });
+      return res.json({
+        ...puzzle,
+        puzzle,
+        success: true,
+      });
+    }
 
-    const contentCandidates = uniqueContentWords.map((w) => ({
-      answer: w,
-      clue: defaultClues[w] || `Core educational concept and principle discussed in ${effectiveTopic}`,
-    }));
+    // Fallback: extract contextual sentences from the content itself
+    const sentences = effectiveContent
+      .replace(/[#*_>`~]/g, '')
+      .split(/(?<=[.!?])\s+|\n+/)
+      .map((s: string) => s.trim())
+      .filter((s: string) => s.length > 25 && s.length < 200);
+    const contextualCandidates: { answer: string; clue: string }[] = [];
+    for (const s of sentences) {
+      if (contextualCandidates.length >= 12) break;
+      const matches = s.match(/\b[A-Za-z]{4,9}\b/g) || [];
+      for (const m of matches) {
+        const up = m.toUpperCase();
+        if (!['THIS', 'THAT', 'WITH', 'FROM', 'HAVE', 'WERE', 'CHAPTER', 'STUDENT'].includes(up)) {
+          const blanked = s.replace(new RegExp(`\\b${m}\\b`, 'i'), '_____');
+          if (blanked !== s) {
+            contextualCandidates.push({ answer: up, clue: blanked });
+            break;
+          }
+        }
+      }
+    }
 
-    // Supplementary words to ensure 6 intersecting words are always reachable
-    const SUPPLEMENTARY_WORDS = [
-      { answer: 'KNOWLEDGE', clue: 'Understanding acquired through deep learning and study' },
-      { answer: 'BALANCE', clue: 'Equilibrium in action, thought, and daily lifestyle' },
-      { answer: 'ENERGY', clue: 'Vital force sustaining physical and cognitive activity' },
-      { answer: 'PRACTICE', clue: 'Repetitive exercise to master a concept or skill' },
-      { answer: 'PURPOSE', clue: 'Guiding objective behind dedication and study' },
-      { answer: 'DISCIPLINE', clue: 'Consistent self-regulation in daily habits' },
-      { answer: 'HARMONY', clue: 'Peaceful alignment of mind, intellect, and action' },
-      { answer: 'WISDOM', clue: 'Discerning judgment applied to life situations' },
-      { answer: 'FOCUS', clue: 'Undivided attention anchored on the task at hand' },
-      { answer: 'TRUTH', clue: 'Adherence to factual reality and moral rectitude' },
-    ];
-
-    const mergedCandidates = [...candidateWords, ...contentCandidates, ...SUPPLEMENTARY_WORDS];
-    const puzzle = buildValidCrosswordLayout(mergedCandidates, {
-      title: effectiveTopic,
-      theme: '6-Word Chapter Examination (8 XP per word)',
-      summary: effectiveContent.slice(0, 300),
-    });
+    const finalPool = [...(candidateWords || []), ...contextualCandidates];
+    const puzzle = buildValidCrosswordLayout(
+      finalPool.length >= 4 ? finalPool : SAMPLE_CROSSWORDS[0].words.map((w) => ({ answer: w.answer, clue: w.clue })),
+      {
+        title: effectiveTopic,
+        theme: '6-Word Chapter Examination (8 XP per word)',
+        summary: effectiveContent.slice(0, 300),
+      }
+    );
 
     return res.json({
       ...puzzle,

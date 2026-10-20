@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
 import { claimChapterStageReward } from '../lib/firebase';
+import { extractPdfVidyaBrowser } from '../lib/geminiClient';
 
 const EXTRACTION_STAGES = [
   'Extracting textbook text and diagrams...',
@@ -262,6 +263,39 @@ export const VidyaPage: React.FC<VidyaPageProps> = ({
           reader.onerror = () => resolve('');
           reader.readAsDataURL(file);
         });
+      }
+
+      // 2A. Try Browser Gemini API keys first (VITE_GURU_GEMINI_API_KEY & VITE_GEMINI_API_KEY) for Firebase Hosting compatibility
+      try {
+        const browserSummary = await extractPdfVidyaBrowser({
+          pdfBase64: base64Data,
+          fileName: file.name,
+          extractedText,
+        });
+        if (browserSummary && browserSummary.length > 80) {
+          clearTimers();
+          const cleanSummary = sanitizeClientVidya(browserSummary, file.name);
+          const computedTitle = extractVidyaTitle(cleanSummary, file.name);
+          setStageMessage('Vidya ready!');
+          setDocTitle(computedTitle);
+          setSummary(cleanSummary);
+          setStatus('done');
+
+          try {
+            const saved = await saveChapter({
+              fileName: file.name,
+              title: computedTitle,
+              summary: cleanSummary,
+              fileSize: file.size,
+            });
+            setCurrentChapter(saved);
+          } catch (saveErr) {
+            console.warn('Background chapter cloud save notice:', saveErr);
+          }
+          return;
+        }
+      } catch (browserExtractErr) {
+        console.warn('[Vidya] Browser Gemini PDF synthesis notice, trying /api/extract-pdf:', browserExtractErr);
       }
 
       const response = await fetch('/api/extract-pdf', {

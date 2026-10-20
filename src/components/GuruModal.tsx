@@ -16,6 +16,7 @@ import {
   saveGuruChatToFirestore,
   clearGuruChatInFirestore
 } from '../lib/guruChat';
+import { generateGuruReply } from '../lib/geminiClient';
 
 interface GuruModalProps {
   isOpen: boolean;
@@ -116,30 +117,7 @@ export const GuruModal: React.FC<GuruModalProps> = ({ isOpen, onClose }) => {
     saveGuruChatToFirestore(newMessages, user);
 
     try {
-      const response = await fetch('/api/guru-chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: textToSend,
-          history: newMessages,
-        }),
-      });
-
-      const contentType = response.headers.get('content-type') || '';
-      if (contentType.includes('text/html')) {
-        throw new Error('Server warmup in progress. Please retry in a moment.');
-      }
-
-      const data = await response.json().catch(() => null);
-
-      let replyText = data?.reply;
-      if (!replyText || typeof replyText !== 'string') {
-        replyText =
-          data?.error ||
-          'I am reflecting on your question. Let us return to your studies: what concept can we review together?';
-      }
+      const replyText = await generateGuruReply(textToSend, newMessages);
 
       // Ensure reply is pure plaintext with no markdown symbols
       const cleanReply = replyText

@@ -24,6 +24,7 @@ import { SAMPLE_CROSSWORDS } from '../lib/sampleCrosswords';
 import { SavedChapter } from '../lib/chapters';
 import { buildValidCrosswordLayout, hasNoLetterCollisions } from '../lib/crosswordGenerator';
 import { useAuth } from '../context/AuthContext';
+import { generateCrosswordPuzzleForChapter } from '../lib/geminiClient';
 
 interface GyanQuestCrosswordProps {
   initialChapter?: SavedChapter;
@@ -215,27 +216,19 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
     }
 
     setIsLoading(true);
-    setLoadingMessage(`Reading ${file.name} with Guru AI...`);
+    setLoadingMessage(`Reading ${file.name} with Guru AI (Gemini 3.5 Flash Lite)...`);
 
     const reader = new FileReader();
     reader.onload = async () => {
       try {
         const base64 = (reader.result as string).split(',')[1];
-        setLoadingMessage('Extracting key concepts & designing crossword grid...');
+        setLoadingMessage('Extracting key concepts & designing 6-word crossword grid...');
 
-        const res = await fetch('/api/generate-crossword', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pdfData: base64,
-            mimeType: file.type || 'application/pdf',
-            fileName: file.name,
-            difficulty,
-          }),
+        const data = await generateCrosswordPuzzleForChapter({
+          pdfBase64: base64,
+          mimeType: file.type || 'application/pdf',
+          fileName: file.name,
         });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to generate crossword');
         initGame(data);
       } catch (err: any) {
         console.error(err);
@@ -254,21 +247,14 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
     if (!term.trim() && !summaryText) return;
 
     setIsLoading(true);
-    setLoadingMessage(`Generating crossword from ${term || 'uploaded chapter'}...`);
+    setLoadingMessage(`Generating 6-word crossword from ${term || 'uploaded chapter'} with Gemini 3.5 Flash Lite...`);
 
     try {
-      const res = await fetch('/api/generate-crossword', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: term,
-          summary: summaryText,
-          difficulty,
-        }),
+      const data = await generateCrosswordPuzzleForChapter({
+        topic: term,
+        summary: summaryText,
+        chapter: initialChapter,
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to generate crossword');
       initGame(data);
     } catch (err: any) {
       console.error(err);

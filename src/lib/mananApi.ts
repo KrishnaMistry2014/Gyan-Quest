@@ -1,4 +1,5 @@
 import { SavedChapter } from './chapters';
+import { generateBrowserGeminiContent } from './geminiClient';
 
 /**
  * Endpoints for image generation and diagnostics.
@@ -217,6 +218,22 @@ export async function buildEducationalImagePrompt(
   if (!chapter) {
     return buildFallbackEducationalPrompt(null);
   }
+
+  // 1. Try Browser Gemini API keys first (VITE_GURU_GEMINI_API_KEY & VITE_GEMINI_API_KEY)
+  try {
+    const chapterTitle = (chapter.title || chapter.fileName || 'Textbook Chapter').trim();
+    const chapterSnippet = (chapter.summary || '').slice(0, 2000).trim();
+    const promptInstruction = `Synthesize a concise, text-free educational concept illustration prompt for a jigsaw puzzle.
+Topic: "${chapterTitle}". Context: "${chapterSnippet.slice(0, 500)}".
+Return only the single descriptive visual prompt string under 60 words. Completely text-free, no words or labels.`;
+    const { text } = await generateBrowserGeminiContent({
+      contents: [promptInstruction],
+      timeoutMs: 8000,
+    });
+    if (text && text.trim().length > 25) {
+      return text.trim();
+    }
+  } catch (_) {}
 
   try {
     const promptCtrl = new AbortController();

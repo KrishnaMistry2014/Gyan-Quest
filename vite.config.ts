@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 // Sanitize malformed or truncated API key in environment
 if (process.env.VITE_FIREBASE_API_KEY && !process.env.VITE_FIREBASE_API_KEY.startsWith('AIza')) {
@@ -41,9 +41,32 @@ function authBridgeBypassPlugin(): Plugin {
   };
 }
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, '.', '');
+  const resolvedGuruKey =
+    env.VITE_GURU_GEMINI_API_KEY ||
+    process.env.VITE_GURU_GEMINI_API_KEY ||
+    env.VITE_GEMINI_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    env.GEMINI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    '';
+  const resolvedGeminiKey =
+    env.VITE_GEMINI_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    env.VITE_GURU_GEMINI_API_KEY ||
+    process.env.VITE_GURU_GEMINI_API_KEY ||
+    env.GEMINI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    '';
+
   return {
     plugins: [react(), tailwindcss(), authBridgeBypassPlugin()],
+    define: {
+      'process.env.VITE_GURU_GEMINI_API_KEY': JSON.stringify(resolvedGuruKey),
+      'process.env.VITE_GEMINI_API_KEY': JSON.stringify(resolvedGeminiKey),
+      'process.env.GEMINI_API_KEY': JSON.stringify(resolvedGeminiKey),
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

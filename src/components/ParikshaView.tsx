@@ -48,9 +48,9 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
   }, [chapter]);
 
   // When chapter test is completed
-  const handleParikshaCompleted = async (solvedCount = 25) => {
+  const handleParikshaCompleted = async (solvedCount = 6) => {
     let ch = activeChapter ? { ...activeChapter } : null;
-    const earnedXp = Math.min(50, Math.max(2, solvedCount * 2));
+    const earnedXp = Math.min(50, Math.max(8, solvedCount >= 6 ? 50 : solvedCount * 8));
     if (ch) {
       if (!ch.uniqueCode || ch.uniqueCode.length !== 10) {
         ch.uniqueCode = generateUniqueChapterCode();
