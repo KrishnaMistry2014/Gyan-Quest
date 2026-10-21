@@ -1242,7 +1242,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                     borderColor: 'var(--border-warm)',
                   }}
                 >
-                  <div className="w-full max-h-[550px] overflow-auto p-2 flex justify-center items-center">
+                  <div className="w-full overflow-x-auto py-2">
                     {/* The Interactive NxN Grid */}
                     {(() => {
                       let minR = 0, maxR = (puzzle.gridSize || 11) - 1, minC = 0, maxC = (puzzle.gridSize || 11) - 1;
@@ -1257,20 +1257,22 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                           minC = Math.min(minC, w.col);
                           maxC = Math.max(maxC, endC);
                         }
-                        const pad = 1;
-                        minR = Math.max(0, minR - pad);
-                        maxR = maxR + pad;
-                        minC = Math.max(0, minC - pad);
-                        maxC = maxC + pad;
                       }
-                      const rowCount = maxR - minR + 1;
-                      const colCount = maxC - minC + 1;
+                      const rowCount = Math.max(1, maxR - minR + 1);
+                      const colCount = Math.max(1, maxC - minC + 1);
+                      const maxDim = Math.max(rowCount, colCount);
+                      const cellSizeClass =
+                        maxDim > 13
+                          ? 'w-7 h-7 sm:w-8 sm:h-8 text-xs sm:text-sm'
+                          : maxDim > 11
+                          ? 'w-8 h-8 sm:w-9 sm:h-9 text-xs sm:text-sm'
+                          : 'w-9 h-9 sm:w-10 sm:h-10 text-xs sm:text-base';
 
                       return (
                         <div
-                          className="grid gap-[2px] p-3 rounded-2xl shadow-inner"
+                          className="grid gap-[2px] p-3 rounded-2xl shadow-inner w-fit mx-auto"
                           style={{
-                            gridTemplateColumns: `repeat(${colCount}, minmax(36px, 1fr))`,
+                            gridTemplateColumns: `repeat(${colCount}, auto)`,
                             backgroundColor: 'var(--border-warm)',
                           }}
                         >
@@ -1299,7 +1301,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                                 <div
                                   key={key}
                                   onClick={() => handleCellClick(r, c)}
-                                  className={`w-9 h-9 sm:w-10 sm:h-10 shrink-0 relative flex items-center justify-center font-bold text-xs sm:text-base cursor-pointer transition select-none rounded-sm border ${
+                                  className={`${cellSizeClass} shrink-0 relative flex items-center justify-center font-bold cursor-pointer transition select-none rounded-sm border ${
                                     isSelected
                                       ? 'shadow-md ring-2 ring-amber-400 dark:ring-amber-300 z-10 scale-105'
                                       : isInActiveWord
@@ -1339,7 +1341,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                               ) : (
                                 <div
                                   key={key}
-                                  className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-sm"
+                                  className={`${cellSizeClass} shrink-0 rounded-sm`}
                                   style={{
                                     backgroundColor: 'var(--bg-card-subtle)',
                                     opacity: 0.6,
