@@ -414,12 +414,7 @@ CRITICAL REQUIREMENTS:
         console.log(`[TTS Tier ${i + 1}/${TTS_MODELS_ORDER.length}] Synthesizing with ${model} (Voice: ${voice})...`);
         const ttsPromise = ai.models.generateContent({
           model,
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: cleanText }],
-            },
-          ] as any,
+          contents: [{ parts: [{ text: cleanText }] }],
           config: {
             responseModalities: ['AUDIO'],
             speechConfig: {
@@ -430,7 +425,7 @@ CRITICAL REQUIREMENTS:
           },
         });
 
-        const res = await callWithTimeout(ttsPromise, 45000, `${model} TTS`);
+        const res = await callWithTimeout(ttsPromise, 90000, `${model} TTS`);
         const rawBase64 = res.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
         if (rawBase64) {
           const rawBuf = Buffer.from(rawBase64, 'base64');
@@ -457,7 +452,10 @@ CRITICAL REQUIREMENTS:
       }
 
       let cleanText = text.replace(/[*_#>`~]/g, '').trim();
-      cleanText = cleanText.replace(/^(Speak in|Please narrate|Instructions:|Prompt:|System:)[^\n]*(\n+|$)/gi, '').trim();
+      cleanText = cleanText
+        .replace(/^(Speak in|Please narrate|Instructions:|Prompt:|System:)[^\n]*(\n+|$)/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
 
       const validVoice = voice === 'Charon' || voice === 'Fenrir' ? voice : 'Puck';
       const result = await synthesizeSpeechChain(cleanText, validVoice);

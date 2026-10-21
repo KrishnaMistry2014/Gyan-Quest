@@ -232,6 +232,7 @@ export async function synthesizeSpeechBrowser(
   const cleanText = rawText
     .replace(/[*_#>`~]/g, '')
     .replace(/^(Speak in|Please narrate|Instructions:|Prompt:|System:)[^\n]*(\n+|$)/gi, '')
+    .replace(/\s+/g, ' ')
     .trim();
 
   if (!cleanText) {
@@ -264,12 +265,7 @@ export async function synthesizeSpeechBrowser(
         const res = await callWithTimeout(
           client.models.generateContent({
             model,
-            contents: [
-              {
-                role: 'user',
-                parts: [{ text: cleanText }],
-              },
-            ] as any,
+            contents: [{ parts: [{ text: cleanText }] }],
             config: {
               responseModalities: ['AUDIO'],
               speechConfig: {
@@ -279,7 +275,7 @@ export async function synthesizeSpeechBrowser(
               },
             },
           }),
-          40000,
+          90000,
           `${model} Browser TTS`
         );
 

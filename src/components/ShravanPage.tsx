@@ -41,47 +41,7 @@ function resolveAudioSrc(src: string): string {
   return `data:${mime};base64,${src}`;
 }
 
-// Cleanly merge multiple 24kHz 16-bit mono WAV blobs into one single valid WAV file
-async function mergeWavBlobs(blobs: Blob[]): Promise<Blob> {
-  if (blobs.length === 0) return new Blob([], { type: 'audio/wav' });
-  if (blobs.length === 1) return blobs[0];
-
-  const arrayBuffers = await Promise.all(blobs.map((b) => b.arrayBuffer()));
-  let totalPcmBytes = 0;
-  const pcmParts: Uint8Array[] = [];
-
-  for (let i = 0; i < arrayBuffers.length; i++) {
-    const buf = arrayBuffers[i];
-    // WAV header is 44 bytes in standard Gemini output
-    if (buf.byteLength > 44) {
-      const pcm = new Uint8Array(buf, 44);
-      pcmParts.push(pcm);
-      totalPcmBytes += pcm.byteLength;
-    }
-  }
-
-  // Use the 44-byte header from the first buffer as template
-  const headerBuf = arrayBuffers[0].slice(0, 44);
-  const headerView = new DataView(headerBuf);
-
-  // Update RIFF chunk size: 36 + totalPcmBytes
-  headerView.setUint32(4, 36 + totalPcmBytes, true);
-  // Update data subchunk2 size: totalPcmBytes
-  headerView.setUint32(40, totalPcmBytes, true);
-
-  const merged = new Uint8Array(44 + totalPcmBytes);
-  merged.set(new Uint8Array(headerBuf), 0);
-
-  let offset = 44;
-  for (const part of pcmParts) {
-    merged.set(part, offset);
-    offset += part.byteLength;
-  }
-
-  return new Blob([merged], { type: 'audio/wav' });
-}
-
-// Helper to strip Markdown formatting so TTS narrates clean, natural spoken plain text
+// Helper to strip Markdown formatting so TTS narrates clean, natural spoken plain text in a single prompt
 function stripMarkdownForSpeech(md: string): string {
   if (!md) return '';
   return md
@@ -108,54 +68,9 @@ function stripMarkdownForSpeech(md: string): string {
     .replace(/^[ \t]*\d+\.[ \t]+/gm, '')
     // Strip horizontal rules (---, ***, ___)
     .replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, '')
-    // Normalize spaces and multiple blank lines
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
+    // Collapse all whitespace and line breaks into a single continuous prompt string
+    .replace(/\s+/g, ' ')
     .trim();
-}
-
-// Helper to divide long chapter summaries into optimal sections of ~350-450 words
-// to guarantee fast synthesis and prevent 502/timeouts on Render & Cloudflare.
-function chunkTextForTTS(text: string, maxWordsPerChunk = 400): string[] {
-  if (!text) return [];
-  const paragraphs = text.split(/\n+/).map((p) => p.trim()).filter(Boolean);
-  const chunks: string[] = [];
-  let currentChunk = '';
-
-  for (const para of paragraphs) {
-    const paraWords = para.split(/\s+/).length;
-    const currentWords = currentChunk ? currentChunk.split(/\s+/).length : 0;
-
-    if (currentWords + paraWords <= maxWordsPerChunk) {
-      currentChunk = currentChunk ? `${currentChunk}\n\n${para}` : para;
-    } else {
-      if (currentChunk) {
-        chunks.push(currentChunk);
-        currentChunk = '';
-      }
-      if (paraWords > maxWordsPerChunk) {
-        const sentences = para.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) || [para];
-        for (const sentence of sentences) {
-          const sentWords = sentence.split(/\s+/).length;
-          const curWords = currentChunk ? currentChunk.split(/\s+/).length : 0;
-          if (curWords + sentWords <= maxWordsPerChunk) {
-            currentChunk = currentChunk ? `${currentChunk} ${sentence}` : sentence;
-          } else {
-            if (currentChunk) chunks.push(currentChunk);
-            currentChunk = sentence;
-          }
-        }
-      } else {
-        currentChunk = para;
-      }
-    }
-  }
-
-  if (currentChunk) {
-    chunks.push(currentChunk);
-  }
-
-  return chunks.length > 0 ? chunks : [text];
 }
 
 export const ShravanPage: React.FC<ShravanPageProps> = ({
@@ -176,7 +91,6 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     chapter.audioBase64 ? 'ready' : 'idle'
   );
   const [isWakingUp, setIsWakingUp] = useState<boolean>(false);
-  const [chunkProgress, setChunkProgress] = useState<{ current: number; total: number } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -325,69 +239,22 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 
     try {
       const plainText = stripMarkdownForSpeech(rawSummaryText);
-      const wordsCount = plainText.split(/\s+/).length;
 
-      // For standard summaries (under 250 words), synthesize in a single fast request
-      if (wordsCount <= 250) {
-        setChunkProgress({ current: 1, total: 1 });
-        const blob = await synthesizeChunk(plainText, controller.signal);
-
-        if (controller.signal.aborted) return;
-        if (objectUrlRef.current) {
-          URL.revokeObjectURL(objectUrlRef.current);
-          objectUrlRef.current = null;
-        }
-
-        const newAudioUrl = URL.createObjectURL(blob);
-        objectUrlRef.current = newAudioUrl;
-        setAudioUrl(newAudioUrl);
-        setStatus('ready');
-        setChunkProgress(null);
-        return;
-      }
-
-      // For long summaries (> 250 words), divide into ~180 word sections for fast synthesis
-      const chunks = chunkTextForTTS(plainText, 180);
-      setChunkProgress({ current: 0, total: chunks.length });
-
-      const audioBlobs: Blob[] = [];
-
-      for (let i = 0; i < chunks.length; i++) {
-        if (controller.signal.aborted) return;
-        setChunkProgress({ current: i + 1, total: chunks.length });
-
-        const chunkController = new AbortController();
-        const onParentAbort = () => chunkController.abort();
-        controller.signal.addEventListener('abort', onParentAbort, { once: true });
-        const timeoutId = setTimeout(() => chunkController.abort(), 45000);
-
-        try {
-          const blob = await synthesizeChunk(chunks[i], chunkController.signal);
-          audioBlobs.push(blob);
-        } finally {
-          clearTimeout(timeoutId);
-          controller.signal.removeEventListener('abort', onParentAbort);
-        }
-      }
+      // Always send the entire text in a single TTS request (single prompt / single part)
+      const blob = await synthesizeChunk(plainText, controller.signal);
 
       if (controller.signal.aborted) return;
-
-      // Cleanly merge all WAV chunks
-      const combinedBlob = await mergeWavBlobs(audioBlobs);
-
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
       }
 
-      const newAudioUrl = URL.createObjectURL(combinedBlob);
+      const newAudioUrl = URL.createObjectURL(blob);
       objectUrlRef.current = newAudioUrl;
       setAudioUrl(newAudioUrl);
       setStatus('ready');
-      setChunkProgress(null);
     } catch (err: any) {
       if (controller.signal.aborted) return;
-      setChunkProgress(null);
       setIsWakingUp(false);
       if (err?.name === 'AbortError' || controller.signal.aborted) {
         return;
@@ -791,26 +658,11 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
               style={{ borderTopColor: 'var(--accent-saffron)' }}
             />
             <h3 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-              {chunkProgress && chunkProgress.total > 1
-                ? `Generating Audio Section ${chunkProgress.current} of ${chunkProgress.total}...`
-                : `Preparing Guru Narration with ${selectedVoice}...`}
+              {`Preparing Guru Narration with ${selectedVoice}...`}
             </h3>
             <p className="text-xs sm:text-sm max-w-md" style={{ color: 'var(--text-secondary)' }}>
-              {chunkProgress && chunkProgress.total > 1
-                ? `Synthesizing educational chapter summary in smooth sections (${chunkProgress.current}/${chunkProgress.total}). Please hold on.`
-                : 'Preparing natural teacher voice narration with custom delivery style. Please allow a few moments...'}
+              Preparing natural teacher voice narration in a single prompt. Please allow a few moments...
             </p>
-            {chunkProgress && chunkProgress.total > 1 && (
-              <div className="w-56 h-2 bg-stone-200 dark:bg-stone-800 rounded-full overflow-hidden mt-2">
-                <div
-                  className="h-full transition-all duration-300 rounded-full"
-                  style={{
-                    backgroundColor: 'var(--accent-saffron)',
-                    width: `${Math.round((chunkProgress.current / chunkProgress.total) * 100)}%`,
-                  }}
-                />
-              </div>
-            )}
           </div>
         )}
 
