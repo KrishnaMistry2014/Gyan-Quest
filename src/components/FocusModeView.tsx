@@ -1,32 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import {
   Timer,
-  Clock,
-  Footprints,
   Play,
   Pause,
   RotateCcw,
-  Sparkles,
-  ShieldCheck,
   Volume2,
-  BookOpen,
-  Sliders,
-  CheckCircle2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
-import { playMindfulChime } from '../lib/chime';
+import {
+  playMindfulChime,
+  playLoudFocusWarningChime,
+  requestAppFullscreen,
+  exitAppFullscreen,
+} from '../lib/chime';
 
 interface FocusModeViewProps {
   onNavigateMyBooks?: () => void;
   onOpenSettingsModal?: () => void;
 }
 
-export const FocusModeView: React.FC<FocusModeViewProps> = ({
-  onNavigateMyBooks,
-  onOpenSettingsModal,
-}) => {
-  const { user, streak, openStreakModal, settings } = useAuth();
+export const FocusModeView: React.FC<FocusModeViewProps> = () => {
+  const { user, streak, openStreakModal } = useAuth();
   const { t } = useLanguage();
 
   // Active Timer state
@@ -36,8 +31,28 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
     return !isNaN(parsed) && parsed > 0 ? parsed : 25;
   });
 
-  const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(selectedMinutes * 60);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [isRunning, setIsRunning] = useState<boolean>(() => {
+    return localStorage.getItem('gyanquest_focus_mode_active') === 'true';
+  });
+
+  const [timeLeftSeconds, setTimeLeftSeconds] = useState<number>(() => {
+    const isActive = localStorage.getItem('gyanquest_focus_mode_active') === 'true';
+    const endRaw = localStorage.getItem('gyanquest_focus_end_time');
+    if (isActive && endRaw) {
+      const diff = Math.ceil((parseInt(endRaw, 10) - Date.now()) / 1000);
+      if (diff > 0) return diff;
+    }
+    const pausedRem = localStorage.getItem('gyanquest_focus_remaining_seconds');
+    if (pausedRem) {
+      const parsedRem = parseInt(pausedRem, 10);
+      if (!isNaN(parsedRem) && parsedRem > 0) return parsedRem;
+    }
+    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || '25';
+    const parsed = parseInt(raw, 10);
+    const mins = !isNaN(parsed) && parsed > 0 ? parsed : 25;
+    return mins * 60;
+  });
+
   const [completedSessions, setCompletedSessions] = useState<number>(() => {
     try {
       return parseInt(localStorage.getItem('gyanquest_focus_sessions_today') || '0', 10);
@@ -46,56 +61,108 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
     }
   });
 
+  // Sync state with global FocusBreakOverlay events
+  useEffect(() => {
+    const syncState = () => {
+      const active = localStorage.getItem('gyanquest_focus_mode_active') === 'true';
+      setIsRunning(active);
+      try {
+        setCompletedSessions(parseInt(localStorage.getItem('gyanquest_focus_sessions_today') || '0', 10));
+      } catch (_) {}
+      if (!active) {
+        const pausedRem = localStorage.getItem('gyanquest_focus_remaining_seconds');
+        if (pausedRem) {
+          const p = parseInt(pausedRem, 10);
+          if (!isNaN(p) && p >= 0) setTimeLeftSeconds(p);
+        }
+      }
+    };
+
+    window.addEventListener('gyanquest_focus_state_changed', syncState);
+    window.addEventListener('gyanquest_break_started', syncState);
+    window.addEventListener('gyanquest_break_ended', syncState);
+    return () => {
+      window.removeEventListener('gyanquest_focus_state_changed', syncState);
+      window.removeEventListener('gyanquest_break_started', syncState);
+      window.removeEventListener('gyanquest_break_ended', syncState);
+    };
+  }, []);
+
   // Adjust timeLeft when user changes duration while timer is stopped
   const handleSelectMinutes = (mins: number) => {
     setSelectedMinutes(mins);
     if (!isRunning) {
       setTimeLeftSeconds(mins * 60);
+      localStorage.setItem('gyanquest_focus_remaining_seconds', String(mins * 60));
     }
     localStorage.setItem('gyanquest_focus_mode_minutes', String(mins));
     window.dispatchEvent(new Event('gyanquest_focus_mode_changed'));
   };
 
-  // Timer Tick
+  // Timer Tick synced with timestamp in localStorage
   useEffect(() => {
     if (!isRunning) return;
 
     const interval = setInterval(() => {
-      setTimeLeftSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setIsRunning(false);
-          // Play chime sound
-          playMindfulChime();
-          // Dispatch break event to trigger FocusBreakOverlay
-          window.dispatchEvent(new Event('gyanquest_force_focus_break'));
-          setCompletedSessions((c) => {
-            const next = c + 1;
-            localStorage.setItem('gyanquest_focus_sessions_today', String(next));
-            return next;
-          });
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      const endRaw = localStorage.getItem('gyanquest_focus_end_time');
+      if (!endRaw) return;
+      const endTime = parseInt(endRaw, 10);
+      const diff = Math.ceil((endTime - Date.now()) / 1000);
+
+      if (diff <= 0) {
+        clearInterval(interval);
+        setTimeLeftSeconds(0);
+        setIsRunning(false);
+        localStorage.setItem('gyanquest_focus_mode_active', 'false');
+        localStorage.removeItem('gyanquest_focus_end_time');
+        localStorage.setItem('gyanquest_focus_remaining_seconds', String(selectedMinutes * 60));
+        window.dispatchEvent(new Event('gyanquest_force_focus_break'));
+        window.dispatchEvent(new Event('gyanquest_focus_state_changed'));
+        return;
+      }
+
+      setTimeLeftSeconds(diff);
+    }, 250);
 
     return () => clearInterval(interval);
-  }, [isRunning]);
+  }, [isRunning, selectedMinutes]);
 
-  const handleToggleTimer = () => {
-    if (timeLeftSeconds === 0) {
-      setTimeLeftSeconds(selectedMinutes * 60);
+  const handleToggleTimer = async () => {
+    if (!isRunning) {
+      // Enabling Focus Mode -> Force Fullscreen & start timer
+      const durationSec = timeLeftSeconds > 0 ? timeLeftSeconds : selectedMinutes * 60;
+      const endTime = Date.now() + durationSec * 1000;
+      setTimeLeftSeconds(durationSec);
+      localStorage.setItem('gyanquest_focus_mode_minutes', String(selectedMinutes));
+      localStorage.setItem('gyanquest_focus_end_time', String(endTime));
+      localStorage.setItem('gyanquest_focus_mode_active', 'true');
+      localStorage.removeItem('gyanquest_focus_remaining_seconds');
+      setIsRunning(true);
+      await requestAppFullscreen();
+      window.dispatchEvent(new Event('gyanquest_focus_state_changed'));
+    } else {
+      // Disabling Focus Mode -> Pause timer & turn off fullscreen enforcement
+      localStorage.setItem('gyanquest_focus_mode_active', 'false');
+      localStorage.removeItem('gyanquest_focus_end_time');
+      localStorage.setItem('gyanquest_focus_remaining_seconds', String(timeLeftSeconds));
+      setIsRunning(false);
+      window.dispatchEvent(new Event('gyanquest_focus_state_changed'));
+      await exitAppFullscreen();
     }
-    setIsRunning(!isRunning);
   };
 
-  const handleResetTimer = () => {
+  const handleResetTimer = async () => {
+    localStorage.setItem('gyanquest_focus_mode_active', 'false');
+    localStorage.removeItem('gyanquest_focus_end_time');
+    localStorage.setItem('gyanquest_focus_remaining_seconds', String(selectedMinutes * 60));
     setIsRunning(false);
     setTimeLeftSeconds(selectedMinutes * 60);
+    window.dispatchEvent(new Event('gyanquest_focus_state_changed'));
+    await exitAppFullscreen();
   };
 
   const handleTestChime = () => {
+    playLoudFocusWarningChime();
     playMindfulChime();
   };
 
@@ -176,9 +243,9 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
 
       {/* Main Focus Timer Card */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Interactive Timer Display */}
+        {/* Interactive Timer Display */}
         <div
-          className="lg:col-span-7 rounded-3xl border p-6 sm:p-10 shadow-xs space-y-6 flex flex-col items-center text-center"
+          className="lg:col-span-12 rounded-3xl border p-6 sm:p-10 shadow-xs space-y-6 flex flex-col items-center text-center"
           style={{
             backgroundColor: 'var(--bg-card)',
             borderColor: 'var(--border-warm)',
@@ -241,7 +308,7 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
                 {formatTime(timeLeftSeconds)}
               </span>
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: isRunning ? 'var(--accent-saffron)' : 'var(--text-muted)' }}>
-                {isRunning ? 'Session Active' : 'Ready to Focus'}
+                {isRunning ? 'Focus Mode Active (Fullscreen)' : 'Ready to Focus'}
               </span>
             </div>
           </div>
@@ -292,83 +359,8 @@ export const FocusModeView: React.FC<FocusModeViewProps> = ({
             </button>
           </div>
         </div>
-
-        {/* Right Column: Principles & Quick Actions */}
-        <div className="lg:col-span-5 space-y-5">
-          {/* Walking Pause Explanation */}
-          <div
-            className="p-6 rounded-3xl border space-y-3"
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              borderColor: 'var(--border-warm)',
-            }}
-          >
-            <div className="flex items-center gap-2.5 font-bold text-sm" style={{ color: 'var(--accent-saffron-text)' }}>
-              <Footprints className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span>{t.mandatoryPause}</span>
-            </div>
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              When your timer elapses, your screen blurs with a calm breathing animation. Stand up, drink water, and walk around for 180 seconds. Physical circulation oxygenates the brain and cements information in long-term memory.
-            </p>
-          </div>
-
-          {/* Quick Navigation to Study Material */}
-          <div
-            className="p-6 rounded-3xl border space-y-4"
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              borderColor: 'var(--border-warm)',
-            }}
-          >
-            <h3 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-              {t.readyToStudy}
-            </h3>
-            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              Keep this Focus timer active while reading your uploaded NCERT textbooks or listening to Shravan audio recitations.
-            </p>
-
-            <div className="flex flex-col gap-2.5 pt-1">
-              {onNavigateMyBooks && (
-                <button
-                  type="button"
-                  onClick={onNavigateMyBooks}
-                  className="w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all hover:opacity-90 cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--bg-card-subtle)',
-                    borderColor: 'var(--border-warm)',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    <span>{t.openMyBooks}</span>
-                  </div>
-                  <span>→</span>
-                </button>
-              )}
-
-              {onOpenSettingsModal && (
-                <button
-                  type="button"
-                  onClick={onOpenSettingsModal}
-                  className="w-full flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all hover:opacity-90 cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--bg-card-subtle)',
-                    borderColor: 'var(--border-warm)',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <Sliders className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    <span>{t.configureFocus}</span>
-                  </div>
-                  <span>→</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
 };
+

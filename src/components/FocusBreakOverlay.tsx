@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Footprints, Sparkles, Clock, EyeOff, Lock } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { playMindfulChime } from '../lib/chime';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Footprints, Sparkles, Clock, EyeOff, AlertTriangle, Maximize2 } from 'lucide-react';
+import {
+  playMindfulChime,
+  playLoudFocusWarningChime,
+  requestAppFullscreen,
+} from '../lib/chime';
 
-const BREAK_DURATION_SECONDS = 300; // 5 minutes (300 seconds)
+const BREAK_DURATION_SECONDS = 180; // 3 minutes (180 seconds)
 
 /**
  * Checks if a break countdown was in progress before reload.
@@ -15,7 +18,7 @@ function getInitialBreakState() {
       const endTime = parseInt(storedBreakEnd, 10);
       const diffSeconds = Math.ceil((endTime - Date.now()) / 1000);
       if (diffSeconds > 0) {
-        return { active: true, remaining: diffSeconds };
+        return { active: true, remaining: Math.min(BREAK_DURATION_SECONDS, diffSeconds) };
       } else {
         localStorage.removeItem('gyanquest_break_end_time');
       }
@@ -29,7 +32,6 @@ function getInitialBreakState() {
  * to stop in-progress learning activities when the break triggers.
  */
 function stopAllActiveOperations() {
-  // Pause all playing audio elements across the document
   try {
     const audios = document.querySelectorAll('audio');
     audios.forEach((audioEl) => {
@@ -41,14 +43,12 @@ function stopAllActiveOperations() {
     console.debug('Error pausing document audio:', err);
   }
 
-  // Cancel any browser Web Speech synthesis
   try {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
   } catch (_) {}
 
-  // Broadcast window events to notify learning pages and modals
   try {
     window.dispatchEvent(new CustomEvent('gyanquest_stop_activity'));
     window.dispatchEvent(new CustomEvent('gyanquest_break_started'));
@@ -56,118 +56,214 @@ function stopAllActiveOperations() {
 }
 
 export const FocusBreakOverlay: React.FC = () => {
-  const { user, isEmailUnverified } = useAuth();
   const [isBreakActive, setIsBreakActive] = useState(() => getInitialBreakState().active);
   const [remainingSeconds, setRemainingSeconds] = useState(() => getInitialBreakState().remaining);
-  const [focusSetting, setFocusSetting] = useState<string>(() => {
-    return localStorage.getItem('gyanquest_focus_mode_minutes') || 'none';
+  const [isFocusModeActive, setIsFocusModeActive] = useState<boolean>(() => {
+    return localStorage.getItem('gyanquest_focus_mode_active') === 'true';
   });
 
-  const sessionStartRef = useRef<number>(Date.now());
-  const timerCheckRef = useRef<NodeJS.Timeout | null>(null);
+  // Warning states ONLY active when Focus Mode is ON
+  const [leftFullscreenWarning, setLeftFullscreenWarning] = useState<boolean>(false);
+  const [leftTabWarning, setLeftTabWarning] = useState<boolean>(false);
+
   const breakCountdownRef = useRef<NodeJS.Timeout | null>(null);
-  const hasChimedBreakStartRef = useRef<boolean>(false);
+  const warningChimeLoopRef = useRef<NodeJS.Timeout | null>(null);
+  const originalTitleRef = useRef<string>(document.title || 'Gyan Quest');
 
-  // Read current focus mode configuration from localStorage
-  const getFocusMinutes = (): number | null => {
-    const raw = localStorage.getItem('gyanquest_focus_mode_minutes') || 'none';
-    if (raw === 'none' || raw === 'no_limit') return null;
-    const parsed = parseInt(raw, 10);
-    return isNaN(parsed) || parsed <= 0 ? null : parsed;
-  };
+  const triggerThreeMinuteBreak = useCallback(() => {
+    stopAllActiveOperations();
 
-  // Listen to focus mode updates from SettingsModal
-  useEffect(() => {
-    const handleSettingChange = () => {
-      const updated = localStorage.getItem('gyanquest_focus_mode_minutes') || 'none';
-      setFocusSetting(updated);
-    };
+    // Mark Focus Mode session completed and start mandatory 3-minute break
+    localStorage.setItem('gyanquest_focus_mode_active', 'false');
+    localStorage.removeItem('gyanquest_focus_end_time');
+    try {
+      const prevSessions = parseInt(localStorage.getItem('gyanquest_focus_sessions_today') || '0', 10);
+      localStorage.setItem('gyanquest_focus_sessions_today', String((isNaN(prevSessions) ? 0 : prevSessions) + 1));
+    } catch (_) {}
 
-    window.addEventListener('gyanquest_focus_mode_changed', handleSettingChange);
-    window.addEventListener('gyanquest_settings_applied', handleSettingChange);
-    window.addEventListener('storage', handleSettingChange);
-    return () => {
-      window.removeEventListener('gyanquest_focus_mode_changed', handleSettingChange);
-      window.removeEventListener('gyanquest_settings_applied', handleSettingChange);
-      window.removeEventListener('storage', handleSettingChange);
-    };
+    const breakEndTime = Date.now() + BREAK_DURATION_SECONDS * 1000;
+    localStorage.setItem('gyanquest_break_end_time', String(breakEndTime));
+
+    setIsFocusModeActive(false);
+    setLeftFullscreenWarning(false);
+    setLeftTabWarning(false);
+    setIsBreakActive(true);
+    setRemainingSeconds(BREAK_DURATION_SECONDS);
+
+    playLoudFocusWarningChime();
+    playMindfulChime();
+    window.dispatchEvent(new Event('gyanquest_focus_state_changed'));
   }, []);
 
-  // When user signs in or app reloads, initialize session start timestamp & verify break state
+  // Sync Focus Mode active status
   useEffect(() => {
-    if (user && !isEmailUnverified) {
-      // Check if break is currently still active from storage
-      const storedBreakEnd = localStorage.getItem('gyanquest_break_end_time');
-      if (storedBreakEnd) {
-        const endTime = parseInt(storedBreakEnd, 10);
-        const diffSeconds = Math.ceil((endTime - Date.now()) / 1000);
-        if (diffSeconds > 0) {
-          setIsBreakActive(true);
-          setRemainingSeconds(diffSeconds);
-          stopAllActiveOperations();
-        } else {
-          localStorage.removeItem('gyanquest_break_end_time');
-          setIsBreakActive(false);
+    const handleStateChange = () => {
+      const active = localStorage.getItem('gyanquest_focus_mode_active') === 'true';
+      setIsFocusModeActive(active);
+      if (!active) {
+        setLeftFullscreenWarning(false);
+        setLeftTabWarning(false);
+        document.title = originalTitleRef.current;
+      } else {
+        // Ensure fullscreen when Focus Mode turns on
+        const isFs = Boolean(document.fullscreenElement || (document as any).webkitFullscreenElement);
+        if (!isFs) {
+          requestAppFullscreen().then((entered) => {
+            if (!entered && !document.fullscreenElement) {
+              setLeftFullscreenWarning(true);
+              playLoudFocusWarningChime();
+            }
+          });
         }
       }
+    };
 
-      const storedStart = localStorage.getItem('gq_session_signin_time') || sessionStorage.getItem('gq_session_signin_time');
-      if (storedStart) {
-        sessionStartRef.current = parseInt(storedStart, 10);
-      } else {
-        sessionStartRef.current = Date.now();
-        localStorage.setItem('gq_session_signin_time', String(sessionStartRef.current));
-        sessionStorage.setItem('gq_session_signin_time', String(sessionStartRef.current));
-      }
-    } else {
-      localStorage.removeItem('gq_session_signin_time');
-      sessionStorage.removeItem('gq_session_signin_time');
-      localStorage.removeItem('gyanquest_break_end_time');
-      setIsBreakActive(false);
-    }
-  }, [user?.uid, isEmailUnverified]);
+    const handleForceBreak = () => {
+      triggerThreeMinuteBreak();
+    };
 
-  // Main session elapsed monitor
+    window.addEventListener('gyanquest_focus_state_changed', handleStateChange);
+    window.addEventListener('gyanquest_force_focus_break', handleForceBreak);
+    window.addEventListener('storage', handleStateChange);
+    return () => {
+      window.removeEventListener('gyanquest_focus_state_changed', handleStateChange);
+      window.removeEventListener('gyanquest_force_focus_break', handleForceBreak);
+      window.removeEventListener('storage', handleStateChange);
+    };
+  }, [triggerThreeMinuteBreak]);
+
+  // Monitor Focus Mode countdown globally so the 3-minute break triggers even if user is on another view
   useEffect(() => {
-    if (!user || isEmailUnverified || isBreakActive) return;
+    if (!isFocusModeActive || isBreakActive) return;
 
     const interval = setInterval(() => {
-      const targetMins = getFocusMinutes();
-      if (targetMins === null) return; // "no time limit" selected
-
-      const elapsedMs = Date.now() - sessionStartRef.current;
-      const targetMs = targetMins * 60 * 1000;
-
-      if (elapsedMs >= targetMs) {
-        // Stop any currently playing audio and running activities immediately!
-        stopAllActiveOperations();
-
-        // Trigger mandatory 3-minute break & persist end timestamp
-        const breakEndTime = Date.now() + BREAK_DURATION_SECONDS * 1000;
-        localStorage.setItem('gyanquest_break_end_time', String(breakEndTime));
-        setIsBreakActive(true);
-        setRemainingSeconds(BREAK_DURATION_SECONDS);
-
-        // Sound audible chime when the "take a walk" screen appears
-        if (!hasChimedBreakStartRef.current) {
-          playMindfulChime();
-          hasChimedBreakStartRef.current = true;
-        }
+      const endRaw = localStorage.getItem('gyanquest_focus_end_time');
+      if (!endRaw) return;
+      const endTime = parseInt(endRaw, 10);
+      if (Date.now() >= endTime) {
+        clearInterval(interval);
+        triggerThreeMinuteBreak();
       }
-    }, 500);
+    }, 250);
 
-    timerCheckRef.current = interval;
     return () => clearInterval(interval);
-  }, [user, isEmailUnverified, isBreakActive, focusSetting]);
+  }, [isFocusModeActive, isBreakActive, triggerThreeMinuteBreak]);
 
-  // 3-minute break countdown handler - precise timestamp comparison every 250ms to prevent skipping seconds
+  // STRICT FOCUS MODE ENFORCEMENT (Fullscreen + Tab-Leave Detection & Prevention)
+  // ONLY active when isFocusModeActive === true
   useEffect(() => {
-    if (!isBreakActive) {
-      hasChimedBreakStartRef.current = false;
+    if (!isFocusModeActive) {
+      setLeftFullscreenWarning(false);
+      setLeftTabWarning(false);
+      document.title = originalTitleRef.current;
       return;
     }
 
-    // Immediately ensure activities remain stopped while break is active
+    const handleFullscreenChange = () => {
+      const isActiveNow = localStorage.getItem('gyanquest_focus_mode_active') === 'true';
+      if (!isActiveNow) return;
+
+      const isFs = Boolean(document.fullscreenElement || (document as any).webkitFullscreenElement);
+      if (!isFs) {
+        setLeftFullscreenWarning(true);
+        playLoudFocusWarningChime();
+      } else {
+        setLeftFullscreenWarning(false);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      const isActiveNow = localStorage.getItem('gyanquest_focus_mode_active') === 'true';
+      if (!isActiveNow) return;
+
+      if (document.hidden) {
+        setLeftTabWarning(true);
+        document.title = '⚠️ RETURN TO GYAN QUEST — FOCUS MODE ACTIVE!';
+        playLoudFocusWarningChime();
+        try {
+          window.focus();
+        } catch (_) {}
+      } else {
+        document.title = originalTitleRef.current;
+        playLoudFocusWarningChime();
+      }
+    };
+
+    const handleWindowBlur = () => {
+      const isActiveNow = localStorage.getItem('gyanquest_focus_mode_active') === 'true';
+      if (!isActiveNow) return;
+
+      setLeftTabWarning(true);
+      document.title = '⚠️ RETURN TO GYAN QUEST — FOCUS MODE ACTIVE!';
+      playLoudFocusWarningChime();
+    };
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      const isActiveNow = localStorage.getItem('gyanquest_focus_mode_active') === 'true';
+      if (!isActiveNow) return;
+      playLoudFocusWarningChime();
+      e.preventDefault();
+      e.returnValue = 'Focus Mode is active! Please stay on the Gyan Quest tab until your study timer completes.';
+      return e.returnValue;
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isActiveNow = localStorage.getItem('gyanquest_focus_mode_active') === 'true';
+      if (!isActiveNow) return;
+      if (
+        e.key === 'Escape' ||
+        ((e.ctrlKey || e.metaKey) && ['w', 'W', 't', 'T', 'n', 'N'].includes(e.key)) ||
+        (e.altKey && e.key === 'F4')
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        playLoudFocusWarningChime();
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('keydown', handleKeyDown, true);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      document.title = originalTitleRef.current;
+    };
+  }, [isFocusModeActive]);
+
+  // Repeating loud full-volume chime while warning is active (left fullscreen or left tab while Focus Mode is ON)
+  useEffect(() => {
+    if (isFocusModeActive && (leftFullscreenWarning || leftTabWarning)) {
+      warningChimeLoopRef.current = setInterval(() => {
+        playLoudFocusWarningChime();
+      }, 3000);
+    } else if (warningChimeLoopRef.current) {
+      clearInterval(warningChimeLoopRef.current);
+      warningChimeLoopRef.current = null;
+    }
+
+    return () => {
+      if (warningChimeLoopRef.current) {
+        clearInterval(warningChimeLoopRef.current);
+        warningChimeLoopRef.current = null;
+      }
+    };
+  }, [isFocusModeActive, leftFullscreenWarning, leftTabWarning]);
+
+  // 3-minute break countdown handler - precise timestamp comparison every 250ms
+  useEffect(() => {
+    if (!isBreakActive) {
+      return;
+    }
+
     stopAllActiveOperations();
 
     const countdown = setInterval(() => {
@@ -178,16 +274,10 @@ export const FocusBreakOverlay: React.FC = () => {
         const diff = Math.ceil((endTime - now) / 1000);
 
         if (diff <= 0 || !storedEnd) {
-          // Break strictly finished! Learning time resumes!
           clearInterval(countdown);
           localStorage.removeItem('gyanquest_break_end_time');
-          playMindfulChime(); // Play chime when learning time resumes
+          playMindfulChime();
           setIsBreakActive(false);
-
-          // Reset session timer for the next focus period
-          sessionStartRef.current = Date.now();
-          localStorage.setItem('gq_session_signin_time', String(sessionStartRef.current));
-          sessionStorage.setItem('gq_session_signin_time', String(sessionStartRef.current));
 
           try {
             window.dispatchEvent(new CustomEvent('gyanquest_break_ended'));
@@ -207,7 +297,7 @@ export const FocusBreakOverlay: React.FC = () => {
     return () => clearInterval(countdown);
   }, [isBreakActive]);
 
-  // Prevent closing via Escape or keyboard during mandatory 5-min break
+  // Prevent closing via Escape during mandatory 3-min break
   useEffect(() => {
     if (!isBreakActive) return;
     const preventEscape = (e: KeyboardEvent) => {
@@ -220,7 +310,57 @@ export const FocusBreakOverlay: React.FC = () => {
     return () => window.removeEventListener('keydown', preventEscape, true);
   }, [isBreakActive]);
 
-  if (!isBreakActive || !user) return null;
+  // 1. Render Fullscreen / Tab-Leave Warning Modal when Focus Mode is ON and student leaves fullscreen or tab
+  if (isFocusModeActive && (leftFullscreenWarning || leftTabWarning) && !isBreakActive) {
+    return (
+      <aside
+        id="focus-mode-violation-warning"
+        aria-label="Focus Mode Warning"
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 backdrop-blur-2xl bg-red-950/90 text-white select-none animate-in fade-in"
+      >
+        <div className="w-full max-w-lg rounded-[32px] border-2 border-red-400 bg-stone-950 p-8 sm:p-10 text-center shadow-2xl flex flex-col items-center space-y-6">
+          <div className="w-20 h-20 rounded-3xl bg-red-500/20 border-2 border-red-500 flex items-center justify-center text-red-400 animate-bounce">
+            <AlertTriangle className="w-10 h-10" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-red-500/20 text-red-300 border border-red-500/40">
+              Focus Mode Alert
+            </span>
+
+            <h2 className="text-2xl sm:text-3xl font-extrabold font-serif-heading text-white">
+              {leftFullscreenWarning
+                ? 'Warning: Fullscreen Mode Required!'
+                : 'Warning: Do Not Leave the Gyan Quest Tab!'}
+            </h2>
+
+            <p className="text-xs sm:text-sm text-red-100 leading-relaxed max-w-md mx-auto">
+              {leftFullscreenWarning
+                ? 'Focus Mode forces full screen study. You exited fullscreen mode while your Focus Mode timer is active. Return to fullscreen immediately to stop the alert chime.'
+                : 'Switching tabs or leaving the Gyan Quest window is not allowed while Focus Mode is on. Stay focused on your study session!'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await requestAppFullscreen();
+              setLeftFullscreenWarning(false);
+              setLeftTabWarning(false);
+              document.title = originalTitleRef.current;
+            }}
+            className="w-full py-4 px-6 rounded-2xl text-sm sm:text-base font-extrabold text-white shadow-xl transition-transform hover:scale-102 active:scale-98 cursor-pointer flex items-center justify-center gap-2.5 bg-red-600 hover:bg-red-500"
+          >
+            <Maximize2 className="w-5 h-5" />
+            <span>Return to Fullscreen Focus Mode</span>
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+  // 2. Render 3-Minute Walk Around Break Screen when Focus Mode Timer Elapses
+  if (!isBreakActive) return null;
 
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
@@ -233,7 +373,6 @@ export const FocusBreakOverlay: React.FC = () => {
       aria-label="Focus Break & Walking Pause"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-2xl bg-black/85 text-white select-none transition-all duration-700 animate-in fade-in cursor-default"
       onClick={(e) => {
-        // Prevent dismissal on clicking backdrop
         e.stopPropagation();
       }}
     >
@@ -259,11 +398,11 @@ export const FocusBreakOverlay: React.FC = () => {
           </h2>
 
           <p className="text-xs sm:text-sm text-stone-300 leading-relaxed max-w-md mx-auto">
-            Your focus study session has elapsed. Ongoing narration and learning tasks have been paused. Please step away from your screen and take a <strong>full 5-minute break</strong> to rest your eyes and stretch your body.
+            Your focus study session has elapsed. Ongoing narration and learning tasks have been paused. Please step away from your screen and take a <strong>full 3-minute break</strong> to rest your eyes and walk around.
           </p>
         </div>
 
-        {/* 5-Minute Countdown Display */}
+        {/* 3-Minute Countdown Display */}
         <div className="w-full py-4 px-6 rounded-2xl bg-black/50 border border-stone-800 space-y-3">
           <div className="flex items-center justify-center gap-2 text-stone-400 text-xs font-semibold uppercase tracking-wider">
             <Clock className="w-4 h-4 text-amber-400" />
@@ -281,10 +420,6 @@ export const FocusBreakOverlay: React.FC = () => {
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-
-          <span className="text-[11px] text-stone-400 block">
-            Screen is blurred to protect your eyesight and encourage healthy movement
-          </span>
         </div>
 
         {/* Wellness Prompts */}
@@ -298,15 +433,8 @@ export const FocusBreakOverlay: React.FC = () => {
             <span>Take 100 gentle steps around your room</span>
           </div>
         </div>
-
-        {/* Enforced Waiting Notice */}
-        <div className="pt-2 w-full">
-          <div className="flex items-center justify-center gap-2 text-xs font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/30 px-4 py-2.5 rounded-2xl">
-            <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Mandatory 5-min break in progress • Learning unlocks automatically at 00:00</span>
-          </div>
-        </div>
       </div>
     </aside>
   );
 };
+
