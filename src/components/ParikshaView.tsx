@@ -14,7 +14,7 @@ import { GyanQuestCrossword } from './GyanQuestCrossword';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
-import { claimChapterStageReward } from '../lib/firebase';
+import { claimChapterStageReward, addUserXp } from '../lib/firebase';
 
 interface ParikshaViewProps {
   chapter?: SavedChapter | null;
@@ -47,10 +47,10 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
     }
   }, [chapter]);
 
-  // When chapter test is completed
-  const handleParikshaCompleted = async (solvedCount = 6) => {
+  // When chapter test is completed, always award 50 XP
+  const handleParikshaCompleted = async (_solvedCount?: number) => {
+    const earnedXp = 50;
     let ch = activeChapter ? { ...activeChapter } : null;
-    const earnedXp = Math.min(50, Math.max(8, solvedCount >= 6 ? 50 : solvedCount * 8));
     if (ch) {
       if (!ch.uniqueCode || ch.uniqueCode.length !== 10) {
         ch.uniqueCode = generateUniqueChapterCode();
@@ -74,14 +74,24 @@ export const ParikshaView: React.FC<ParikshaViewProps> = ({
         console.warn('Error claiming Pariksha reward:', err);
       }
     }
-    // Fallback or already claimed
+
+    // Ensure 50 XP is still awarded when Complete Pariksha is clicked
+    try {
+      const updatedProfile = await addUserXp(user, earnedXp);
+      if (typeof updatedProfile?.xp === 'number' && Number.isFinite(updatedProfile.xp)) {
+        updateProfileXp(updatedProfile.xp);
+      }
+    } catch (err) {
+      console.warn('Error adding Pariksha XP:', err);
+    }
     recordStreakActivity('pariksha_mastery');
     showToast({
-      title: language === 'hi' ? 'परीक्षा पूर्ण!' : 'Pariksha Completed!',
+      title: language === 'hi' ? `परीक्षा उत्तीर्ण! +${earnedXp} XP` : `Pariksha Conquered! +${earnedXp} XP`,
       message: language === 'hi'
-        ? `आपने परीक्षा सफलतापूर्वक पूर्ण कर ली है!`
-        : `Congratulations! You completed the Pariksha assessment.`,
-      type: 'success',
+        ? `आपने ${ch?.title || 'अध्याय'} की परीक्षा सफलतापूर्वक पूर्ण कर ली है!`
+        : `Congratulations! You completed the Pariksha assessment and earned +${earnedXp} XP!`,
+      type: 'xp',
+      xpAmount: earnedXp,
     });
   };
 

@@ -562,8 +562,9 @@ export async function addUserXp(user: User | null, amount: number): Promise<User
     activeDays: [getLocalDateString()],
     xp: 0,
   };
-  const currentXp = typeof local.xp === 'number' ? local.xp : 0;
-  const updated = { ...local, xp: currentXp + amount };
+  const currentXp = typeof local.xp === 'number' && Number.isFinite(local.xp) ? local.xp : 0;
+  const safeAmount = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
+  const updated = { ...local, xp: currentXp + safeAmount };
   saveLocalProfile(user.uid, updated);
   try {
     const userRef = doc(db, 'users', user.uid);
@@ -610,7 +611,8 @@ export async function claimChapterStageReward(
   customXp?: number
 ): Promise<ChapterRewardResult> {
   const isMananSubActivity = stage === 'manan_jigsaw' || stage === 'manan_wordle' || stage === 'manan_crossword';
-  const xpToAdd = customXp !== undefined ? customXp : (stage === 'shravan' ? 10 : isMananSubActivity ? 5 : stage === 'manan' ? 5 : 50);
+  const validCustomXp = typeof customXp === 'number' && Number.isFinite(customXp) ? customXp : undefined;
+  const xpToAdd = validCustomXp !== undefined ? validCustomXp : (stage === 'shravan' ? 10 : isMananSubActivity ? 5 : stage === 'manan' ? 5 : 50);
   const stageLabel =
     stage === 'shravan'
       ? 'Shravan (10 XP)'
@@ -699,15 +701,16 @@ export async function claimChapterStageReward(
     try {
       const userDocRef = doc(db, 'users', effectiveUserId);
       const userSnap = await getDoc(userDocRef);
-      if (userSnap.exists() && typeof userSnap.data()?.xp === 'number') {
-        currentTotalXp = userSnap.data().xp;
+      const snapXp = userSnap.exists() ? userSnap.data()?.xp : undefined;
+      if (typeof snapXp === 'number' && Number.isFinite(snapXp)) {
+        currentTotalXp = snapXp;
       } else {
         const local = getLocalProfile(effectiveUserId) || getGuestProfile();
-        currentTotalXp = typeof local?.xp === 'number' ? local.xp : 0;
+        currentTotalXp = typeof local?.xp === 'number' && Number.isFinite(local.xp) ? local.xp : 0;
       }
     } catch {
       const local = getLocalProfile(effectiveUserId) || getGuestProfile();
-      currentTotalXp = typeof local?.xp === 'number' ? local.xp : 0;
+      currentTotalXp = typeof local?.xp === 'number' && Number.isFinite(local.xp) ? local.xp : 0;
     }
 
     const newTotal = currentTotalXp + xpToAdd;
@@ -836,15 +839,16 @@ export async function claimChapterStageReward(
   try {
     const userDocRef = doc(db, 'users', effectiveUserId);
     const userSnap = await getDoc(userDocRef);
-    if (userSnap.exists() && typeof userSnap.data()?.xp === 'number') {
-      currentTotalXp = userSnap.data().xp;
+    const snapXp = userSnap.exists() ? userSnap.data()?.xp : undefined;
+    if (typeof snapXp === 'number' && Number.isFinite(snapXp)) {
+      currentTotalXp = snapXp;
     } else {
       const local = getLocalProfile(effectiveUserId) || getGuestProfile();
-      currentTotalXp = typeof local?.xp === 'number' ? local.xp : 0;
+      currentTotalXp = typeof local?.xp === 'number' && Number.isFinite(local.xp) ? local.xp : 0;
     }
   } catch {
     const local = getLocalProfile(effectiveUserId) || getGuestProfile();
-    currentTotalXp = typeof local?.xp === 'number' ? local.xp : 0;
+    currentTotalXp = typeof local?.xp === 'number' && Number.isFinite(local.xp) ? local.xp : 0;
   }
 
   const newTotal = currentTotalXp + xpToAdd;

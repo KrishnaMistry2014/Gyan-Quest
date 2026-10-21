@@ -57,18 +57,6 @@ Have you ever felt too busy or cluttered with homework, projects, classes, or st
         title: 'Krishna & Arjuna at Kurukshetra',
         caption: 'The Divine Charioteer imparting eternal guidance on the battlefield of duty and righteous action.',
       },
-      {
-        id: 'gita_2',
-        url: '/assets/scriptures/gita_dhyana_meditation_1792219980685.jpg',
-        title: 'Dhyana Yoga & Calm Meditation',
-        caption: 'Inner stillness, regulated breath, and disciplined mental focus under the sacred banyan tree.',
-      },
-      {
-        id: 'gita_3',
-        url: '/assets/scriptures/gita_cosmic_harmony_1792219992249.jpg',
-        title: 'Cosmic Universal Harmony',
-        caption: 'The transcendental golden lotus order connecting all living beings in balanced harmony.',
-      },
     ],
   },
   ramayana: {
@@ -98,18 +86,6 @@ True strength is built through quiet, daily choices. Just as Rama remained balan
         title: 'Rama, Sita & Lakshmana in Forest Exile',
         caption: 'Embracing forest exile with calm dignity to honor King Dasharatha word and preserve dharma.',
       },
-      {
-        id: 'ramayana_2',
-        url: '/assets/scriptures/ramayana_shiva_bow_1792220019253.jpg',
-        title: "Breaking Shiva's Bow in Mithila",
-        caption: "Prince Rama effortlessly lifting and stringing the mighty bow in King Janaka royal assembly.",
-      },
-      {
-        id: 'ramayana_3',
-        url: '/assets/scriptures/ramayana_hanuman_ring_1792220033179.jpg',
-        title: 'Hanuman Devotion in Ashoka Vatika',
-        caption: 'Shri Hanuman presenting Rama signet ring with humility, solace, and courage to Sita.',
-      },
     ],
   },
   mahabharata: {
@@ -138,18 +114,6 @@ Life presents complex choices every day. The Mahabharata teaches scholars to cul
         url: '/assets/scriptures/mahabharata_kurukshetra_counsel_1792220047309.jpg',
         title: 'Krishna Guiding Arjuna on the Divine Chariot',
         caption: 'The divine counsel at Kurukshetra teaching courageous action and self-mastery.',
-      },
-      {
-        id: 'mahabharata_2',
-        url: '/assets/scriptures/mahabharata_bhishma_wisdom_1792220061443.jpg',
-        title: 'Bhishma Pitamah Discourse on Dharma',
-        caption: 'Grand patriarch Bhishma resting on the bed of arrows imparting timeless wisdom on Shanti Parva.',
-      },
-      {
-        id: 'mahabharata_3',
-        url: '/assets/scriptures/mahabharata_indraprastha_splendor_1792220075573.jpg',
-        title: 'The Splendor of Indraprastha',
-        caption: 'The grand city of righteousness built for King Yudhisthira and the five Pandava brothers.',
       },
     ],
   },

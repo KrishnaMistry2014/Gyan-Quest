@@ -29,7 +29,7 @@ import { generateCrosswordPuzzleForChapter } from '../lib/geminiClient';
 interface GyanQuestCrosswordProps {
   initialChapter?: SavedChapter;
   onExit?: () => void;
-  onComplete?: () => void;
+  onComplete?: (solvedCount?: number) => void;
   isPariksha?: boolean;
   onGoToPariksha?: () => void;
 }
@@ -313,6 +313,34 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
   const totalWordsCount = puzzle?.words ? puzzle.words.length : 0;
   const progressPercent = totalWordsCount > 0 ? Math.round((solvedWordsCount / totalWordsCount) * 100) : 0;
 
+  const getUserEnteredWord = (word: CrosswordWord): string => {
+    if (!word || !word.answer) return '';
+    let entered = '';
+    for (let i = 0; i < word.answer.length; i++) {
+      const r = word.direction === 'across' ? word.row : word.row + i;
+      const c = word.direction === 'across' ? word.col + i : word.col;
+      const key = cellKey(r, c);
+      entered += userLetters[key] || '_';
+    }
+    return entered;
+  };
+
+  const handleCompleteParikshaClick = () => {
+    setGameStatus('won');
+    setIsTimerRunning(false);
+    if (!rewardClaimedRef.current) {
+      rewardClaimedRef.current = true;
+      onComplete?.(solvedWordsCount);
+    }
+    try {
+      confetti({
+        particleCount: 120,
+        spread: 80,
+        origin: { y: 0.6 },
+      });
+    } catch (_) {}
+  };
+
   // Active word based on selection and direction
   const activeWord = (() => {
     if (!puzzle || !selectedCell) return null;
@@ -360,10 +388,11 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
       if (!rewardClaimedRef.current) {
         rewardClaimedRef.current = true;
         if (isPariksha) {
-          showToast('Crossword Mastered! Pariksha examination complete.', 'success');
-          onComplete?.(solvedWordsCount);
+          showToast('Crossword Mastered! Pariksha examination complete. +50 XP Earned!', 'success');
+          onComplete?.(puzzle.words.length);
         } else {
           showToast('Manan Crossword 100% Mastered! You may now advance to Pariksha.', 'success');
+          onComplete?.(puzzle.words.length);
         }
       }
       try {
@@ -906,10 +935,10 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                 {/* Pariksha Complete Button (Only when >= 75%) */}
-                {isPariksha && progressPercent >= 75 && onComplete && (
+                {isPariksha && progressPercent >= 75 && (
                   <button
                     type="button"
-                    onClick={onComplete}
+                    onClick={handleCompleteParikshaClick}
                     className="px-4 py-2 text-xs sm:text-sm font-bold text-white rounded-xl shadow-md transition cursor-pointer hover:opacity-95 flex items-center gap-1.5 animate-pulse"
                     style={{ backgroundColor: 'var(--accent-saffron)' }}
                     title="Score is 75% or higher • Conclude Pariksha"
@@ -1011,17 +1040,15 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
                       </p>
                     </div>
                   </div>
-                  {onComplete && (
-                    <button
-                      type="button"
-                      onClick={onComplete}
-                      className="px-4 py-2 text-xs sm:text-sm font-bold text-white rounded-xl shadow-md transition cursor-pointer hover:opacity-95 flex items-center gap-1.5 shrink-0"
-                      style={{ backgroundColor: 'var(--accent-saffron)' }}
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Complete Pariksha ({progressPercent}%)</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleCompleteParikshaClick}
+                    className="px-4 py-2 text-xs sm:text-sm font-bold text-white rounded-xl shadow-md transition cursor-pointer hover:opacity-95 flex items-center gap-1.5 shrink-0"
+                    style={{ backgroundColor: 'var(--accent-saffron)' }}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Complete Pariksha ({progressPercent}%)</span>
+                  </button>
                 </div>
               ) : hasCheckedAnswers && progressPercent < 75 ? (
                 <div className="mb-5 p-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1600,107 +1627,354 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
           </div>
         )}
 
-        {/* Victory Celebration Modal */}
+        {/* Victory Celebration / Detailed Pariksha Report Modal */}
         <AnimatePresence>
           {gameStatus === 'won' && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 backdrop-blur-md flex items-center justify-center p-6"
-              style={{ backgroundColor: 'rgba(20, 18, 16, 0.75)' }}
+              className="fixed inset-0 z-50 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
+              style={{ backgroundColor: 'rgba(20, 18, 16, 0.78)' }}
             >
-              <motion.div
-                initial={{ scale: 0.9, y: 20 }}
-                animate={{ scale: 1, y: 0 }}
-                className="rounded-3xl p-8 max-w-md w-full text-center shadow-2xl relative overflow-hidden border"
-                style={{
-                  backgroundColor: 'var(--bg-card)',
-                  borderColor: 'var(--border-warm)',
-                }}
-              >
-                <div
-                  className="w-18 h-18 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xs"
+              {isPariksha && puzzle ? (
+                <motion.div
+                  initial={{ scale: 0.95, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  className="rounded-3xl p-6 sm:p-8 max-w-3xl w-full shadow-2xl relative border my-auto max-h-[90vh] overflow-y-auto space-y-6"
                   style={{
-                    backgroundColor: 'var(--accent-saffron-light)',
-                    color: 'var(--accent-saffron)',
-                  }}
-                >
-                  <Trophy className="w-9 h-9" />
-                </div>
-                <h3 className="text-2xl font-bold font-serif-heading mb-2" style={{ color: 'var(--text-primary)' }}>
-                  Fantastic Job!
-                </h3>
-                <p className="text-xs sm:text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
-                  {initialChapter
-                    ? `You successfully solved the crossword for "${initialChapter.title}".`
-                    : 'You successfully solved the crossword puzzle derived from your document.'}
-                </p>
-                <div
-                  className="grid grid-cols-2 gap-4 mb-6 p-4 rounded-2xl border"
-                  style={{
-                    backgroundColor: 'var(--bg-main)',
+                    backgroundColor: 'var(--bg-card)',
                     borderColor: 'var(--border-warm)',
                   }}
                 >
-                  <div>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Time Taken</p>
-                    <p className="text-lg font-mono font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>
-                      {formatTimer(timerSeconds)}
-                    </p>
+                  {/* Report Top Header */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5" style={{ borderColor: 'var(--border-warm)' }}>
+                    <div className="flex items-center gap-3.5">
+                      <div
+                        className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm"
+                        style={{
+                          backgroundColor: 'var(--accent-saffron-light)',
+                          color: 'var(--accent-saffron)',
+                        }}
+                      >
+                        <Trophy className="w-7 h-7" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                            Pariksha Passed
+                          </span>
+                          <span
+                            className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border"
+                            style={{
+                              backgroundColor: 'var(--accent-saffron-light)',
+                              color: 'var(--accent-saffron-text)',
+                              borderColor: 'var(--border-warm)',
+                            }}
+                          >
+                            +50 XP Awarded
+                          </span>
+                        </div>
+                        <h3 className="text-xl sm:text-2xl font-extrabold font-serif-heading mt-1" style={{ color: 'var(--text-primary)' }}>
+                          Detailed Pariksha Assessment Report
+                        </h3>
+                        <p className="text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
+                          {initialChapter?.title || puzzle.title}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Hints Used</p>
-                    <p className="text-lg font-mono font-bold mt-0.5 text-amber-600 dark:text-amber-400">
-                      {hintCount}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  {!isPariksha && onGoToPariksha && (
-                    <button
-                      type="button"
-                      onClick={onGoToPariksha}
-                      className="flex-1 py-3 text-white font-bold rounded-xl transition text-xs sm:text-sm shadow-md cursor-pointer hover:opacity-95 flex items-center justify-center gap-1.5"
-                      style={{ backgroundColor: 'var(--accent-saffron)' }}
+
+                  {/* 4 Key Performance Metrics */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div
+                      className="p-3.5 rounded-2xl border text-center"
+                      style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-warm)' }}
                     >
-                      <ClipboardCheck className="w-4 h-4" />
-                      <span>Go to Pariksha</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                        Final Score
+                      </p>
+                      <p className="text-xl font-mono font-extrabold mt-1 text-emerald-600 dark:text-emerald-400">
+                        {progressPercent}%
+                      </p>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                        {solvedWordsCount} / {totalWordsCount} Words
+                      </p>
+                    </div>
+
+                    <div
+                      className="p-3.5 rounded-2xl border text-center"
+                      style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-warm)' }}
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                        XP Earned
+                      </p>
+                      <p className="text-xl font-mono font-extrabold mt-1" style={{ color: 'var(--accent-saffron)' }}>
+                        +50 XP
+                      </p>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                        Stage 04 Mastery
+                      </p>
+                    </div>
+
+                    <div
+                      className="p-3.5 rounded-2xl border text-center"
+                      style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-warm)' }}
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                        Time Taken
+                      </p>
+                      <p className="text-xl font-mono font-extrabold mt-1" style={{ color: 'var(--text-primary)' }}>
+                        {formatTimer(timerSeconds)}
+                      </p>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                        Completion Time
+                      </p>
+                    </div>
+
+                    <div
+                      className="p-3.5 rounded-2xl border text-center"
+                      style={{ backgroundColor: 'var(--bg-main)', borderColor: 'var(--border-warm)' }}
+                    >
+                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                        Hints Used
+                      </p>
+                      <p className="text-xl font-mono font-extrabold mt-1 text-amber-600 dark:text-amber-400">
+                        {hintCount}
+                      </p>
+                      <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                        {hintCount === 0 ? 'Unaided Recall' : 'Assisted Recall'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Overall Mastery Standing */}
+                  <div
+                    className="p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                    style={{
+                      backgroundColor: 'var(--bg-card-subtle)',
+                      borderColor: 'var(--border-warm)',
+                    }}
+                  >
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--accent-saffron-text)' }}>
+                        Overall Evaluation:{' '}
+                      </span>
+                      <span className="text-xs sm:text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                        {progressPercent === 100
+                          ? 'Utkrushta (100% Distinction — Complete Chapter Mastery)'
+                          : `Pratham Shreni (${progressPercent}% — Passed Above 75% Threshold)`}
+                      </span>
+                    </div>
+                    <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      ✓ Verified & Recorded
+                    </span>
+                  </div>
+
+                  {/* Detailed Question-by-Question Breakdown */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs sm:text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+                      Question-by-Question Breakdown ({solvedWordsCount} of {totalWordsCount} Correct)
+                    </h4>
+                    <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+                      {(puzzle.words || []).map((w) => {
+                        const solved = isWordSolved(w);
+                        const entered = getUserEnteredWord(w);
+                        return (
+                          <div
+                            key={w.id}
+                            className="p-3.5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left"
+                            style={{
+                              backgroundColor: 'var(--bg-main)',
+                              borderColor: solved ? 'rgba(16, 185, 129, 0.35)' : 'var(--border-warm)',
+                            }}
+                          >
+                            <div className="space-y-1 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="px-2 py-0.5 rounded-md text-[11px] font-bold"
+                                  style={{
+                                    backgroundColor: 'var(--accent-saffron-light)',
+                                    color: 'var(--accent-saffron-text)',
+                                  }}
+                                >
+                                  #{w.number} {w.direction === 'across' ? 'Across' : 'Down'}
+                                </span>
+                                <span
+                                  className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                    solved
+                                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                                      : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+                                  }`}
+                                >
+                                  {solved ? '✓ Correct' : 'Reviewed'}
+                                </span>
+                              </div>
+                              <p className="text-xs sm:text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                                {w.clue}
+                              </p>
+                            </div>
+
+                            <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0 text-xs font-mono">
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>Your Answer: </span>
+                                <span className={`font-bold ${solved ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                  {entered}
+                                </span>
+                              </div>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)' }}>Correct: </span>
+                                <span className="font-bold" style={{ color: 'var(--text-primary)' }}>
+                                  {w.answer}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Chapter Concept Summary */}
+                  {puzzle.summary && (
+                    <div
+                      className="p-4 rounded-2xl border space-y-1 text-left"
+                      style={{
+                        backgroundColor: 'var(--bg-main)',
+                        borderColor: 'var(--border-warm)',
+                      }}
+                    >
+                      <h5 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--accent-saffron-text)' }}>
+                        Chapter Knowledge Synthesis
+                      </h5>
+                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                        {puzzle.summary}
+                      </p>
+                    </div>
                   )}
-                  {isPariksha && onComplete && (
+
+                  {/* Report Actions */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <button
                       type="button"
-                      onClick={() => onComplete(solvedWordsCount)}
-                      className="flex-1 py-3 text-white font-bold rounded-xl transition text-xs sm:text-sm shadow-md cursor-pointer hover:opacity-95 flex items-center justify-center gap-1.5"
+                      onClick={() => {
+                        if (!rewardClaimedRef.current) {
+                          rewardClaimedRef.current = true;
+                          onComplete?.(solvedWordsCount);
+                        }
+                        onExit?.();
+                      }}
+                      className="flex-1 py-3.5 px-5 text-white font-bold rounded-xl transition text-xs sm:text-sm shadow-md cursor-pointer hover:opacity-95 flex items-center justify-center gap-2"
                       style={{ backgroundColor: 'var(--accent-saffron)' }}
                     >
                       <CheckCircle2 className="w-4 h-4" />
                       <span>Complete Pariksha</span>
+                      <ArrowRight className="w-4 h-4" />
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (initialChapter && (initialChapter.title || initialChapter.summary)) {
-                        handleGenerateTopic(initialChapter.title, initialChapter.summary);
-                      } else {
-                        setView('welcome');
-                      }
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (initialChapter && (initialChapter.title || initialChapter.summary)) {
+                          handleGenerateTopic(initialChapter.title, initialChapter.summary);
+                        } else {
+                          setView('welcome');
+                        }
+                      }}
+                      className="py-3.5 px-5 font-semibold rounded-xl transition text-xs sm:text-sm border cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-center gap-1.5"
+                      style={{
+                        backgroundColor: 'var(--bg-main)',
+                        borderColor: 'var(--border-warm)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Retry Puzzle</span>
+                    </button>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ scale: 0.9, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  className="rounded-3xl p-8 max-w-md w-full text-center shadow-2xl relative overflow-hidden border"
+                  style={{
+                    backgroundColor: 'var(--bg-card)',
+                    borderColor: 'var(--border-warm)',
+                  }}
+                >
+                  <div
+                    className="w-18 h-18 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xs"
+                    style={{
+                      backgroundColor: 'var(--accent-saffron-light)',
+                      color: 'var(--accent-saffron)',
                     }}
-                    className="flex-1 py-3 font-semibold rounded-xl transition text-xs sm:text-sm border cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-center gap-1.5"
+                  >
+                    <Trophy className="w-9 h-9" />
+                  </div>
+                  <h3 className="text-2xl font-bold font-serif-heading mb-2" style={{ color: 'var(--text-primary)' }}>
+                    Fantastic Job!
+                  </h3>
+                  <p className="text-xs sm:text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
+                    {initialChapter
+                      ? `You successfully solved the crossword for "${initialChapter.title}".`
+                      : 'You successfully solved the crossword puzzle derived from your document.'}
+                  </p>
+                  <div
+                    className="grid grid-cols-2 gap-4 mb-6 p-4 rounded-2xl border"
                     style={{
                       backgroundColor: 'var(--bg-main)',
                       borderColor: 'var(--border-warm)',
-                      color: 'var(--text-primary)',
                     }}
                   >
-                    <RotateCcw className="w-4 h-4" />
-                    <span>Retry Puzzle</span>
-                  </button>
-                </div>
-              </motion.div>
+                    <div>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Time Taken</p>
+                      <p className="text-lg font-mono font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                        {formatTimer(timerSeconds)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Hints Used</p>
+                      <p className="text-lg font-mono font-bold mt-0.5 text-amber-600 dark:text-amber-400">
+                        {hintCount}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    {!isPariksha && onGoToPariksha && (
+                      <button
+                        type="button"
+                        onClick={onGoToPariksha}
+                        className="flex-1 py-3 text-white font-bold rounded-xl transition text-xs sm:text-sm shadow-md cursor-pointer hover:opacity-95 flex items-center justify-center gap-1.5"
+                        style={{ backgroundColor: 'var(--accent-saffron)' }}
+                      >
+                        <ClipboardCheck className="w-4 h-4" />
+                        <span>Go to Pariksha</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (initialChapter && (initialChapter.title || initialChapter.summary)) {
+                          handleGenerateTopic(initialChapter.title, initialChapter.summary);
+                        } else {
+                          setView('welcome');
+                        }
+                      }}
+                      className="flex-1 py-3 font-semibold rounded-xl transition text-xs sm:text-sm border cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-center gap-1.5"
+                      style={{
+                        backgroundColor: 'var(--bg-main)',
+                        borderColor: 'var(--border-warm)',
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Retry Puzzle</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

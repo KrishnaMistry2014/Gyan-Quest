@@ -269,7 +269,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateProfileXp = useCallback((newXp: number) => {
-    setProfile((prev) => (prev ? { ...prev, xp: newXp } : null));
+    const safeXp = typeof newXp === 'number' && Number.isFinite(newXp) ? newXp : 0;
+    setProfile((prev) => (prev ? { ...prev, xp: safeXp } : null));
   }, []);
 
   const updateSettings = useCallback(async (newSettings: Partial<UserSettingsData>): Promise<UserSettingsData> => {

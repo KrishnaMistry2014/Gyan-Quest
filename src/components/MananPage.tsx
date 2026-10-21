@@ -59,7 +59,6 @@ export const MananPage: React.FC<MananPageProps> = ({
   onNavigatePariksha,
 }) => {
   const scripture = getScriptureDefinition(chapter);
-  const [selectedScriptureImageIdx, setSelectedScriptureImageIdx] = useState<number>(0);
   const { user, profile, updateProfileXp, refreshUser, isStreakActiveToday, recordStreakActivity } = useAuth();
   const { showToast } = useToast();
   const { t } = useLanguage();
@@ -228,11 +227,11 @@ export const MananPage: React.FC<MananPageProps> = ({
     abortControllerRef.current = controller;
     const currentRequestId = ++requestIdRef.current;
 
-    // Check if chapter is a predefined scripture
+    // Check if chapter is a predefined scripture (single image like custom PDFs)
     if (scripture && scripture.scriptureImages.length > 0) {
       if (currentRequestId !== requestIdRef.current || !isMountedRef.current) return;
       isGeneratingRef.current = false;
-      const activeImg = scripture.scriptureImages[selectedScriptureImageIdx] || scripture.scriptureImages[0];
+      const activeImg = scripture.scriptureImages[0];
       setImageUrl(activeImg.url);
       setIsAiGenerated(false);
       setStatus('ready');
@@ -358,7 +357,7 @@ export const MananPage: React.FC<MananPageProps> = ({
         isGeneratingRef.current = false;
       }
     }
-  }, [chapter, scripture, selectedScriptureImageIdx]);
+  }, [chapter, scripture]);
 
   // Manually re-check health of upstream services
   const handleCheckHealth = async () => {
@@ -1080,76 +1079,6 @@ export const MananPage: React.FC<MananPageProps> = ({
       ) : (
         /* Active Jigsaw Puzzle Gameplay */
         <div className="space-y-6">
-          {/* Scripture 3-Scene Selector */}
-          {scripture && scripture.scriptureImages.length > 0 && (
-            <div
-              className="p-4 sm:p-5 rounded-2xl border space-y-3 shadow-2xs"
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                borderColor: 'var(--border-warm)',
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-xs font-bold px-2.5 py-0.5 rounded-full border"
-                    style={{
-                      backgroundColor: 'var(--accent-saffron-light)',
-                      borderColor: 'var(--border-warm)',
-                      color: 'var(--accent-saffron-text)',
-                    }}
-                  >
-                    3 Scripture Scenes Available
-                  </span>
-                  <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                    Select which authentic scene you want to assemble for your Manan reflection:
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {scripture.scriptureImages.map((img, idx) => {
-                  const isSelected = selectedScriptureImageIdx === idx;
-                  return (
-                    <button
-                      key={img.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedScriptureImageIdx(idx);
-                        setImageUrl(img.url);
-                        initPuzzlePieces(img.url, gridSize, boardSize);
-                      }}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 ${
-                        isSelected
-                          ? 'ring-2 ring-amber-500 shadow-md'
-                          : 'hover:border-amber-400 opacity-80 hover:opacity-100'
-                      }`}
-                      style={{
-                        backgroundColor: isSelected ? 'var(--bg-card-subtle)' : 'var(--bg-main)',
-                        borderColor: isSelected ? 'var(--accent-saffron)' : 'var(--border-warm)',
-                      }}
-                    >
-                      <img
-                        src={img.url}
-                        alt={img.title}
-                        className="w-14 h-14 rounded-lg object-cover border shrink-0"
-                        style={{ borderColor: 'var(--border-warm)' }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-                          Scene {idx + 1}: {img.title}
-                        </div>
-                        <div className="text-[11px] line-clamp-2 mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                          {img.caption}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Game Stats & Controls Bar */}
           <div
             className="p-4 rounded-2xl border flex flex-wrap items-center justify-between gap-4 shadow-2xs"
