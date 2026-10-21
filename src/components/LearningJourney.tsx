@@ -187,7 +187,7 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
                   </div>
                 </div>
 
-                <p className="text-xs leading-relaxed line-clamp-2 pt-1 font-normal" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-xs leading-relaxed pt-1 font-normal" style={{ color: 'var(--text-secondary)' }}>
                   {stage.description}
                 </p>
               </div>
@@ -284,29 +284,10 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
 
             {currentStage.id === 'pariksha' && onNavigatePariksha && (
               <div className="pt-2">
-                <button
-                  type="button"
-                  id="btn-journey-enter-pariksha"
-                  onClick={onNavigatePariksha}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-102 active:scale-98 cursor-pointer text-white"
-                  style={{ backgroundColor: 'var(--accent-saffron)' }}
-                >
-                  <ClipboardCheck className="w-4 h-4" />
-                  <span>{t.journeyEnterPariksha}</span>
-                </button>
               </div>
             )}
             {currentStage.id !== 'pariksha' && onStartLearning && (
               <div className="pt-2">
-                <button
-                  type="button"
-                  id="btn-journey-start-stage"
-                  onClick={onStartLearning}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all hover:bg-black/5 dark:hover:bg-white/5 active:scale-98 cursor-pointer"
-                  style={{ borderColor: 'var(--border-warm)', color: 'var(--text-primary)' }}
-                >
-                  <span>{t.journeyStartStage}</span>
-                </button>
               </div>
             )}
           </div>

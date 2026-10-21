@@ -146,7 +146,7 @@ export const SettingsModal: React.FC = () => {
                 <h4 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Narration Speed</h4>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Adjust audio reader speed for shlokas and summaries</p>
                 <div className="flex items-center gap-2">
-                  {['0.75x', '1.0x', '1.25x', '1.5x'].map((speed) => (
+                  {['0.75x', '1.0x', '1.25x'].map((speed) => (
                     <button
                       key={speed}
                       type="button"

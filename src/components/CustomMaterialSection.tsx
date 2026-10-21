@@ -97,45 +97,6 @@ export const CustomMaterialSection: React.FC<CustomMaterialSectionProps> = ({ on
           />
 
           <div className="flex flex-col sm:flex-row gap-2 w-full pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (!user) {
-                  openAuthModal();
-                } else {
-                  onStartLearning?.();
-                }
-              }}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all hover:opacity-90 active:scale-95 cursor-pointer shadow-2xs"
-              style={{
-                backgroundColor: 'var(--bg-main)',
-                borderColor: 'var(--border-warm)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <BookOpen className="w-3.5 h-3.5 text-amber-600" />
-              <span>Scriptures</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (!user) {
-                  openAuthModal();
-                } else {
-                  fileInputRef.current?.click();
-                }
-              }}
-              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all hover:opacity-90 active:scale-95 cursor-pointer shadow-2xs"
-              style={{
-                backgroundColor: 'var(--accent-saffron)',
-                borderColor: 'var(--accent-saffron)',
-                color: '#FFFFFF',
-              }}
-            >
-              <UploadCloud className="w-3.5 h-3.5" />
-              <span>Upload PDF</span>
-            </button>
           </div>
         </div>
 
