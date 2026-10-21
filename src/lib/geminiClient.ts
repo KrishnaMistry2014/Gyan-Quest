@@ -226,7 +226,7 @@ const browserTtsCache = new Map<string, { blob: Blob; modelUsed: string; voiceUs
  */
 export async function synthesizeSpeechBrowser(
   rawText: string,
-  voice = 'Puck',
+  voice = 'Sulafat',
   signal?: AbortSignal
 ): Promise<{ blob: Blob; modelUsed: string; voiceUsed: string; fromCache: boolean }> {
   const cleanText = rawText
@@ -239,7 +239,7 @@ export async function synthesizeSpeechBrowser(
     throw new Error('Empty text for TTS synthesis');
   }
 
-  const validVoice = voice === 'Charon' || voice === 'Fenrir' ? voice : 'Puck';
+  const validVoice = voice === 'Charon' || voice === 'Fenrir' || voice === 'Puck' ? voice : 'Sulafat';
   const cacheKey = `${validVoice}:${cleanText}`;
   const cached = browserTtsCache.get(cacheKey);
   if (cached) {

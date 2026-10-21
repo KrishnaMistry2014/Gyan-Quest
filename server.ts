@@ -390,7 +390,7 @@ CRITICAL REQUIREMENTS:
     return crypto.createHash('sha256').update(`${text.trim()}|${voice}|v1-guru`).digest('hex');
   }
 
-  async function synthesizeSpeechChain(cleanText: string, voice = 'Puck') {
+  async function synthesizeSpeechChain(cleanText: string, voice = 'Sulafat') {
     const cacheKey = getTtsCacheKey(cleanText, voice);
     const cacheFilePath = path.join(TTS_CACHE_DIR, `${cacheKey}.wav`);
     if (fs.existsSync(cacheFilePath)) {
@@ -457,7 +457,7 @@ CRITICAL REQUIREMENTS:
         .replace(/\s+/g, ' ')
         .trim();
 
-      const validVoice = voice === 'Charon' || voice === 'Fenrir' ? voice : 'Puck';
+      const validVoice = voice === 'Charon' || voice === 'Fenrir' || voice === 'Puck' ? voice : 'Sulafat';
       const result = await synthesizeSpeechChain(cleanText, validVoice);
 
       const acceptHeader = req.headers.accept || '';

@@ -145,11 +145,11 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
 
   const generateAudio = async (voiceToUse = selectedVoice) => {
     const apiVoiceMap: Record<'Adinath' | 'Vidur' | 'Sumed', string> = {
-      Adinath: 'Puck',
+      Adinath: 'Sulafat',
       Vidur: 'Charon',
       Sumed: 'Fenrir',
     };
-    const serverVoice = apiVoiceMap[voiceToUse] || 'Puck';
+    const serverVoice = apiVoiceMap[voiceToUse] || 'Sulafat';
 
     // If audio already cached on chapter and voice matches default, use it
     if (chapter.audioBase64 && voiceToUse === 'Adinath') {
