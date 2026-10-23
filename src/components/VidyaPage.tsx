@@ -271,6 +271,7 @@ export const VidyaPage: React.FC<VidyaPageProps> = ({
           pdfBase64: base64Data,
           fileName: file.name,
           extractedText,
+          signal: controller.signal,
         });
         if (browserSummary && browserSummary.length > 80) {
           clearTimers();
@@ -294,7 +295,10 @@ export const VidyaPage: React.FC<VidyaPageProps> = ({
           }
           return;
         }
-      } catch (browserExtractErr) {
+      } catch (browserExtractErr: any) {
+        if (controller.signal.aborted || browserExtractErr?.name === 'AbortError') {
+          throw browserExtractErr;
+        }
         console.warn('[Vidya] Browser Gemini PDF synthesis notice, trying /api/extract-pdf:', browserExtractErr);
       }
 

@@ -222,12 +222,60 @@ export function base64AudioToWavBlob(base64Data: string, sampleRate = 24000, num
 const browserTtsCache = new Map<string, { blob: Blob; modelUsed: string; voiceUsed: string }>();
 
 /**
+ * Speech style instructions for Shravan narration.
+ * Guides Gemini TTS toward natural Indian-English pronunciation, clear articulation of
+ * Indian names and Sanskrit terms, and a calm, warm, teacher-like delivery (best-effort;
+ * prebuilt voices like Sulafat do not guarantee a fixed regional accent).
+ */
+export const SHRAVAN_TTS_STYLE_INSTRUCTION =
+  'Speak in a calm, warm, patient, teacher-like delivery with natural Indian-English pronunciation and clear, respectful articulation of Indian names and Sanskrit words.';
+
+export function clearBrowserTtsCache(): void {
+  browserTtsCache.clear();
+}
+
+export function buildShravanTtsRequestPayload(
+  model: string,
+  cleanText: string,
+  voice = 'Sulafat'
+) {
+  const validVoice = voice === 'Charon' || voice === 'Fenrir' || voice === 'Puck' ? voice : 'Sulafat';
+  const supportsSpeechMetadata = model.startsWith('gemini-3.8-');
+
+  const part = supportsSpeechMetadata
+    ? {
+        text: cleanText,
+        speechMetadata: {
+          style: SHRAVAN_TTS_STYLE_INSTRUCTION,
+        },
+      }
+    : {
+        text: `### DIRECTOR'S NOTES:\n${SHRAVAN_TTS_STYLE_INSTRUCTION}\n\n### TRANSCRIPT:\n${cleanText}`,
+      };
+
+  return {
+    model,
+    contents: [{ role: 'user', parts: [part] }],
+    config: {
+      responseModalities: ['AUDIO'],
+      speechConfig: {
+        languageCode: 'en-IN',
+        voiceConfig: {
+          prebuiltVoiceConfig: { voiceName: validVoice },
+        },
+      },
+    },
+  };
+}
+
+/**
  * Synthesizes Shravan TTS directly in the browser using VITE_GURU_GEMINI_API_KEY and VITE_GEMINI_API_KEY.
  */
 export async function synthesizeSpeechBrowser(
   rawText: string,
   voice = 'Sulafat',
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  clientsOverride?: Array<{ models: { generateContent: (params: any) => Promise<any> } }>
 ): Promise<{ blob: Blob; modelUsed: string; voiceUsed: string; fromCache: boolean }> {
   const cleanText = rawText
     .replace(/[*_#>`~]/g, '')
@@ -246,7 +294,7 @@ export async function synthesizeSpeechBrowser(
     return { ...cached, fromCache: true };
   }
 
-  const clients = createBrowserGeminiClients();
+  const clients = clientsOverride ?? createBrowserGeminiClients();
   if (clients.length === 0) {
     throw new Error('No browser Gemini API key configured for TTS');
   }
@@ -262,19 +310,9 @@ export async function synthesizeSpeechBrowser(
       }
 
       try {
+        const payload = buildShravanTtsRequestPayload(model, cleanText, validVoice);
         const res = await callWithTimeout(
-          client.models.generateContent({
-            model,
-            contents: [{ parts: [{ text: cleanText }] }],
-            config: {
-              responseModalities: ['AUDIO'],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: { voiceName: validVoice },
-                },
-              },
-            },
-          }),
+          client.models.generateContent(payload),
           90000,
           `${model} Browser TTS`
         );
@@ -798,35 +836,29 @@ export async function extractPdfVidyaBrowser(params: {
   pdfBase64?: string;
   fileName: string;
   extractedText?: string;
+  signal?: AbortSignal;
 }): Promise<string> {
-  let details = (params.extractedText || '').trim();
-
-  // If client ASCII parser didn't get enough text and we have pdfBase64, perform multimodal OCR via Gemini 3.5 Flash Lite
-  if (details.length < 60 && params.pdfBase64 && params.pdfBase64.length > 0) {
-    const ocrPrompt = `You are an expert document OCR engine. Extract all chapter headings, text, scientific principles, formulas, diagrams, and definitions from this PDF.`;
-    const { text: ocrText } = await generateBrowserGeminiContent({
-      contents: [
-        { inlineData: { mimeType: 'application/pdf', data: params.pdfBase64 } },
-        ocrPrompt,
-      ],
-      timeoutMs: 45000,
-    });
-    if (ocrText && ocrText.trim().length > 40) {
-      details = ocrText.trim();
-    }
+  if (params.signal?.aborted) {
+    const abortErr = new Error('Extraction aborted');
+    abortErr.name = 'AbortError';
+    throw abortErr;
   }
 
-  if (details.length < 30 && !params.pdfBase64) {
+  const cleanPdfBase64 = (params.pdfBase64 || '')
+    .replace(/^data:[^;]+;base64,/, '')
+    .replace(/\s+/g, '');
+  const details = (params.extractedText || '').trim();
+
+  if (details.length < 30 && !cleanPdfBase64) {
     throw new Error('Insufficient readable text in PDF');
   }
 
-  const summarizerPrompt = `You are a distinguished academic educator writing a high-yield, 5-minute chapter revision summary titled "Vidya" for students.
-Below is the textbook chapter content:
----
-${details.slice(0, 120000)}
----
+  const cleanFileName = (params.fileName || 'Chapter Study')
+    .replace(/\.pdf$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .trim();
 
-CRITICAL REQUIREMENTS:
+  const requirementsBlock = `CRITICAL REQUIREMENTS:
 1. TITLE FORMAT: The very first line MUST be: # [Exact Chapter Title]
 2. TARGET LENGTH: Strictly ~650 to 750 words calibrated for a 5-minute read.
 3. STRUCTURED HEADINGS:
@@ -837,22 +869,42 @@ CRITICAL REQUIREMENTS:
    ## Summary Takeaways
 4. FORMAT: Plain keyboard characters only (NO LaTeX math dollar signs). NO emojis. NO questions or quizzes.`;
 
-  const contents: any[] = [];
   // Always send the original PDF when available. The lightweight browser text parser
   // can return partial or garbled strings from compressed PDFs, so text length alone
-  // must not decide whether Gemini gets the actual document.
-  if (params.pdfBase64) {
-    contents.push({ inlineData: { mimeType: 'application/pdf', data: params.pdfBase64 } });
+  // must never prevent Gemini from receiving the actual PDF document.
+  const contents: any[] = [];
+  if (cleanPdfBase64) {
+    contents.push({ inlineData: { mimeType: 'application/pdf', data: cleanPdfBase64 } });
+    if (details.length >= 60) {
+      contents.push(
+        `Supplementary extracted text (may be incomplete; verify against the attached PDF):\n${details.slice(0, 60000)}`
+      );
+    }
+    contents.push(
+      `You are a distinguished academic educator writing a high-yield, 5-minute chapter revision summary titled "Vidya" for students.\nDocument / Chapter Name: "${cleanFileName}"\nSynthesize the attached PDF chapter document thoroughly according to these requirements:\n\n${requirementsBlock}`
+    );
+  } else {
+    const summarizerPrompt = `You are a distinguished academic educator writing a high-yield, 5-minute chapter revision summary titled "Vidya" for students.
+Document / Chapter Name: "${cleanFileName}"
+Below is the textbook chapter content:
+---
+${details.slice(0, 120000)}
+---
+
+${requirementsBlock}`;
+    contents.push(summarizerPrompt);
   }
-  if (details.length >= 60) {
-    contents.push(`Supplementary extracted text (may be incomplete; verify against the attached PDF):\n${details.slice(0, 60000)}`);
-  }
-  contents.push(summarizerPrompt);
 
   const { text: summary } = await generateBrowserGeminiContent({
     contents,
     timeoutMs: 45000,
   });
+
+  if (params.signal?.aborted) {
+    const abortErr = new Error('Extraction aborted');
+    abortErr.name = 'AbortError';
+    throw abortErr;
+  }
 
   if (!summary || summary.trim().length < 80) {
     throw new Error('Generated summary too short');
@@ -860,3 +912,4 @@ CRITICAL REQUIREMENTS:
 
   return summary.trim();
 }
+

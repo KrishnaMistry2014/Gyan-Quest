@@ -204,38 +204,34 @@ ${definitions.length > 0 ? definitions.map((d, i) => `- Concept ${i + 1}: ${d}`)
         }
       }
 
-      // 1C. Multimodal OCR via Gemini 3.5 Flash-Lite (Fallback: Gemini 3.1 Flash-Lite)
+      const SERVER_VIDYA_MODELS = [
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-flash-lite',
+        'gemini-3.1-flash-lite-preview',
+        'gemini-3.8-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.5-flash',
+        'gemini-flash-latest',
+      ] as const;
+
+      // 1C. Multimodal OCR fallback if neither PDFParse nor client text produced enough text and we need raw text
       if ((!extractedDetails || extractedDetails.length < 50) && pdfBase64 && pdfBase64.length > 0 && isGeminiConfigured()) {
         if (pdfBase64.length <= 25 * 1024 * 1024) {
           const ocrPrompt = `You are an expert document OCR engine. Extract all chapter headings, text, scientific principles, formulas, diagrams, and definitions from this PDF.`;
-          try {
-            console.log(`[Vidya Step 1C] Multimodal OCR with Gemini 3.5 Flash-Lite...`);
-            const ocrPromise = ai.models.generateContent({
-              model: 'gemini-3.5-flash-lite',
-              contents: [
-                { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } },
-                ocrPrompt,
-              ],
-              config: { maxOutputTokens: 8192 },
-            });
-            const ocrRes = await callWithTimeout(ocrPromise, 45000, 'Gemini 3.5 Flash-Lite OCR');
-            if (ocrRes.text && ocrRes.text.trim().length > 40) {
-              extractedDetails = ocrRes.text.trim();
-            }
-          } catch (ocrErr: any) {
-            console.log('[Vidya Step 1C] 3.5 Flash-Lite OCR unavailable, trying 3.1 Flash-Lite');
+          for (const model of SERVER_VIDYA_MODELS) {
             try {
-              const ocrLitePromise = ai.models.generateContent({
-                model: 'gemini-3.1-flash-lite',
+              const ocrPromise = ai.models.generateContent({
+                model,
                 contents: [
                   { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } },
                   ocrPrompt,
                 ],
                 config: { maxOutputTokens: 8192 },
               });
-              const ocrLiteRes = await callWithTimeout(ocrLitePromise, 40000, 'Gemini 3.1 Flash-Lite OCR');
-              if (ocrLiteRes.text && ocrLiteRes.text.trim().length > 40) {
-                extractedDetails = ocrLiteRes.text.trim();
+              const ocrRes = await callWithTimeout(ocrPromise, 40000, `${model} OCR`);
+              if (ocrRes.text && ocrRes.text.trim().length > 40) {
+                extractedDetails = ocrRes.text.trim();
+                break;
               }
             } catch (_) {}
           }
@@ -255,7 +251,7 @@ ${definitions.length > 0 ? definitions.map((d, i) => `- Concept ${i + 1}: ${d}`)
         }
       }
 
-      if (!extractedDetails || extractedDetails.trim().length < 20) {
+      if ((!extractedDetails || extractedDetails.trim().length < 20) && !pdfBase64) {
         return res.status(422).json({
           success: false,
           error: 'Unable to extract text or diagrams from this PDF. Please ensure the document is a readable chapter PDF.',
@@ -264,14 +260,9 @@ ${definitions.length > 0 ? definitions.map((d, i) => `- Concept ${i + 1}: ${d}`)
 
       // =========================================================================
       // STEP 2: VIDYA 5-MINUTE REVISION SUMMARY GENERATOR
-      // Model: Primary gemini-3.5-flash-lite -> Fallback gemini-3.1-flash-lite
       // =========================================================================
       const summarizerPrompt = `You are a distinguished academic educator writing a high-yield, 5-minute chapter revision summary titled "Vidya" for students.
-Below is the textbook chapter text extracted from the PDF:
----
-${extractedDetails.slice(0, 120000)}
----
-
+${extractedDetails ? `Below is the textbook chapter text extracted from the PDF:\n---\n${extractedDetails.slice(0, 120000)}\n---\n` : ''}
 CRITICAL REQUIREMENTS:
 1. TITLE FORMAT: The very first line MUST be: # [Exact Chapter Title]
 2. TARGET LENGTH: Strictly ~650 to 750 words calibrated for a 5-minute read.
@@ -286,42 +277,38 @@ CRITICAL REQUIREMENTS:
       let summary = '';
 
       if (isGeminiConfigured()) {
-        // Primary: Gemini 3.5 Flash-Lite
-        try {
-          console.log(`[Vidya Step 2] Generating summary with Gemini 3.5 Flash-Lite...`);
-          const lite35Promise = ai.models.generateContent({
-            model: 'gemini-3.5-flash-lite',
-            contents: [summarizerPrompt],
-            config: { maxOutputTokens: 2048 },
-          });
-          const lite35Response = await callWithTimeout(lite35Promise, 45000, 'Gemini 3.5 Flash-Lite');
-          if (lite35Response.text && lite35Response.text.trim().length > 80) {
-            summary = sanitizeVidya(lite35Response.text, fileName || 'Chapter Summary');
-            console.log(`[Vidya Step 2] Gemini 3.5 Flash-Lite summary generated successfully!`);
-          }
-        } catch (lite35Err: any) {
-          console.log('[Vidya Step 2] 3.5 Flash-Lite notice, fallback to 3.1 Flash-Lite');
-          // Fallback: Gemini 3.1 Flash-Lite
+        const summaryContents: any[] = [];
+        if (pdfBase64 && pdfBase64.length > 0 && pdfBase64.length <= 25 * 1024 * 1024) {
+          summaryContents.push({ inlineData: { mimeType: 'application/pdf', data: pdfBase64 } });
+        }
+        summaryContents.push(summarizerPrompt);
+
+        for (const model of SERVER_VIDYA_MODELS) {
           try {
-            console.log(`[Vidya Step 2 Fallback] Summarizing with Gemini 3.1 Flash-Lite...`);
-            const litePromise = ai.models.generateContent({
-              model: 'gemini-3.1-flash-lite',
-              contents: [summarizerPrompt],
+            console.log(`[Vidya Step 2] Generating summary with ${model}...`);
+            const genPromise = ai.models.generateContent({
+              model,
+              contents: summaryContents,
               config: { maxOutputTokens: 2048 },
             });
-            const liteResponse = await callWithTimeout(litePromise, 40000, 'Gemini 3.1 Flash-Lite');
-            if (liteResponse.text && liteResponse.text.trim().length > 80) {
-              summary = sanitizeVidya(liteResponse.text, fileName || 'Chapter Summary');
-              console.log(`[Vidya Step 2 Fallback] Gemini 3.1 Flash-Lite summary generated successfully!`);
+            const genResponse = await callWithTimeout(genPromise, 45000, model);
+            if (genResponse.text && genResponse.text.trim().length > 80) {
+              summary = sanitizeVidya(genResponse.text, fileName || 'Chapter Summary');
+              console.log(`[Vidya Step 2] ${model} summary generated successfully!`);
+              break;
             }
-          } catch (liteErr: any) {
-            console.log('[Vidya Step 2 Fallback] 3.1 Flash-Lite completed');
-          }
+          } catch (_) {}
         }
       }
 
       // If Gemini is unreachable or not configured, synthesize using the deterministic academic synthesizer
       if (!summary || summary.trim().length < 80) {
+        if (!extractedDetails || extractedDetails.trim().length < 20) {
+          return res.status(422).json({
+            success: false,
+            error: 'Unable to extract text or diagrams from this PDF. Please ensure the document is a readable chapter PDF.',
+          });
+        }
         console.log('[Vidya Step 2] Synthesizing academic chapter summary...');
         summary = generateAcademicChapterSummary(extractedDetails, fileName || 'Chapter Summary');
       }
@@ -386,8 +373,11 @@ CRITICAL REQUIREMENTS:
     fs.mkdirSync(TTS_CACHE_DIR, { recursive: true });
   }
 
+  const SHRAVAN_TTS_STYLE_INSTRUCTION =
+    'Speak in a calm, warm, patient, teacher-like delivery with natural Indian-English pronunciation and clear, respectful articulation of Indian names and Sanskrit words.';
+
   function getTtsCacheKey(text: string, voice: string): string {
-    return crypto.createHash('sha256').update(`${text.trim()}|${voice}|v1-guru`).digest('hex');
+    return crypto.createHash('sha256').update(`${text.trim()}|${voice}|v2-guru-in`).digest('hex');
   }
 
   async function synthesizeSpeechChain(cleanText: string, voice = 'Sulafat') {
@@ -412,12 +402,25 @@ CRITICAL REQUIREMENTS:
       const model = TTS_MODELS_ORDER[i];
       try {
         console.log(`[TTS Tier ${i + 1}/${TTS_MODELS_ORDER.length}] Synthesizing with ${model} (Voice: ${voice})...`);
+        const supportsSpeechMetadata = model.startsWith('gemini-3.8-');
+        const part = supportsSpeechMetadata
+          ? {
+              text: cleanText,
+              speechMetadata: {
+                style: SHRAVAN_TTS_STYLE_INSTRUCTION,
+              },
+            }
+          : {
+              text: `### DIRECTOR'S NOTES:\n${SHRAVAN_TTS_STYLE_INSTRUCTION}\n\n### TRANSCRIPT:\n${cleanText}`,
+            };
+
         const ttsPromise = ai.models.generateContent({
           model,
-          contents: [{ parts: [{ text: cleanText }] }],
+          contents: [{ role: 'user', parts: [part] }],
           config: {
             responseModalities: ['AUDIO'],
             speechConfig: {
+              languageCode: 'en-IN',
               voiceConfig: {
                 prebuiltVoiceConfig: { voiceName: voice },
               },
