@@ -1,16 +1,22 @@
 import { GoogleGenAI } from '@google/genai';
 import { SavedChapter } from './chapters';
 import { getScriptureDefinition } from './scriptureData';
-import { CrosswordData } from '../types';
+import { CrosswordData, ChronologicalCrosswordEvent } from '../types';
 import { buildValidCrosswordLayout } from './crosswordGenerator';
-import { SAMPLE_CROSSWORDS } from './sampleCrosswords';
+import {
+  SAMPLE_CROSSWORDS,
+  CHRONOLOGICAL_SAMPLE_CROSSWORDS,
+  attachChronologicalMetadata,
+} from './sampleCrosswords';
 
 /**
- * Primary model for puzzle & text generation as requested:
+ * Primary model for keyword extraction, puzzle generation, and text synthesis:
  * gemini-3.5-flash-lite first, with seamless fallback if an endpoint aliases the model name.
  */
+export const KEYWORD_EXTRACTION_MODEL = 'gemini-3.5-flash-lite' as const;
+
 export const TEXT_MODELS_CHAIN = [
-  'gemini-3.5-flash-lite',
+  KEYWORD_EXTRACTION_MODEL,
   'gemini-3.1-flash-lite',
   'gemini-3.1-flash-lite-preview',
   'gemini-3.8-flash',
@@ -45,7 +51,7 @@ function isValidApiKey(val: unknown): val is string {
 
 /**
  * Retrieves all valid browser-injected Gemini API keys.
- * Supports both VITE_GURU_GEMINI_API_KEY and VITE_GEMINI_API_KEY across import.meta.env,
+ * Supports both VITE_GEMINI_API_KEY and VITE_GURU_GEMINI_API_KEY across import.meta.env,
  * window runtime globals, and build-time process.env definitions.
  */
 export function getBrowserGeminiApiKeys(): string[] {
@@ -54,31 +60,27 @@ export function getBrowserGeminiApiKeys(): string[] {
   try {
     const metaEnv = (import.meta as any)?.env;
     if (metaEnv) {
-      candidates.push(metaEnv.VITE_GURU_GEMINI_API_KEY);
       candidates.push(metaEnv.VITE_GEMINI_API_KEY);
-      candidates.push(metaEnv.GEMINI_API_KEY);
+      candidates.push(metaEnv.VITE_GURU_GEMINI_API_KEY);
     }
   } catch (_) {}
 
   try {
     if (typeof window !== 'undefined') {
       const win = window as any;
-      candidates.push(win.VITE_GURU_GEMINI_API_KEY);
       candidates.push(win.VITE_GEMINI_API_KEY);
-      candidates.push(win.GEMINI_API_KEY);
+      candidates.push(win.VITE_GURU_GEMINI_API_KEY);
       if (win.__ENV__) {
-        candidates.push(win.__ENV__.VITE_GURU_GEMINI_API_KEY);
         candidates.push(win.__ENV__.VITE_GEMINI_API_KEY);
-        candidates.push(win.__ENV__.GEMINI_API_KEY);
+        candidates.push(win.__ENV__.VITE_GURU_GEMINI_API_KEY);
       }
     }
   } catch (_) {}
 
   try {
     if (typeof process !== 'undefined' && process.env) {
-      candidates.push((process.env as any).VITE_GURU_GEMINI_API_KEY);
       candidates.push((process.env as any).VITE_GEMINI_API_KEY);
-      candidates.push((process.env as any).GEMINI_API_KEY);
+      candidates.push((process.env as any).VITE_GURU_GEMINI_API_KEY);
     }
   } catch (_) {}
 
@@ -114,7 +116,7 @@ function callWithTimeout<T>(promise: Promise<T>, timeoutMs: number, label: strin
 }
 
 /**
- * Generates content using the browser API keys (VITE_GURU_GEMINI_API_KEY & VITE_GEMINI_API_KEY),
+ * Generates content using the browser API keys (VITE_GEMINI_API_KEY & VITE_GURU_GEMINI_API_KEY),
  * prioritizing gemini-3.5-flash-lite first.
  */
 export async function generateBrowserGeminiContent(params: {
@@ -123,17 +125,21 @@ export async function generateBrowserGeminiContent(params: {
   responseMimeType?: string;
   temperature?: number;
   timeoutMs?: number;
+  preferredModel?: string;
 }): Promise<{ text: string; modelUsed: string }> {
   const clients = createBrowserGeminiClients();
   if (clients.length === 0) {
-    throw new Error('No browser Gemini API key (VITE_GURU_GEMINI_API_KEY or VITE_GEMINI_API_KEY) found.');
+    throw new Error('No browser Gemini API key (VITE_GEMINI_API_KEY or VITE_GURU_GEMINI_API_KEY) found.');
   }
 
   const timeoutMs = params.timeoutMs || 30000;
   const errors: string[] = [];
+  const modelsToTry = params.preferredModel
+    ? [params.preferredModel, ...TEXT_MODELS_CHAIN.filter((m) => m !== params.preferredModel)]
+    : [...TEXT_MODELS_CHAIN];
 
   for (const client of clients) {
-    for (const model of TEXT_MODELS_CHAIN) {
+    for (const model of modelsToTry) {
       try {
         const config: Record<string, any> = {};
         if (params.systemInstruction) config.systemInstruction = params.systemInstruction;
@@ -269,7 +275,7 @@ export function buildShravanTtsRequestPayload(
 }
 
 /**
- * Synthesizes Shravan TTS directly in the browser using VITE_GURU_GEMINI_API_KEY and VITE_GEMINI_API_KEY.
+ * Synthesizes Shravan TTS directly in the browser using VITE_GEMINI_API_KEY and VITE_GURU_GEMINI_API_KEY.
  */
 export async function synthesizeSpeechBrowser(
   rawText: string,
@@ -335,7 +341,7 @@ export async function synthesizeSpeechBrowser(
 }
 
 /**
- * Guru Chatbot reply generator using Browser API keys first, then server fallback.
+ * Guru Chatbot reply generator using strictly Browser API keys (VITE_GEMINI_API_KEY & VITE_GURU_GEMINI_API_KEY).
  */
 export async function generateGuruReply(
   message: string,
@@ -357,38 +363,17 @@ STRICT PLAIN TEXT ONLY. NO markdown asterisks, hashes, backticks, or LaTeX math 
   }
   contents.push({ role: 'user', parts: [{ text: message.trim() }] });
 
-  // 1. Try Browser API Keys (VITE_GURU_GEMINI_API_KEY & VITE_GEMINI_API_KEY)
-  try {
-    const { text } = await generateBrowserGeminiContent({
-      contents,
-      systemInstruction,
-      temperature: 0.7,
-      timeoutMs: 25000,
-    });
-    if (text) {
-      return text.replace(/[*_#>`~]/g, '').trim();
-    }
-  } catch (browserErr) {
-    console.warn('[Guru] Browser key attempt notice, trying backend:', browserErr);
-  }
-
-  // 2. Fallback to Express backend /api/guru-chat
-  const response = await fetch('/api/guru-chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, history }),
+  const { text } = await generateBrowserGeminiContent({
+    contents,
+    systemInstruction,
+    temperature: 0.7,
+    timeoutMs: 25000,
   });
 
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) {
-    throw new Error('Guru backend unreachable');
+  if (text) {
+    return text.replace(/[*_#>`~]/g, '').trim();
   }
-
-  const data = await response.json();
-  if (data?.reply && typeof data.reply === 'string') {
-    return data.reply.replace(/[*_#>`~]/g, '').trim();
-  }
-  throw new Error(data?.error || 'Unable to generate Guru response');
+  throw new Error('Unable to generate Guru response with browser Gemini API key');
 }
 
 /**
@@ -540,6 +525,164 @@ const STOPWORDS = new Set([
 ]);
 
 /**
+ * Validates and deduplicates extracted keywords for Wordle (length 4..7) or Crossword (length 3..10).
+ */
+export function validateExtractedKeywords(
+  rawKeywords: unknown,
+  mode: 'wordle' | 'crossword' | 'chronological'
+): string[] {
+  const minLen = mode === 'wordle' ? 4 : 3;
+  const maxLen = mode === 'wordle' ? 7 : 10;
+
+  let candidates: unknown[] = [];
+  if (Array.isArray(rawKeywords)) {
+    candidates = rawKeywords;
+  } else if (rawKeywords && typeof rawKeywords === 'object') {
+    const obj = rawKeywords as Record<string, unknown>;
+    if (Array.isArray(obj.keywords)) candidates = obj.keywords;
+    else if (Array.isArray(obj.words)) candidates = obj.words;
+    else if (Array.isArray(obj.terms)) candidates = obj.terms;
+  }
+
+  const seen = new Set<string>();
+  const valid: string[] = [];
+
+  for (const item of candidates) {
+    const rawStr =
+      typeof item === 'string'
+        ? item
+        : item && typeof item === 'object' && typeof (item as any).keyword === 'string'
+        ? (item as any).keyword
+        : item && typeof item === 'object' && typeof (item as any).word === 'string'
+        ? (item as any).word
+        : item && typeof item === 'object' && typeof (item as any).answer === 'string'
+        ? (item as any).answer
+        : '';
+
+    const normalized = rawStr.trim().toUpperCase().replace(/[^A-Z]/g, '');
+    if (normalized.length < minLen || normalized.length > maxLen) continue;
+    if (STOPWORDS.has(normalized) || seen.has(normalized)) continue;
+
+    seen.add(normalized);
+    valid.push(normalized);
+  }
+
+  return valid;
+}
+
+/**
+ * Deterministic local keyword extractor from lesson text used when browser Gemini is unreachable
+ * or returns fewer keywords than required.
+ */
+export function extractDeterministicKeywordsFromText(
+  lessonTitle: string,
+  lessonText: string,
+  mode: 'wordle' | 'crossword' | 'chronological',
+  targetCount = 10
+): string[] {
+  const minLen = mode === 'wordle' ? 4 : 3;
+  const maxLen = mode === 'wordle' ? 7 : 10;
+  const combined = `${lessonTitle} ${lessonText}`.replace(/[#*_>`~]/g, ' ');
+  const matches = combined.match(/\b[A-Za-z]{3,10}\b/g) || [];
+
+  const freq = new Map<string, number>();
+  for (const w of matches) {
+    const upper = w.toUpperCase();
+    if (upper.length < minLen || upper.length > maxLen || STOPWORDS.has(upper)) continue;
+    freq.set(upper, (freq.get(upper) || 0) + 1);
+  }
+
+  return Array.from(freq.entries())
+    .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+    .slice(0, targetCount)
+    .map(([word]) => word);
+}
+
+/**
+ * Dedicated keyword extraction function using gemini-3.5-flash-lite in the browser
+ * for EVERY lesson (both predefined scriptures/history chapters and custom uploaded PDF lessons).
+ * Keeps keyword extraction cleanly separated from clue generation and puzzle validation.
+ */
+export async function extractLessonKeywordsWithFlashLite(params: {
+  title: string;
+  content: string;
+  pdfBase64?: string;
+  mimeType?: string;
+  mode: 'wordle' | 'crossword' | 'chronological';
+  targetCount?: number;
+}): Promise<{ keywords: string[]; modelUsed: string }> {
+  const targetCount = params.targetCount || (params.mode === 'wordle' ? 8 : 12);
+  const minLen = params.mode === 'wordle' ? 4 : 3;
+  const maxLen = params.mode === 'wordle' ? 7 : 10;
+
+  const extractionPrompt = `You are a curriculum keyword extraction specialist for Gyan Quest.
+Analyze the following lesson and extract ${targetCount} distinct, high-value educational keywords strictly from the lesson content for a ${
+    params.mode === 'wordle'
+      ? 'Wordle (Word Quest) vocabulary game'
+      : params.mode === 'chronological'
+      ? 'Chronological Sequence Crossword puzzle'
+      : 'Standard Chapter Crossword puzzle'
+  }.
+
+Lesson Title: ${params.title}
+Lesson Content:
+---
+${(params.content || '').slice(0, 20000)}
+---
+
+STRICT KEYWORD EXTRACTION RULES:
+1. Extract ${targetCount} single-word uppercase English or Sanskrit terms (ONLY letters A-Z, no spaces, hyphens, or numbers).
+2. Each keyword MUST be between ${minLen} and ${maxLen} letters long.
+3. Every keyword MUST appear in or be a central concept of "${params.title}" above. Do NOT invent unrelated filler words.
+4. Return STRICTLY valid JSON in this exact format:
+{
+  "keywords": ["KEYWORDONE", "KEYWORDTWO"]
+}`;
+
+  try {
+    const contents: any[] = [];
+    if (params.pdfBase64 && (!params.content || params.content.trim().length < 50)) {
+      contents.push({
+        inlineData: {
+          mimeType: params.mimeType || 'application/pdf',
+          data: params.pdfBase64,
+        },
+      });
+    }
+    contents.push(extractionPrompt);
+
+    const { text, modelUsed } = await generateBrowserGeminiContent({
+      contents,
+      responseMimeType: 'application/json',
+      temperature: 0.2,
+      timeoutMs: 20000,
+      preferredModel: KEYWORD_EXTRACTION_MODEL,
+    });
+
+    const cleanJson = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+    const parsed = JSON.parse(cleanJson);
+    const validated = validateExtractedKeywords(parsed, params.mode);
+
+    if (validated.length >= 4) {
+      return { keywords: validated.slice(0, targetCount), modelUsed };
+    }
+  } catch (err) {
+    console.warn(`[Keyword Extraction • ${KEYWORD_EXTRACTION_MODEL}] Fallback notice:`, err);
+  }
+
+  const fallbackKeywords = extractDeterministicKeywordsFromText(
+    params.title,
+    params.content,
+    params.mode,
+    targetCount
+  );
+  return {
+    keywords: fallbackKeywords,
+    modelUsed: 'deterministic-fallback',
+  };
+}
+
+/**
  * Extracts context-grounded fallback Wordle questions strictly from the chapter's sentences.
  */
 export function buildContextualWordleFallback(
@@ -590,7 +733,9 @@ export function buildContextualWordleFallback(
 
 /**
  * Generates 5 highly relevant, chapter/scripture-specific Wordle questions using
- * Browser API keys (VITE_GURU_GEMINI_API_KEY & VITE_GEMINI_API_KEY) and Gemini 3.5 Flash Lite.
+ * Browser API keys (VITE_GEMINI_API_KEY & VITE_GURU_GEMINI_API_KEY) and gemini-3.5-flash-lite.
+ * Step 1: Extracts lesson keywords with gemini-3.5-flash-lite.
+ * Step 2: Generates clues/questions for those extracted keywords and validates output.
  */
 export async function generateWordleQuestionsForChapter(
   chapter: SavedChapter
@@ -599,8 +744,25 @@ export async function generateWordleQuestionsForChapter(
   const effectiveTitle = scripture ? scripture.title : (chapter.title || 'Chapter Study');
   const effectiveSummary = (scripture ? scripture.summary : (chapter.summary || '')).slice(0, 15000).trim();
 
+  // Step 1: Extract suitable Wordle keywords from the lesson content using gemini-3.5-flash-lite
+  const { keywords: extractedKeywords } = await extractLessonKeywordsWithFlashLite({
+    title: effectiveTitle,
+    content: effectiveSummary,
+    mode: 'wordle',
+    targetCount: 8,
+  });
+
+  const keywordGuidance =
+    extractedKeywords.length > 0
+      ? `EXTRACTED LESSON KEYWORDS (use these validated keywords from the lesson as your target answers): ${extractedKeywords.join(', ')}`
+      : '';
+
   const scriptureConstraint = scripture
-    ? `IMPORTANT: This lesson is from the sacred scripture "${scripture.title}". Every single answer word MUST be a core Sanskrit or thematic term directly present in this scripture text (for example: ${SCRIPTURE_WORDLE_DECKS[scripture.scriptureKey].map((d) => d.answer).join(', ')}). Do NOT generate generic or unrelated words.`
+    ? `IMPORTANT: This lesson is "${scripture.title}". Every single answer word MUST be a core Sanskrit, historical, or thematic term directly present in this lesson text (such as: ${
+        extractedKeywords.length > 0
+          ? extractedKeywords.join(', ')
+          : SCRIPTURE_WORDLE_DECKS[scripture.scriptureKey].map((d) => d.answer).join(', ')
+      }). Do NOT generate generic or unrelated words.`
     : `IMPORTANT: Every single answer word MUST be an actual key concept, scientific term, or historical/educational keyword that appears directly in the provided chapter summary. Do NOT generate unrelated words.`;
 
   const prompt = `You are creating a 5-question educational Word Quest (Wordle) game strictly based on the following lesson:
@@ -610,10 +772,11 @@ Lesson Text:
 ${effectiveSummary}
 ---
 
+${keywordGuidance}
 ${scriptureConstraint}
 
 CRITICAL RULES:
-1. Generate exactly 5 easy, clear, direct questions (or fill-in-the-blank clues) based strictly on the Lesson Text above.
+1. Generate exactly 5 easy, clear, direct questions (or fill-in-the-blank clues) based strictly on the Lesson Text above, prioritizing the EXTRACTED LESSON KEYWORDS.
 2. Each "answer" MUST be a single uppercase English/Sanskrit word of 4 to 7 letters (ONLY A-Z, no spaces or hyphens) that is directly from the lesson.
 3. Each "question" must clearly ask about the concept or quote the lesson so a student who read the lesson can easily figure out the word.
 4. Return STRICTLY valid JSON:
@@ -654,13 +817,14 @@ CRITICAL RULES:
     return valid;
   };
 
-  // 1. Try Browser Gemini API keys first (gemini-3.5-flash-lite)
+  // Step 2: Generate clues/questions using browser Gemini API keys (gemini-3.5-flash-lite first)
   try {
     const { text } = await generateBrowserGeminiContent({
       contents: [prompt],
       responseMimeType: 'application/json',
-      temperature: 0.4,
+      temperature: 0.3,
       timeoutMs: 25000,
+      preferredModel: KEYWORD_EXTRACTION_MODEL,
     });
     const cleanJson = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
     const parsed = JSON.parse(cleanJson);
@@ -670,42 +834,22 @@ CRITICAL RULES:
       return valid.slice(0, 5);
     }
   } catch (browserErr) {
-    console.warn('[Word Quest] Browser Gemini notice, trying backend/scripture deck:', browserErr);
+    console.warn('[Word Quest] Browser Gemini notice, using lesson fallback deck:', browserErr);
   }
 
-  // 2. If predefined Scripture and browser Gemini was unavailable, return the authentic Scripture deck immediately
-  // so it never returns unrelated generic words from a fallback!
+  // Step 3: Purely client-side lesson-grounded fallback (never uses server-side Gemini keys)
   if (scripture && SCRIPTURE_WORDLE_DECKS[scripture.scriptureKey]) {
     return SCRIPTURE_WORDLE_DECKS[scripture.scriptureKey];
   }
 
-  // 3. Try Express server endpoint if available
-  try {
-    const response = await fetch('/api/generate-questions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: effectiveSummary,
-        title: effectiveTitle,
-      }),
-    });
-    const contentType = response.headers.get('content-type') || '';
-    if (response.ok && contentType.includes('application/json')) {
-      const data = await response.json();
-      const valid = sanitizeQuestions(data?.questions);
-      if (valid.length >= 3) {
-        return valid.slice(0, 5);
-      }
-    }
-  } catch (_) {}
-
-  // 4. Contextual fill-in-the-blank fallback from actual chapter sentences
   return buildContextualWordleFallback(chapter);
 }
 
 /**
- * Generates a 6-word collision-free Crossword puzzle strictly from the chapter/scripture/PDF
- * using the Browser API keys (VITE_GURU_GEMINI_API_KEY & VITE_GEMINI_API_KEY) and Gemini 3.5 Flash Lite.
+ * Generates a 6-word collision-free Standard Crossword puzzle strictly from the chapter/scripture/PDF
+ * using Browser API keys (VITE_GEMINI_API_KEY & VITE_GURU_GEMINI_API_KEY) and gemini-3.5-flash-lite.
+ * Step 1: Extracts lesson keywords with gemini-3.5-flash-lite.
+ * Step 2: Generates clues for those keywords and builds a validated crossword grid.
  */
 export async function generateCrosswordPuzzleForChapter(params: {
   topic?: string;
@@ -733,15 +877,32 @@ export async function generateCrosswordPuzzleForChapter(params: {
     ? scripture.summary
     : (params.summary || params.chapter?.summary || params.topic || '').trim();
 
+  // Step 1: Extract suitable Crossword keywords from the lesson using gemini-3.5-flash-lite
+  const { keywords: extractedKeywords } = await extractLessonKeywordsWithFlashLite({
+    title: effectiveTopic,
+    content: effectiveSummary,
+    pdfBase64: params.pdfBase64,
+    mimeType: params.mimeType,
+    mode: 'crossword',
+    targetCount: 12,
+  });
+
+  const keywordInstruction =
+    extractedKeywords.length > 0
+      ? `EXTRACTED LESSON KEYWORDS (use these validated keywords from the lesson as your crossword answers): ${extractedKeywords.join(', ')}`
+      : '';
+
   const crosswordPrompt = `You are an expert curriculum crossword puzzle architect.
-Extract 10 to 12 essential, distinct vocabulary terms, key concepts, and educational facts STRICTLY from the following lesson material:
+Build 10 to 12 vocabulary answer-and-clue pairs STRICTLY from the following lesson material:
 Lesson Title: ${effectiveTopic}
 ---
 ${effectiveSummary.slice(0, 30000)}
 ---
 
+${keywordInstruction}
+
 CRITICAL REQUIREMENTS:
-1. Every word MUST be directly relevant to "${effectiveTopic}" and present in or directly taught by the material above. Do NOT include unrelated filler words.
+1. Prioritize the EXTRACTED LESSON KEYWORDS above. Every word MUST be directly relevant to "${effectiveTopic}" and taught in the material above. Do NOT include unrelated filler words.
 2. Each clue must be a clear, specific, engaging educational question or definition directly tied to the lesson (never vague placeholders).
 3. Words must contain ONLY uppercase English letters A-Z (length 3 to 10 letters). NO spaces, hyphens, or numbers.
 4. Return STRICTLY valid JSON array:
@@ -768,7 +929,7 @@ CRITICAL REQUIREMENTS:
     return valid;
   };
 
-  // 1. Try Browser Gemini API keys first (gemini-3.5-flash-lite)
+  // Step 2: Generate clues using Browser Gemini API keys (gemini-3.5-flash-lite)
   try {
     const contents: any[] = [];
     if (params.pdfBase64 && (!effectiveSummary || effectiveSummary.length < 50)) {
@@ -786,22 +947,24 @@ CRITICAL REQUIREMENTS:
       responseMimeType: 'application/json',
       temperature: 0.3,
       timeoutMs: 30000,
+      preferredModel: KEYWORD_EXTRACTION_MODEL,
     });
 
     const candidates = parseCandidates(text);
     if (candidates.length >= 6) {
-      return buildValidCrosswordLayout(candidates, {
+      const built = buildValidCrosswordLayout(candidates, {
         title: effectiveTopic,
         theme: '6-Word Chapter Examination (8 XP per word)',
         summary: effectiveSummary.slice(0, 300),
         glossary: candidates.slice(0, 6).map((c) => ({ term: c.answer, definition: c.clue })),
       });
+      return { ...built, mode: 'standard' };
     }
   } catch (browserErr) {
-    console.warn('[Crossword] Browser Gemini notice, trying fallback:', browserErr);
+    console.warn('[Crossword] Browser Gemini notice, using lesson fallback:', browserErr);
   }
 
-  // 2. If this is one of the predefined Scriptures or Curriculum Chapters, return its curated 6-word Crossword!
+  // Step 3: Client-side curated or contextual fallback (no server-side Gemini calls)
   if (scripture) {
     const matchId =
       scripture.scriptureKey === 'gita'
@@ -810,36 +973,13 @@ CRITICAL REQUIREMENTS:
         ? 'ramayana-dharma'
         : scripture.scriptureKey === 'indus_valley'
         ? 'indus-valley-history'
-        : 'mahabharata-dharma';
+        : 'mahabharata-epic';
     const matchedSample = SAMPLE_CROSSWORDS.find((s) => s.id === matchId);
     if (matchedSample) {
       return matchedSample;
     }
   }
 
-  // 3. Try Express backend /api/generate-crossword
-  try {
-    const res = await fetch('/api/generate-crossword', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        topic: effectiveTopic,
-        summary: effectiveSummary,
-        pdfData: params.pdfBase64,
-        mimeType: params.mimeType,
-        fileName: params.fileName,
-      }),
-    });
-    const contentType = res.headers.get('content-type') || '';
-    if (res.ok && contentType.includes('application/json')) {
-      const data = await res.json();
-      if (data && Array.isArray(data.words) && data.words.length > 0) {
-        return data;
-      }
-    }
-  } catch (_) {}
-
-  // 4. Contextual fallback built strictly from sentences in the chapter summary
   const contextualItems = buildContextualWordleFallback({
     id: 'temp',
     uniqueCode: '',
@@ -849,7 +989,7 @@ CRITICAL REQUIREMENTS:
     createdAt: '',
   });
   if (contextualItems.length >= 4) {
-    return buildValidCrosswordLayout(
+    const built = buildValidCrosswordLayout(
       contextualItems.map((item) => ({ answer: item.answer, clue: item.question })),
       {
         title: effectiveTopic,
@@ -857,9 +997,198 @@ CRITICAL REQUIREMENTS:
         summary: effectiveSummary.slice(0, 300),
       }
     );
+    return { ...built, mode: 'standard' };
   }
 
   return SAMPLE_CROSSWORDS[0];
+}
+
+/**
+ * Generates a Chronological Crossword puzzle for ANY lesson in Gyan Quest
+ * using Browser API keys (VITE_GEMINI_API_KEY & VITE_GURU_GEMINI_API_KEY) and gemini-3.5-flash-lite.
+ * Extracts keywords with gemini-3.5-flash-lite, sequences 6 to 8 lesson events in chronological
+ * or logical progression order (Step 1 -> Step N), and builds an intersecting crossword grid.
+ */
+export async function generateChronologicalCrosswordForChapter(params: {
+  topic?: string;
+  summary?: string;
+  pdfBase64?: string;
+  mimeType?: string;
+  fileName?: string;
+  chapter?: SavedChapter | null;
+}): Promise<CrosswordData> {
+  const scripture = getScriptureDefinition(
+    params.chapter || {
+      id: params.topic || params.fileName || '',
+      uniqueCode: '',
+      title: params.topic || params.fileName || '',
+      fileName: params.fileName || '',
+      summary: params.summary || '',
+      createdAt: '',
+    }
+  );
+
+  const effectiveTopic = scripture
+    ? scripture.title
+    : (params.topic || params.fileName || params.chapter?.title || 'Chapter Sequence').trim();
+  const effectiveSummary = scripture
+    ? scripture.summary
+    : (params.summary || params.chapter?.summary || params.topic || '').trim();
+
+  // Step 1: Extract suitable keywords using gemini-3.5-flash-lite
+  const { keywords: extractedKeywords } = await extractLessonKeywordsWithFlashLite({
+    title: effectiveTopic,
+    content: effectiveSummary,
+    pdfBase64: params.pdfBase64,
+    mimeType: params.mimeType,
+    mode: 'chronological',
+    targetCount: 10,
+  });
+
+  const chronologicalPrompt = `You are a historian and curriculum designer creating a Chronological Crossword for Gyan Quest.
+Analyze the following lesson and identify 8 key historical events, narrative milestones, or sequential stages in strict chronological / sequential order from earliest (Step 1) to latest (Step 8).
+
+Lesson Title: ${effectiveTopic}
+---
+${effectiveSummary.slice(0, 30000)}
+---
+
+${
+  extractedKeywords.length > 0
+    ? `EXTRACTED LESSON KEYWORDS (prefer these validated keywords from the lesson as the "answer" for each chronological step): ${extractedKeywords.join(', ')}`
+    : ''
+}
+
+CRITICAL REQUIREMENTS:
+1. Order the items strictly from earliest/first stage (stepOrder: 1) to latest/final stage (stepOrder: 8).
+2. Each item MUST have:
+   - "stepOrder": number (1, 2, 3, ...)
+   - "eraOrPhase": short date/period or stage label (e.g., "c. 2600 BCE • Rise of Planned Cities" or "Stage 1 • Origin")
+   - "eventDescription": 1 clear sentence describing what happened at this step in the sequence
+   - "answer": a single uppercase keyword (3 to 10 letters A-Z only, no spaces or hyphens) directly tied to this event
+   - "clue": a clear crossword clue asking for the keyword in the context of this chronological event
+3. Return STRICTLY valid JSON array:
+[
+  {
+    "stepOrder": 1,
+    "eraOrPhase": "Stage 1 • ...",
+    "eventDescription": "...",
+    "answer": "KEYWORD",
+    "clue": "..."
+  }
+]`;
+
+  try {
+    const contents: any[] = [];
+    if (params.pdfBase64 && (!effectiveSummary || effectiveSummary.length < 50)) {
+      contents.push({
+        inlineData: {
+          mimeType: params.mimeType || 'application/pdf',
+          data: params.pdfBase64,
+        },
+      });
+    }
+    contents.push(chronologicalPrompt);
+
+    const { text } = await generateBrowserGeminiContent({
+      contents,
+      responseMimeType: 'application/json',
+      temperature: 0.25,
+      timeoutMs: 30000,
+      preferredModel: KEYWORD_EXTRACTION_MODEL,
+    });
+
+    const cleanJson = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+    const parsed = JSON.parse(cleanJson);
+    const arr = Array.isArray(parsed) ? parsed : parsed?.events || parsed?.words;
+
+    if (Array.isArray(arr)) {
+      const seen = new Set<string>();
+      const validEvents: (ChronologicalCrosswordEvent & { clue: string })[] = [];
+
+      for (const item of arr) {
+        if (!item || typeof item.answer !== 'string') continue;
+        const ans = item.answer.trim().toUpperCase().replace(/[^A-Z]/g, '');
+        if (ans.length < 3 || ans.length > 10 || STOPWORDS.has(ans) || seen.has(ans)) continue;
+        const clue = typeof item.clue === 'string' && item.clue.trim().length >= 8
+          ? item.clue.trim()
+          : typeof item.eventDescription === 'string'
+          ? item.eventDescription.trim()
+          : '';
+        if (!clue) continue;
+
+        seen.add(ans);
+        validEvents.push({
+          stepOrder: typeof item.stepOrder === 'number' ? item.stepOrder : validEvents.length + 1,
+          eraOrPhase:
+            typeof item.eraOrPhase === 'string' && item.eraOrPhase.trim()
+              ? item.eraOrPhase.trim()
+              : `Sequence Step ${validEvents.length + 1}`,
+          eventDescription:
+            typeof item.eventDescription === 'string' && item.eventDescription.trim()
+              ? item.eventDescription.trim()
+              : clue,
+          answer: ans,
+          clue,
+        });
+      }
+
+      if (validEvents.length >= 5) {
+        validEvents.sort((a, b) => a.stepOrder - b.stepOrder);
+        const baseLayout = buildValidCrosswordLayout(
+          validEvents.map((ev) => ({ answer: ev.answer, clue: ev.clue })),
+          {
+            title: `${effectiveTopic} — Chronological Crossword`,
+            theme: 'Order the lesson timeline from earliest to latest and solve each milestone.',
+            summary: effectiveSummary.slice(0, 300),
+            glossary: validEvents.map((ev, idx) => ({
+              term: `${idx + 1}. ${ev.answer} (${ev.eraOrPhase})`,
+              definition: ev.eventDescription,
+            })),
+          }
+        );
+        return attachChronologicalMetadata(baseLayout, validEvents);
+      }
+    }
+  } catch (err) {
+    console.warn('[Chronological Crossword] Browser Gemini notice, using curated/contextual sequence:', err);
+  }
+
+  // Fallback 1: Predefined curriculum chapters have rich curated Chronological Crosswords
+  if (scripture && CHRONOLOGICAL_SAMPLE_CROSSWORDS[scripture.scriptureKey]) {
+    return CHRONOLOGICAL_SAMPLE_CROSSWORDS[scripture.scriptureKey];
+  }
+
+  // Fallback 2: Build a sequential chronological crossword from sentences in order of appearance in the custom lesson
+  const contextualItems = buildContextualWordleFallback({
+    id: 'temp-chrono',
+    uniqueCode: '',
+    title: effectiveTopic,
+    fileName: params.fileName || '',
+    summary: effectiveSummary,
+    createdAt: '',
+  });
+
+  if (contextualItems.length >= 4) {
+    const events: (ChronologicalCrosswordEvent & { clue: string })[] = contextualItems.map((item, idx) => ({
+      stepOrder: idx + 1,
+      eraOrPhase: `Lesson Sequence • Stage ${idx + 1}`,
+      eventDescription: item.lore || item.question,
+      answer: item.answer,
+      clue: item.question,
+    }));
+    const baseLayout = buildValidCrosswordLayout(
+      events.map((ev) => ({ answer: ev.answer, clue: ev.clue })),
+      {
+        title: `${effectiveTopic} — Chronological Crossword`,
+        theme: 'Sequential progression of concepts and events from the lesson.',
+        summary: effectiveSummary.slice(0, 300),
+      }
+    );
+    return attachChronologicalMetadata(baseLayout, events);
+  }
+
+  return CHRONOLOGICAL_SAMPLE_CROSSWORDS.indus_valley;
 }
 
 /**

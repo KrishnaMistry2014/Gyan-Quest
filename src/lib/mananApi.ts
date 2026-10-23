@@ -219,7 +219,7 @@ export async function buildEducationalImagePrompt(
     return buildFallbackEducationalPrompt(null);
   }
 
-  // 1. Try Browser Gemini API keys first (VITE_GURU_GEMINI_API_KEY & VITE_GEMINI_API_KEY)
+  // Use Browser Gemini API keys (VITE_GEMINI_API_KEY & VITE_GURU_GEMINI_API_KEY)
   try {
     const chapterTitle = (chapter.title || chapter.fileName || 'Textbook Chapter').trim();
     const chapterSnippet = (chapter.summary || '').slice(0, 2000).trim();
@@ -230,41 +230,18 @@ Return only the single descriptive visual prompt string under 60 words. Complete
       contents: [promptInstruction],
       timeoutMs: 8000,
     });
+    if (signal?.aborted) {
+      const err = new Error('Aborted');
+      err.name = 'AbortError';
+      throw err;
+    }
     if (text && text.trim().length > 25) {
       return text.trim();
     }
-  } catch (_) {}
-
-  try {
-    const promptCtrl = new AbortController();
-    const promptTimer = setTimeout(() => promptCtrl.abort(), 5000);
-    if (signal) {
-      signal.addEventListener('abort', () => promptCtrl.abort(), { once: true });
-    }
-
-    const res = await fetch('/api/generate-image-prompt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: chapter.title,
-        summary: chapter.summary,
-        fileName: chapter.fileName,
-      }),
-      signal: promptCtrl.signal,
-    });
-    clearTimeout(promptTimer);
-
-    if (res.ok) {
-      const data = await res.json().catch(() => null);
-      if (data?.prompt && typeof data.prompt === 'string' && data.prompt.trim().length > 30) {
-        return data.prompt.trim();
-      }
-    }
-  } catch (err) {
-    if (signal?.aborted) {
+  } catch (err: any) {
+    if (signal?.aborted || err?.name === 'AbortError') {
       throw err;
     }
-    console.warn('Server prompt synthesis unavailable, using smart local parser:', err);
   }
 
   if (signal?.aborted) {

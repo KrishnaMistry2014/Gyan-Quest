@@ -265,73 +265,24 @@ export const VidyaPage: React.FC<VidyaPageProps> = ({
         });
       }
 
-      // 2A. Try Browser Gemini API keys first (VITE_GURU_GEMINI_API_KEY & VITE_GEMINI_API_KEY) for Firebase Hosting compatibility
-      try {
-        const browserSummary = await extractPdfVidyaBrowser({
-          pdfBase64: base64Data,
-          fileName: file.name,
-          extractedText,
-          signal: controller.signal,
-        });
-        if (browserSummary && browserSummary.length > 80) {
-          clearTimers();
-          const cleanSummary = sanitizeClientVidya(browserSummary, file.name);
-          const computedTitle = extractVidyaTitle(cleanSummary, file.name);
-          setStageMessage('Vidya ready!');
-          setDocTitle(computedTitle);
-          setSummary(cleanSummary);
-          setStatus('done');
-
-          try {
-            const saved = await saveChapter({
-              fileName: file.name,
-              title: computedTitle,
-              summary: cleanSummary,
-              fileSize: file.size,
-            });
-            setCurrentChapter(saved);
-          } catch (saveErr) {
-            console.warn('Background chapter cloud save notice:', saveErr);
-          }
-          return;
-        }
-      } catch (browserExtractErr: any) {
-        if (controller.signal.aborted || browserExtractErr?.name === 'AbortError') {
-          throw browserExtractErr;
-        }
-        console.warn('[Vidya] Browser Gemini PDF synthesis notice, trying /api/extract-pdf:', browserExtractErr);
-      }
-
-      const response = await fetch('/api/extract-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      // Use Browser Gemini API keys (VITE_GEMINI_API_KEY & VITE_GURU_GEMINI_API_KEY)
+      const browserSummary = await extractPdfVidyaBrowser({
+        pdfBase64: base64Data,
+        fileName: file.name,
+        extractedText,
         signal: controller.signal,
-        body: JSON.stringify({
-          pdfBase64: base64Data,
-          fileName: file.name,
-          extractedText,
-        }),
       });
 
       clearTimers();
 
-      const contentType = response.headers.get('content-type') || '';
-      let data: any = null;
-      if (contentType.includes('application/json')) {
-        data = await response.json().catch(() => null);
-      }
-
-      if (data && data.success && data.summary) {
-        const cleanSummary = sanitizeClientVidya(data.summary, file.name);
+      if (browserSummary && browserSummary.length > 80) {
+        const cleanSummary = sanitizeClientVidya(browserSummary, file.name);
         const computedTitle = extractVidyaTitle(cleanSummary, file.name);
         setStageMessage('Vidya ready!');
         setDocTitle(computedTitle);
         setSummary(cleanSummary);
         setStatus('done');
 
-        // Persist to Cloud Firestore database
         try {
           const saved = await saveChapter({
             fileName: file.name,
@@ -343,23 +294,10 @@ export const VidyaPage: React.FC<VidyaPageProps> = ({
         } catch (saveErr) {
           console.warn('Background chapter cloud save notice:', saveErr);
         }
+        return;
       } else {
-        let errMsg = data?.error;
-        if (!errMsg) {
-          if (response.status === 413) {
-            errMsg = 'This PDF file exceeds the maximum allowed upload size. Please select a chapter or handout under 35MB.';
-          } else if (response.status === 422) {
-            errMsg = 'Could not extract readable text or diagrams from this PDF. Please ensure the document is a readable chapter PDF.';
-          } else if (response.status === 504 || response.status === 408) {
-            errMsg = 'Processing timed out. Please try again or use a smaller chapter section.';
-          } else if (!contentType.includes('application/json')) {
-            errMsg = 'Unable to reach the document analysis service. Please try again in a few moments.';
-          } else {
-            errMsg = response.status !== 200 ? `Extraction failed (HTTP ${response.status}). Please try again.` : 'Could not generate chapter summary from this PDF.';
-          }
-        }
         setStatus('error');
-        setErrorMessage(errMsg);
+        setErrorMessage('Could not generate chapter summary from this PDF. Please ensure the document is a readable chapter PDF.');
       }
     } catch (err: any) {
       clearTimers();

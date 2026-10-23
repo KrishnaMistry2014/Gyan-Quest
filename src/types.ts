@@ -62,11 +62,22 @@ export interface CrosswordWord {
   clue: string;
   row: number;
   col: number;
+  chronologicalStep?: number;
+  eraOrPhase?: string;
+  eventDescription?: string;
 }
 
 export interface CrosswordGlossaryItem {
   term: string;
   definition: string;
+}
+
+export interface ChronologicalCrosswordEvent {
+  stepOrder: number;
+  eraOrPhase: string;
+  eventDescription: string;
+  answer: string;
+  wordId?: string;
 }
 
 export interface CrosswordData {
@@ -77,6 +88,8 @@ export interface CrosswordData {
   gridSize: number;
   words: CrosswordWord[];
   glossary: CrosswordGlossaryItem[];
+  mode?: 'standard' | 'chronological';
+  chronologicalEvents?: ChronologicalCrosswordEvent[];
 }
 
 export interface ParikshaQuestion {

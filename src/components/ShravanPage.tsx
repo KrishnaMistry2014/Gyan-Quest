@@ -183,58 +183,10 @@ export const ShravanPage: React.FC<ShravanPageProps> = ({
     setIsUsingWebSpeech(false);
 
     const synthesizeChunk = async (chunkText: string, signal: AbortSignal): Promise<Blob> => {
-      // 1. Primary: Browser Gemini API keys (VITE_GURU_GEMINI_API_KEY & VITE_GEMINI_API_KEY)
-      try {
-        const browserResult = await synthesizeSpeechBrowser(chunkText, serverVoice, signal);
-        setTtsMeta({ voice: browserResult.voiceUsed, fromCache: browserResult.fromCache });
-        return browserResult.blob;
-      } catch (browserErr: any) {
-        if (signal.aborted || browserErr?.name === 'AbortError') {
-          throw browserErr;
-        }
-        console.warn('[Shravan TTS] Browser Gemini TTS notice, attempting /api/tts fallback:', browserErr);
-      }
-
-      // 2. Fallback: Express backend /api/tts
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'audio/wav',
-        },
-        body: JSON.stringify({
-          text: chunkText,
-          voice: serverVoice,
-        }),
-        signal,
-      });
-
-      const contentType = response.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        const errData = await response.json().catch(() => null);
-        if (errData?.fallbackToWebSpeech || !errData?.success) {
-          throw new Error(errData?.error || 'TTS voice engine busy. Switching to Web Speech API.');
-        }
-      }
-
-      if (contentType.includes('text/html')) {
-        throw new Error('TTS voice server is warming up. Activating Web Speech API fallback.');
-      }
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => null);
-        throw new Error(errData?.error || `TTS voice server returned HTTP ${response.status}`);
-      }
-
-      const voiceUsed = response.headers.get('X-TTS-Voice') || serverVoice;
-      const fromCache = response.headers.get('X-TTS-Cached') === 'true';
-      setTtsMeta({ voice: voiceUsed, fromCache });
-
-      const blob = await response.blob();
-      if (!blob || blob.size === 0 || blob.type.includes('text/html')) {
-        throw new Error('Received invalid audio response.');
-      }
-      return blob;
+      // Synthesize speech using Browser Gemini API keys (VITE_GEMINI_API_KEY & VITE_GURU_GEMINI_API_KEY)
+      const browserResult = await synthesizeSpeechBrowser(chunkText, serverVoice, signal);
+      setTtsMeta({ voice: browserResult.voiceUsed, fromCache: browserResult.fromCache });
+      return browserResult.blob;
     };
 
     try {

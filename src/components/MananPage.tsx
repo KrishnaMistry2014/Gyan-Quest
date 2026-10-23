@@ -16,7 +16,8 @@ import {
   X,
   LayoutGrid,
   ClipboardCheck,
-  ArrowRight
+  ArrowRight,
+  ListOrdered,
 } from 'lucide-react';
 import { SavedChapter, generateUniqueChapterCode } from '../lib/chapters';
 import { GyanQuestCrossword } from './GyanQuestCrossword';
@@ -63,10 +64,13 @@ export const MananPage: React.FC<MananPageProps> = ({
   const { showToast } = useToast();
   const { t } = useLanguage();
 
-  // Active contemplation activity in fixed guided flow: Jigsaw -> Wordle -> Crossword
-  const [activeActivity, setActiveActivity] = useState<'jigsaw' | 'wordle' | 'crossword'>('jigsaw');
+  // Active contemplation activity: Jigsaw -> Wordle -> Standard Crossword / Chronological Crossword
+  const [activeActivity, setActiveActivity] = useState<
+    'jigsaw' | 'wordle' | 'crossword' | 'chronological_crossword'
+  >('jigsaw');
   const [wordleCompleted, setWordleCompleted] = useState<boolean>(false);
   const [crosswordCompleted, setCrosswordCompleted] = useState<boolean>(false);
+  const [chronoCrosswordCompleted, setChronoCrosswordCompleted] = useState<boolean>(false);
 
   const handleAdvanceToWordle = async () => {
     let ch = { ...chapter };
@@ -113,6 +117,11 @@ export const MananPage: React.FC<MananPageProps> = ({
       console.warn('Error claiming wordle reward:', err);
     }
     setActiveActivity('crossword');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAdvanceToChronologicalCrossword = () => {
+    setActiveActivity('chronological_crossword');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -713,17 +722,19 @@ export const MananPage: React.FC<MananPageProps> = ({
         </div>
       </header>
 
-      {/* Guided Sequential Flow: Jigsaw > Wordle > Crossword */}
+      {/* Guided Sequential Flow: Jigsaw > Wordle > Crossword > Chronological Crossword */}
       <div className="flex items-center justify-between gap-4 flex-wrap border-b pb-4 pt-1" style={{ borderColor: 'var(--border-warm)' }}>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Activity 1: Jigsaw */}
-          <div
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+          <button
+            type="button"
+            onClick={() => setActiveActivity('jigsaw')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
               activeActivity === 'jigsaw'
                 ? 'shadow-xs'
                 : isCompleted
                 ? 'opacity-90'
-                : 'opacity-60'
+                : 'opacity-75 hover:opacity-100'
             }`}
             style={{
               backgroundColor: activeActivity === 'jigsaw' ? 'var(--accent-saffron)' : 'var(--bg-card)',
@@ -738,18 +749,20 @@ export const MananPage: React.FC<MananPageProps> = ({
                 100%
               </span>
             )}
-          </div>
+          </button>
 
           <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
 
           {/* Activity 2: Wordle */}
-          <div
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+          <button
+            type="button"
+            onClick={() => setActiveActivity('wordle')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
               activeActivity === 'wordle'
                 ? 'shadow-xs'
                 : wordleCompleted
                 ? 'opacity-90'
-                : 'opacity-60'
+                : 'opacity-75 hover:opacity-100'
             }`}
             style={{
               backgroundColor: activeActivity === 'wordle' ? 'var(--accent-saffron)' : 'var(--bg-card)',
@@ -757,25 +770,27 @@ export const MananPage: React.FC<MananPageProps> = ({
               borderColor: 'var(--border-warm)',
             }}
           >
-            {wordleCompleted ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Sparkles className="w-4 h-4 text-amber-300" />}
+            {wordleCompleted ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Sparkles className="w-4 h-4 text-amber-400" />}
             <span>2. Word Quest</span>
             {wordleCompleted && (
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
                 100%
               </span>
             )}
-          </div>
+          </button>
 
           <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
 
-          {/* Activity 3: Crossword */}
-          <div
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+          {/* Activity 3: Standard Crossword */}
+          <button
+            type="button"
+            onClick={() => setActiveActivity('crossword')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
               activeActivity === 'crossword'
                 ? 'shadow-xs'
                 : crosswordCompleted
                 ? 'opacity-90'
-                : 'opacity-60'
+                : 'opacity-75 hover:opacity-100'
             }`}
             style={{
               backgroundColor: activeActivity === 'crossword' ? 'var(--accent-saffron)' : 'var(--bg-card)',
@@ -790,7 +805,42 @@ export const MananPage: React.FC<MananPageProps> = ({
                 100%
               </span>
             )}
-          </div>
+          </button>
+
+          <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
+
+          {/* Activity 4: Chronological Crossword */}
+          <button
+            type="button"
+            data-testid="manan-tab-chronological-crossword"
+            onClick={handleAdvanceToChronologicalCrossword}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+              activeActivity === 'chronological_crossword'
+                ? 'shadow-xs'
+                : chronoCrosswordCompleted
+                ? 'opacity-90'
+                : 'opacity-75 hover:opacity-100'
+            }`}
+            style={{
+              backgroundColor:
+                activeActivity === 'chronological_crossword' ? 'var(--accent-saffron)' : 'var(--bg-card)',
+              color:
+                activeActivity === 'chronological_crossword' ? '#FFFFFF' : 'var(--text-primary)',
+              borderColor: 'var(--border-warm)',
+            }}
+          >
+            {chronoCrosswordCompleted ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <ListOrdered className="w-4 h-4" />
+            )}
+            <span>4. Chronological Crossword</span>
+            {chronoCrosswordCompleted && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+                100%
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
@@ -798,18 +848,24 @@ export const MananPage: React.FC<MananPageProps> = ({
             ? 'Assemble all puzzle pieces (100%) to unlock Next Activity'
             : activeActivity === 'wordle'
             ? 'Solve all words with 100% accuracy against the 60s timer to advance'
+            : activeActivity === 'chronological_crossword'
+            ? 'Order the lesson timeline chronologically & solve the crossword to master sequence'
             : 'Solve Crossword 100% correctly to unlock Stage 04: Pariksha'}
         </div>
       </div>
 
-      {activeActivity === 'crossword' ? (
+      {activeActivity === 'crossword' || activeActivity === 'chronological_crossword' ? (
         <div className="my-6">
           <GyanQuestCrossword
             initialChapter={chapter}
+            initialMode={activeActivity === 'chronological_crossword' ? 'chronological' : 'standard'}
             isPariksha={false}
             onExit={() => onNavigateDashboard?.()}
             onComplete={() => {
               setCrosswordCompleted(true);
+              if (activeActivity === 'chronological_crossword') {
+                setChronoCrosswordCompleted(true);
+              }
             }}
             onGoToPariksha={handleGoToPariksha}
           />
