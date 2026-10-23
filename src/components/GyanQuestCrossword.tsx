@@ -789,7 +789,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
             <button
               type="button"
               data-testid="mode-standard-crossword"
-              onClick={() => handleSwitchCrosswordMode('standard')}
+              onClick={() => window.open('https://gyanquest-pariksha.ai.studio', '_blank')}
               className="px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
               style={{
                 backgroundColor: crosswordMode === 'standard' ? 'var(--accent-saffron)' : 'transparent',
@@ -797,7 +797,7 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
               }}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Standard</span>
+              <span>Standard (External)</span>
             </button>
             <button
               type="button"
@@ -1084,9 +1084,25 @@ export const GyanQuestCrossword: React.FC<GyanQuestCrosswordProps> = ({
               </div>
             </div>
           </div>
-        ) : puzzle ? (
+        ) : puzzle && crosswordMode !== 'standard' ? (
           /* Active Crossword Solving View */
           <div className="flex-1 max-w-7xl mx-auto w-full px-1 sm:px-3 py-2 sm:py-4 flex flex-col">
+        ) : crosswordMode === 'standard' ? (
+          /* Placeholder view for Standard Crossword */
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 sm:p-14 my-auto rounded-3xl border shadow-sm max-w-lg mx-auto w-full">
+            <h3 className="text-xl font-bold mb-4">Standard Crossword Moved</h3>
+            <p className="text-sm mb-6 text-stone-600 dark:text-stone-400">
+              The standard crossword has been moved to a dedicated platform.
+            </p>
+            <a
+              href="https://gyanquest-pariksha.ai.studio"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3 bg-amber-600 text-white rounded-xl font-bold hover:opacity-90 transition"
+            >
+              Play Standard Crossword
+            </a>
+          </div>
             {/* Top Bar with Title & Solve Controls */}
             <div
               className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 p-5 sm:p-6 rounded-2xl border shadow-xs"

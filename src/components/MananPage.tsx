@@ -784,27 +784,16 @@ export const MananPage: React.FC<MananPageProps> = ({
           {/* Activity 3: Standard Crossword */}
           <button
             type="button"
-            onClick={() => setActiveActivity('crossword')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-              activeActivity === 'crossword'
-                ? 'shadow-xs'
-                : crosswordCompleted
-                ? 'opacity-90'
-                : 'opacity-75 hover:opacity-100'
-            }`}
+            onClick={() => window.open('https://gyanquest-pariksha.ai.studio', '_blank')}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer opacity-75 hover:opacity-100"
             style={{
-              backgroundColor: activeActivity === 'crossword' ? 'var(--accent-saffron)' : 'var(--bg-card)',
-              color: activeActivity === 'crossword' ? '#FFFFFF' : 'var(--text-primary)',
+              backgroundColor: 'var(--bg-card)',
+              color: 'var(--text-primary)',
               borderColor: 'var(--border-warm)',
             }}
           >
-            {crosswordCompleted ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <LayoutGrid className="w-4 h-4" />}
-            <span>3. Crossword Quest</span>
-            {crosswordCompleted && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
-                100%
-              </span>
-            )}
+            <LayoutGrid className="w-4 h-4" />
+            <span>3. Crossword (External)</span>
           </button>
 
           <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
