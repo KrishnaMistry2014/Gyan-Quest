@@ -350,6 +350,11 @@ export const VidyaPage: React.FC<VidyaPageProps> = ({
         setStatus('error');
         return;
       }
+      if (file.size > 5 * 1024 * 1024) {
+        setErrorMessage('PDF file is too large (max 5 MB). Please select a smaller file.');
+        setStatus('error');
+        return;
+      }
       onPdfUpload?.(file);
       startExtraction(file);
       e.target.value = '';
