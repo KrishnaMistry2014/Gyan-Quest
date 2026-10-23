@@ -838,8 +838,14 @@ CRITICAL REQUIREMENTS:
 4. FORMAT: Plain keyboard characters only (NO LaTeX math dollar signs). NO emojis. NO questions or quizzes.`;
 
   const contents: any[] = [];
-  if (details.length < 60 && params.pdfBase64) {
+  // Always send the original PDF when available. The lightweight browser text parser
+  // can return partial or garbled strings from compressed PDFs, so text length alone
+  // must not decide whether Gemini gets the actual document.
+  if (params.pdfBase64) {
     contents.push({ inlineData: { mimeType: 'application/pdf', data: params.pdfBase64 } });
+  }
+  if (details.length >= 60) {
+    contents.push(`Supplementary extracted text (may be incomplete; verify against the attached PDF):\n${details.slice(0, 60000)}`);
   }
   contents.push(summarizerPrompt);
 
