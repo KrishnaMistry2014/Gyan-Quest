@@ -278,7 +278,7 @@ export const MananPage: React.FC<MananPageProps> = ({
       } catch (_) {
         controller.abort();
       }
-    }, 240000);
+    }, 75000);
 
     let activePrompt = '';
     try {
@@ -331,8 +331,8 @@ export const MananPage: React.FC<MananPageProps> = ({
         errorObj = new MananImageError({
           statusCode: 408,
           errorCode: 'ERR_REQUEST_TIMEOUT',
-          message: 'The image generation request timed out after 240 seconds. The upstream service took too long to respond.',
-          backendMessage: 'Frontend request timed out after 240000ms. The image backend may be slow or experiencing high traffic. Please retry in a few moments.',
+          message: 'The image generation request timed out after 75 seconds. The upstream service took too long to respond.',
+          backendMessage: 'Frontend request timed out after 75000ms. The image backend may be slow or experiencing high traffic. Please retry in a few moments.',
           endpoint: GYANQUEST_IMAGE_API_URL,
           promptSent: activePrompt,
         });
