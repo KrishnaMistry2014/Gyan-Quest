@@ -177,7 +177,7 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
                 Upload Custom Textbook / PDF
               </h4>
               <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-                Synthesize any school chapter into the 4-stage journey
+                Synthesize any school chapter into the 4-stage journey (max 5 MB PDF)
               </p>
             </div>
           </button>
