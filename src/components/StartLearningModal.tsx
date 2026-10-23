@@ -7,6 +7,7 @@ interface StartLearningModalProps {
   onSelectGita?: () => void;
   onSelectRamayana?: () => void;
   onSelectMahabharata?: () => void;
+  onSelectIndusValley?: () => void;
   onUploadCustomPdf?: () => void;
 }
 
@@ -16,6 +17,7 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
   onSelectGita,
   onSelectRamayana,
   onSelectMahabharata,
+  onSelectIndusValley,
   onUploadCustomPdf,
 }) => {
   if (!isOpen) return null;
@@ -28,7 +30,7 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-md rounded-3xl border shadow-2xl relative p-6 sm:p-8 space-y-6 transition-all overflow-hidden"
+        className="w-full max-w-md rounded-3xl border shadow-2xl relative p-6 sm:p-8 space-y-6 transition-all overflow-hidden max-h-[90vh] overflow-y-auto"
         style={{
           backgroundColor: 'var(--bg-card)',
           borderColor: 'var(--border-warm)',
@@ -54,6 +56,37 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
 
         {/* Learning Options */}
         <div className="space-y-3.5">
+          {/* Featured Option: The Indus Valley Civilization (NCERT Classes 6-8) */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectIndusValley?.();
+              onClose();
+            }}
+            className="w-full p-4 rounded-2xl border text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center gap-4 shadow-2xs group"
+            style={{
+              backgroundColor: 'var(--bg-main)',
+              borderColor: '#0F766E',
+            }}
+          >
+            <div
+              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform bg-teal-800 text-white"
+            >
+              <BookOpen className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <div className="text-[11px] font-mono text-teal-800 dark:text-teal-300 font-semibold">
+                NCERT Classes 6–8 · Complete Interactive History Chapter
+              </div>
+              <h4 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+                The Indus Valley Civilization
+              </h4>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                16 Sections · Maps, Timelines, Dholavira Reservoirs, Great Bath &amp; Quizzes
+              </p>
+            </div>
+          </button>
+
           {/* Option 1: Learn Bhagavad Gita */}
           <button
             type="button"
@@ -81,7 +114,7 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
                 Learn Bhagavad Gita (Verse 6.17)
               </h4>
               <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-                Dhyana Yoga · Daily habits, balance & self-mastery
+                Dhyana Yoga · Daily habits, balance &amp; self-mastery
               </p>
             </div>
           </button>
@@ -113,7 +146,7 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
                 Learn Ramayana
               </h4>
               <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-                Valmiki Epic · Truth, duty, courage & righteousness
+                Valmiki Epic · Truth, duty, courage &amp; righteousness
               </p>
             </div>
           </button>
@@ -145,7 +178,7 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
                 Learn Mahabharata
               </h4>
               <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-                Vyasa Itihasa · Dharma, focus, selflessness & Kurukshetra
+                Vyasa Itihasa · Dharma, focus, selflessness &amp; Kurukshetra
               </p>
             </div>
           </button>

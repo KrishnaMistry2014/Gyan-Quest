@@ -5,11 +5,16 @@ import { useAuth } from '../context/AuthContext';
 interface DashboardProps {
   onResumeLearning?: () => void;
   onStartLearning?: () => void;
+  onOpenIndusValley?: () => void;
   onPdfUpload?: (file: File) => void;
   onNavigatePariksha?: () => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartLearning }) => {
+export const Dashboard: React.FC<DashboardProps> = ({
+  onResumeLearning,
+  onStartLearning,
+  onOpenIndusValley,
+}) => {
   const { streak, isStreakActiveToday, openStreakModal, profile } = useAuth();
 
   return (
@@ -206,6 +211,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ onResumeLearning, onStartL
           </div>
         </div>
       </div>
+
+      {/* Featured NCERT History Chapter Banner: The Indus Valley Civilization */}
+      {onOpenIndusValley && (
+        <div
+          id="card-indus-valley-featured"
+          className="rounded-3xl border p-6 sm:p-8 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderColor: 'var(--border-warm)',
+          }}
+        >
+          <div className="space-y-2 max-w-3xl">
+            <div className="text-xs font-mono text-teal-800 dark:text-teal-300 font-semibold">
+              NCERT Classes 6–8 · Featured Interactive History Chapter · 16 Complete Sections
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+              The Indus Valley Civilization (Harappan Civilization)
+            </h2>
+            <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              Explore the cities, people, water engineering, crafts, undeciphered script, and long-distance trade of one of the world’s earliest urban civilizations—complete with interactive maps, timelines, Dholavira reservoir diagrams, key-fact cards, and section quizzes.
+            </p>
+          </div>
+
+          <div className="shrink-0">
+            <button
+              type="button"
+              id="btn-dashboard-open-indus"
+              onClick={onOpenIndusValley}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white shadow-xs transition-all hover:opacity-95 cursor-pointer whitespace-nowrap"
+              style={{ backgroundColor: '#0F766E' }}
+            >
+              <span>Open Interactive Chapter</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

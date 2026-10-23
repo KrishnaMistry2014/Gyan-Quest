@@ -395,7 +395,7 @@ STRICT PLAIN TEXT ONLY. NO markdown asterisks, hashes, backticks, or LaTeX math 
  * Curated, 100% relevant Scripture Wordle Question Decks
  */
 export const SCRIPTURE_WORDLE_DECKS: Record<
-  'gita' | 'ramayana' | 'mahabharata',
+  'gita' | 'ramayana' | 'mahabharata' | 'indus_valley',
   { question: string; answer: string; hint: string; lore?: string }[]
 > = {
   gita: [
@@ -492,6 +492,38 @@ export const SCRIPTURE_WORDLE_DECKS: Record<
       answer: 'VYASA',
       hint: 'The sage author of the Mahabharata — starts with V and ends with A (5 letters).',
       lore: 'Sage Vyasa composed the Mahabharata as an unparalleled Itihasa of human nature and ethics.',
+    },
+  ],
+  indus_valley: [
+    {
+      question: 'Which 6-letter Gujarat Harappan site had a carnelian bead factory and a brick basin often interpreted as a dockyard?',
+      answer: 'LOTHAL',
+      hint: 'Coastal trade and bead-making site in Gujarat — starts with L and ends with L (6 letters).',
+      lore: 'Lothal connected Harappan craft workshops with maritime trade routes across the Arabian Sea.',
+    },
+    {
+      question: 'Which 6-letter fibre crop grown by Harappan farmers is especially important in the history of early textiles?',
+      answer: 'COTTON',
+      hint: 'Natural fibre spun with spindle whorls — starts with C and ends with N (6 letters).',
+      lore: 'Tiny mineralized traces of woven cotton cloth were preserved on a silver vessel at Mohenjo-daro.',
+    },
+    {
+      question: 'Harappan street ______ were covered with removable brick or stone slabs so they could be cleaned.',
+      answer: 'DRAINS',
+      hint: 'Covered brick channels carrying wastewater away from homes — starts with D and ends with S (6 letters).',
+      lore: 'Covered street drains and neighbourhood wells helped keep Harappan urban areas sanitary.',
+    },
+    {
+      question: 'The Harappan writing system is called the Indus ______, which has not yet been conclusively deciphered.',
+      answer: 'SCRIPT',
+      hint: 'System of written signs found on seals and pottery — starts with S and ends with T (6 letters).',
+      lore: 'Because the Indus script is undeciphered, historians carefully separate archaeological evidence from hypotheses.',
+    },
+    {
+      question: 'What 7-letter artificial glazed material (made from ground quartz) was fired to make blue-green beads and tiny pots?',
+      answer: 'FAIENCE',
+      hint: 'Glazed artificial paste used for ornaments — starts with F and ends with E (7 letters).',
+      lore: 'Crafting faience required high-temperature kiln control and mineral glazes.',
     },
   ],
 };
@@ -769,13 +801,15 @@ CRITICAL REQUIREMENTS:
     console.warn('[Crossword] Browser Gemini notice, trying fallback:', browserErr);
   }
 
-  // 2. If this is one of the 3 predefined Scriptures, return its exact curated 6-word Scripture Crossword!
+  // 2. If this is one of the predefined Scriptures or Curriculum Chapters, return its curated 6-word Crossword!
   if (scripture) {
     const matchId =
       scripture.scriptureKey === 'gita'
         ? 'gita-6-17'
         : scripture.scriptureKey === 'ramayana'
         ? 'ramayana-dharma'
+        : scripture.scriptureKey === 'indus_valley'
+        ? 'indus-valley-history'
         : 'mahabharata-dharma';
     const matchedSample = SAMPLE_CROSSWORDS.find((s) => s.id === matchId);
     if (matchedSample) {

@@ -37,6 +37,7 @@ export type AppView =
   | 'manan'
   | 'pariksha'
   | 'bhagavad-gita'
+  | 'indus-valley'
   | 'focus-mode'
   | 'store';
 
@@ -121,6 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     currentView === 'pariksha';
 
   const isGitaActive = currentView === 'bhagavad-gita';
+  const isIndusActive = currentView === 'indus-valley';
   const isFocusActive = currentView === 'focus-mode';
   const isStoreActive = currentView === 'store';
   const isAboutActive = currentView === 'landing' && activeSection === 'about';
@@ -133,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Automatically close mobile drawer
     setIsMobileOpen(false);
 
-    if (!user && id !== 'home' && id !== 'about') {
+    if (!user && id !== 'home' && id !== 'about' && id !== 'indus-valley') {
       openAuthModal();
       return;
     }
@@ -146,6 +148,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onNavigateView('landing');
           onNavigateSection('home');
         }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+
+      case 'indus-valley':
+        onNavigateView('indus-valley');
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
 
@@ -400,6 +407,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* 2. Scrollable Navigation Menu Items */}
       <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-1">
         {renderNavItem('home', t.navHome, Home, isHomeActive)}
+        {renderNavItem('indus-valley', 'Indus Valley (History)', BookOpen, isIndusActive)}
         {renderNavItem('bhagavad-gita', t.navLearnScriptures, Scroll, isGitaActive)}
         {renderNavItem(
           'guru-ai',

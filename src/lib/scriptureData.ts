@@ -8,11 +8,11 @@ export interface ScriptureImage {
 }
 
 export interface ScriptureDefinition extends SavedChapter {
-  scriptureKey: 'gita' | 'ramayana' | 'mahabharata';
+  scriptureKey: 'gita' | 'ramayana' | 'mahabharata' | 'indus_valley';
   scriptureImages: ScriptureImage[];
 }
 
-export const SCRIPTURES: Record<'gita' | 'ramayana' | 'mahabharata', ScriptureDefinition> = {
+export const SCRIPTURES: Record<'gita' | 'ramayana' | 'mahabharata' | 'indus_valley', ScriptureDefinition> = {
   gita: {
     id: 'gita_chapter_6_17',
     uniqueCode: '6170061700',
@@ -117,10 +117,51 @@ Life presents complex choices every day. The Mahabharata teaches scholars to cul
       },
     ],
   },
+  indus_valley: {
+    id: 'history_indus_valley_6_8',
+    uniqueCode: '2600190021',
+    scriptureKey: 'indus_valley',
+    title: 'The Indus Valley Civilization',
+    fileName: 'NCERT_History_The_Indus_Valley_Civilization.pdf',
+    createdAt: new Date().toISOString(),
+    summary: `# The Indus Valley Civilization (Harappan Civilization)
+## Discover the cities, people, technology, trade, and mysteries of one of the world's earliest urban civilizations (NCERT Classes 6–8)
+
+### 1. Introduction & Naming
+The Indus Valley Civilization, also called the Harappan Civilization after Harappa (the first site excavated in 1921), was one of the world's earliest urban civilizations. It developed across parts of present-day Pakistan and north-western and western India. While early discoveries lay along the Indus River, hundreds of settlements occur in the Ghaggar-Hakra plains and coastal Gujarat. Because the Indus script has not been conclusively deciphered, historians rely on archaeological evidence—bricks, drains, pottery, seals, weights, seeds, and bones—and carefully separate physical evidence from uncertain interpretations.
+
+### 2. Timeline & Phases (Approximate Dates)
+- **Early Farming Communities (Before c. 3300 BCE)**: Settled farming of wheat and barley and herding of cattle, sheep, and goats developed in the wider region; Mehrgarh in Balochistan is an important earlier farming settlement (from c. 7000 BCE).
+- **Early Harappan Phase (c. 3300–2600 BCE)**: Regional towns, wheel-made pottery, mud-brick fortifications, and trade networks grew.
+- **Mature Harappan Phase (c. 2600–1900 BCE)**: Peak of planned cities, baked-brick architecture, covered street drains, the Great Bath, steatite seals, the Indus script, cubical chert weights, and long-distance trade.
+- **Late Harappan Phase (c. 1900–1300 BCE)**: Gradual urban transformation; major cities shrank or changed while smaller settlements and regional cultures continued.
+
+### 3. Discovery & Major Sites
+- **1921**: Daya Ram Sahni led excavations at Harappa (Punjab, Pakistan).
+- **1922**: R. D. Banerji began excavations at Mohenjo-daro (Sindh, Pakistan).
+- **1924**: Sir John Marshall, Director-General of the Archaeological Survey of India, announced the civilization's discovery.
+- **Key Sites**: Harappa (granary platforms, workshops, burials), Mohenjo-daro (Great Bath, covered drains, wells, bronze "Dancing Girl", stone "Priest-King"—modern labels for figures of unknown identity), Dholavira (Gujarat: rock-cut water reservoirs, three-part stone/brick layout, 10-sign signboard), Lothal (Gujarat: carnelian bead factory, warehouse sealings, brick basin often interpreted as a dockyard), Kalibangan (Rajasthan: Early Harappan ploughed field with criss-cross furrows, fire installations), Rakhigarhi (Haryana: one of the largest Harappan settlements), and Mehrgarh (Balochistan: earlier farming precursor).
+
+### 4. Town Planning, Water Management, Farming, Crafts & Trade
+- **Town Planning & Drainage**: Mud and baked bricks in standardized 1:2:4 ratios, courtyard houses, neighbourhood brick wells, sloped bathing floors, and covered street drains with removable slabs for cleaning. Shared building practices show organization without proving a single king ruled every city.
+- **Agriculture**: Wheat, barley, pulses, sesame, mustard, cotton, and regional millets/rice; domesticated cattle, buffalo, sheep, and goats.
+- **Crafts & Trade**: Painted pottery, etched carnelian beads, copper/bronze metallurgy, shell bangles, glazed faience, steatite seals, and standardized cubical chert weights. Trade connected South Asia with Afghanistan, Iran, Oman, and Mesopotamia (where cuneiform texts mention "Meluhha").
+
+### 5. Gradual Transformation (After c. 1900 BCE)
+Urban changes after c. 1900 BCE were gradual and varied by region due to multiple factors: climate and monsoon shifts, changing river courses, evolving long-distance trade, and population movement toward smaller settlements.`,
+    scriptureImages: [
+      {
+        id: 'indus_1',
+        url: '/assets/scriptures/indus_valley_harappan.svg',
+        title: 'Harappan Urban Planning & The Great Bath (Educational Illustration)',
+        caption: 'Artistic reconstruction illustrating baked-brick architecture, covered street drains, brick wells, and the Great Bath at Mohenjo-daro.',
+      },
+    ],
+  },
 };
 
 /**
- * Checks if a given chapter is one of the 3 predefined scriptures.
+ * Checks if a given chapter is one of the predefined scriptures or curriculum chapters.
  */
 export function getScriptureDefinition(chapter?: SavedChapter | null): ScriptureDefinition | null {
   if (!chapter) return null;
@@ -128,6 +169,9 @@ export function getScriptureDefinition(chapter?: SavedChapter | null): Scripture
   const title = chapter.title?.toLowerCase() || '';
   const fileName = chapter.fileName?.toLowerCase() || '';
 
+  if (id.includes('indus') || title.includes('indus') || title.includes('harappa') || fileName.includes('indus')) {
+    return SCRIPTURES.indus_valley;
+  }
   if (id.includes('gita') || title.includes('gita') || fileName.includes('gita')) {
     return SCRIPTURES.gita;
   }

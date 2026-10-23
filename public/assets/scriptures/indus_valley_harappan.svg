@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800">
+  <defs>
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="45%" stop-color="#115E59" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <linearGradient id="sandGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E6CCB2" />
+      <stop offset="100%" stop-color="#C29B61" />
+    </linearGradient>
+    <linearGradient id="waterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F766E" />
+      <stop offset="50%" stop-color="#0D9488" />
+      <stop offset="100%" stop-color="#134E4A" />
+    </linearGradient>
+    <pattern id="brickPattern" width="40" height="20" patternUnits="userSpaceOnUse">
+      <rect width="40" height="20" fill="#B45309" />
+      <path d="M0 0 H40 M0 10 H40 M20 0 V10 M0 10 V20 M40 10 V20" stroke="#78350F" stroke-width="1.5" fill="none" />
+    </pattern>
+  </defs>
+
+  <!-- Sky and Sun -->
+  <rect width="1200" height="420" fill="url(#skyGrad)" />
+  <circle cx="960" cy="150" r="68" fill="#FDE68A" opacity="0.88" />
+  <circle cx="960" cy="150" r="95" fill="#F59E0B" opacity="0.22" />
+
+  <!-- Distant River & Alluvial Plain -->
+  <path d="M0 360 Q320 330 640 355 T1200 340 L1200 430 L0 430 Z" fill="#134E4A" opacity="0.65" />
+  <path d="M0 390 Q450 370 850 395 T1200 385 L1200 435 L0 435 Z" fill="#0F766E" />
+
+  <!-- Ground Sandstone Plain -->
+  <rect y="420" width="1200" height="380" fill="url(#sandGrad)" />
+
+  <!-- Raised Citadel Platform (Left) -->
+  <polygon points="60,430 480,430 520,510 30,510" fill="#9A3412" />
+  <rect x="60" y="310" width="420" height="120" fill="url(#brickPattern)" stroke="#78350F" stroke-width="3" />
+  <!-- Citadel Bastions -->
+  <rect x="85" y="280" width="65" height="150" fill="#9A3412" stroke="#78350F" stroke-width="2" />
+  <rect x="235" y="265" width="85" height="165" fill="#B45309" stroke="#78350F" stroke-width="2" />
+  <rect x="385" y="280" width="65" height="150" fill="#9A3412" stroke="#78350F" stroke-width="2" />
+
+  <!-- Lower Town Planned Grid Houses (Right) -->
+  <rect x="600" y="330" width="160" height="95" fill="url(#brickPattern)" stroke="#78350F" stroke-width="2" />
+  <rect x="630" y="355" width="35" height="40" fill="#1E293B" />
+  <rect x="700" y="355" width="35" height="40" fill="#1E293B" />
+
+  <rect x="810" y="345" width="180" height="80" fill="#9A3412" stroke="#78350F" stroke-width="2" />
+  <rect x="845" y="365" width="30" height="35" fill="#1E293B" />
+  <rect x="915" y="365" width="30" height="35" fill="#1E293B" />
+
+  <!-- The Great Bath Reconstruction (Center Foreground) -->
+  <polygon points="330,480 870,480 960,740 240,740" fill="#78350F" stroke="#FDE68A" stroke-width="3" />
+  <polygon points="390,515 810,515 875,705 325,705" fill="url(#waterGrad)" stroke="#D97706" stroke-width="4" />
+
+  <!-- Northern & Southern Steps into the Great Bath -->
+  <rect x="545" y="515" width="110" height="12" fill="#D6C5B3" stroke="#78350F" stroke-width="1.5" />
+  <rect x="555" y="527" width="90" height="12" fill="#C29B61" stroke="#78350F" stroke-width="1.5" />
+  <rect x="565" y="539" width="70" height="12" fill="#B45309" stroke="#78350F" stroke-width="1.5" />
+
+  <rect x="565" y="669" width="70" height="12" fill="#B45309" stroke="#78350F" stroke-width="1.5" />
+  <rect x="555" y="681" width="90" height="12" fill="#C29B61" stroke="#78350F" stroke-width="1.5" />
+  <rect x="545" y="693" width="110" height="12" fill="#D6C5B3" stroke="#78350F" stroke-width="1.5" />
+
+  <!-- Covered Street Drain (Left Foreground) -->
+  <polygon points="40,560 220,560 180,760 10,760" fill="#9A3412" stroke="#78350F" stroke-width="2" />
+  <polygon points="75,560 155,560 120,760 40,760" fill="#0F766E" />
+  <line x1="65" y1="600" x2="150" y2="600" stroke="#E6CCB2" stroke-width="6" />
+  <line x1="55" y1="650" x2="140" y2="650" stroke="#E6CCB2" stroke-width="6" />
+  <line x1="45" y1="700" x2="130" y2="700" stroke="#E6CCB2" stroke-width="6" />
+
+  <!-- Brick Well & Painted Pottery (Right Foreground) -->
+  <ellipse cx="1060" cy="630" rx="70" ry="38" fill="#78350F" stroke="#FDE68A" stroke-width="2" />
+  <ellipse cx="1060" cy="605" rx="70" ry="38" fill="url(#brickPattern)" stroke="#78350F" stroke-width="3" />
+  <ellipse cx="1060" cy="605" rx="46" ry="22" fill="#0F766E" />
+
+  <!-- Caption Banner -->
+  <rect x="30" y="24" width="590" height="54" rx="10" fill="#1E293B" opacity="0.88" stroke="#D97706" stroke-width="1.5" />
+  <text x="52" y="48" fill="#FDE68A" font-family="Georgia, serif" font-size="18" font-weight="bold">
+    Educational Illustration: Harappan Urban Planning &amp; Water Engineering
+  </text>
+  <text x="52" y="68" fill="#E2E8F0" font-family="sans-serif" font-size="12">
+    Artistic reconstruction showing baked-brick architecture, the Great Bath, covered drains, and brick wells.
+  </text>
+</svg>

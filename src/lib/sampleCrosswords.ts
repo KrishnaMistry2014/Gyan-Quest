@@ -267,5 +267,94 @@ export const SAMPLE_CROSSWORDS: CrosswordData[] = [
         "definition": "Princess born of holy sacrificial fire and Pandava queen"
       }
     ]
+  },
+  {
+    "id": "indus-valley-history",
+    "title": "The Indus Valley Civilization (Classes 6–8)",
+    "theme": "Harappan cities, water engineering, crafts, undeciphered script, and ancient trade.",
+    "summary": "Explore the Mature Harappan urban peak (c. 2600–1900 BCE), planned brick cities, covered drainage, Dholavira reservoirs, Lothal bead workshops, and Meluhha trade links.",
+    "gridSize": 15,
+    "words": [
+      {
+        "id": "1_down",
+        "number": 1,
+        "direction": "down",
+        "answer": "MELUHHA",
+        "clue": "Name in Mesopotamian cuneiform texts widely associated by scholars with the Indus region",
+        "row": 0,
+        "col": 3
+      },
+      {
+        "id": "2_across",
+        "number": 2,
+        "direction": "across",
+        "answer": "SEAL",
+        "clue": "Carved steatite stamp with animal motifs and short Indus script symbols",
+        "row": 1,
+        "col": 2
+      },
+      {
+        "id": "3_across",
+        "number": 3,
+        "direction": "across",
+        "answer": "HARAPPA",
+        "clue": "First major site excavated by Daya Ram Sahni in 1921 in Punjab",
+        "row": 4,
+        "col": 3
+      },
+      {
+        "id": "4_down",
+        "number": 4,
+        "direction": "down",
+        "answer": "DRAINS",
+        "clue": "Covered brick street channels with removable slabs that carried wastewater away",
+        "row": 2,
+        "col": 6
+      },
+      {
+        "id": "5_down",
+        "number": 5,
+        "direction": "down",
+        "answer": "SCRIPT",
+        "clue": "Harappan writing system of short symbol sequences that remains undeciphered",
+        "row": 0,
+        "col": 8
+      },
+      {
+        "id": "6_across",
+        "number": 6,
+        "direction": "across",
+        "answer": "LOTHAL",
+        "clue": "Gujarat site famous for its carnelian bead factory and brick basin interpreted as a dockyard",
+        "row": 6,
+        "col": 9
+      }
+    ],
+    "glossary": [
+      {
+        "term": "Meluhha",
+        "definition": "Mesopotamian cuneiform term widely associated by scholars with the Indus region"
+      },
+      {
+        "term": "Seal",
+        "definition": "Carved steatite stamp with animal motifs and short inscriptions"
+      },
+      {
+        "term": "Harappa",
+        "definition": "Key site excavated in 1921 that gave the Harappan Civilization its name"
+      },
+      {
+        "term": "Drains",
+        "definition": "Covered street channels designed for municipal sanitation and cleaning"
+      },
+      {
+        "term": "Script",
+        "definition": "The undeciphered writing system of the Indus Valley Civilization"
+      },
+      {
+        "term": "Lothal",
+        "definition": "Harappan site in Gujarat known for bead-making and maritime trade links"
+      }
+    ]
   }
 ];

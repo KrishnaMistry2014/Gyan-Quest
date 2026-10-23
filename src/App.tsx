@@ -28,6 +28,7 @@ import { MananPage } from './components/MananPage';
 import { ParikshaView } from './components/ParikshaView';
 import { StoreView } from './components/StoreView';
 import { FocusModeView } from './components/FocusModeView';
+import { IndusValleyChapterView } from './components/IndusValleyChapterView';
 import { SavedChapter } from './lib/chapters';
 import { SCRIPTURES } from './lib/scriptureData';
 import { Menu, BookOpenText, Sun, Moon, Flame, Zap } from 'lucide-react';
@@ -47,6 +48,7 @@ const pathToView = (path: string): AppView => {
     case '/shravan': return 'shravan';
     case '/manan': return 'manan';
     case '/pariksha': return 'pariksha';
+    case '/indus-valley': return 'indus-valley';
     default: return 'landing';
   }
 };
@@ -61,6 +63,7 @@ const viewToPath = (view: AppView): string => {
     case 'shravan': return '/shravan';
     case 'manan': return '/manan';
     case 'pariksha': return '/pariksha';
+    case 'indus-valley': return '/indus-valley';
     default: return '/';
   }
 };
@@ -206,6 +209,11 @@ const MainAppContent: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleOpenIndusValley = () => {
+    setCurrentView('indus-valley');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row relative selection:bg-orange-500 selection:text-white bg-[var(--bg-main)] text-[var(--text-primary)]">
       {/* Modern, Persistent & Collapsible Sidebar (Replaces former floating Navbar) */}
@@ -334,6 +342,38 @@ const MainAppContent: React.FC = () => {
           {/* If user is logged in with email/password and unverified, gate dashboard behind verification screen */}
           {user && isEmailUnverified ? (
             <VerificationScreen />
+          ) : currentView === 'indus-valley' ? (
+            /* Complete Interactive NCERT Classes 6–8 History Chapter: The Indus Valley Civilization */
+            <IndusValleyChapterView
+              onNavigateDashboard={() => {
+                if (!user) {
+                  setCurrentView('landing');
+                } else {
+                  setCurrentView('dashboard');
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateVidya={(ch) => {
+                setSelectedChapter(ch);
+                setUploadedPdf(null);
+                setCurrentView('vidya');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateShravan={(ch) => {
+                setSelectedChapter(ch);
+                setActiveShravanChapter(ch);
+                setCurrentView('shravan');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateManan={(ch) => {
+                setSelectedChapter(ch);
+                setActiveShravanChapter(ch);
+                setActiveMananChapter(ch);
+                setCurrentView('manan');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigatePariksha={(ch) => handleNavigatePariksha(ch)}
+            />
           ) : currentView === 'vidya' ? (
             /* Vidya Page loaded on PDF Upload or opening a chapter */
             <VidyaPage
@@ -476,6 +516,7 @@ const MainAppContent: React.FC = () => {
               onNavigateDashboard={() => setCurrentView('dashboard')}
               onNavigateHome={() => setCurrentView('landing')}
               onNavigatePariksha={handleNavigatePariksha}
+              onOpenIndusValley={handleOpenIndusValley}
             />
           ) : currentView === 'dashboard' && user ? (
             /* Dashboard View - Only accessible when authenticated */
@@ -484,6 +525,7 @@ const MainAppContent: React.FC = () => {
               onStartLearning={handleStartLearning}
               onPdfUpload={handlePdfUploaded}
               onNavigatePariksha={() => handleNavigatePariksha(selectedChapter)}
+              onOpenIndusValley={handleOpenIndusValley}
             />
 
           ) : currentView === 'focus-mode' ? (
@@ -530,6 +572,7 @@ const MainAppContent: React.FC = () => {
               <LearningJourney
                 onNavigatePariksha={() => handleNavigatePariksha(selectedChapter)}
                 onStartLearning={handleStartLearning}
+                onOpenIndusValley={handleOpenIndusValley}
               />
 
               <CustomMaterialSection 
@@ -552,7 +595,7 @@ const MainAppContent: React.FC = () => {
       {/* Firebase Authentication Modal */}
       <AuthModal />
 
-      {/* Start Learning Modal (Bhagavad Gita & Ramayana Options) */}
+      {/* Start Learning Modal (Bhagavad Gita, Ramayana, Mahabharata, Indus Valley & Custom PDF Options) */}
       <StartLearningModal
         isOpen={isStartLearningModalOpen}
         onClose={() => setIsStartLearningModalOpen(false)}
@@ -574,6 +617,7 @@ const MainAppContent: React.FC = () => {
           setCurrentView('vidya');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
+        onSelectIndusValley={handleOpenIndusValley}
         onUploadCustomPdf={() => {
           setSelectedChapter(null);
           setUploadedPdf(null);

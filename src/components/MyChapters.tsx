@@ -24,6 +24,7 @@ import {
 } from '../lib/chapters';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { SCRIPTURES } from '../lib/scriptureData';
 
 interface MyChaptersProps {
   onOpenChapter: (chapter: SavedChapter) => void;
@@ -31,6 +32,7 @@ interface MyChaptersProps {
   onNavigatePariksha?: (chapter: SavedChapter) => void;
   onNavigateDashboard?: () => void;
   onNavigateHome?: () => void;
+  onOpenIndusValley?: () => void;
 }
 
 export const MyChapters: React.FC<MyChaptersProps> = ({
@@ -39,6 +41,7 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
   onNavigatePariksha,
   onNavigateDashboard,
   onNavigateHome,
+  onOpenIndusValley,
 }) => {
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -193,6 +196,76 @@ export const MyChapters: React.FC<MyChaptersProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Featured Curriculum Module: The Indus Valley Civilization */}
+      {onOpenIndusValley && (
+        <div
+          id="my-chapters-indus-valley-card"
+          className="rounded-3xl border p-6 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderColor: 'var(--border-warm)',
+          }}
+        >
+          <div className="space-y-2 max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-mono uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-md bg-teal-900/10 dark:bg-teal-400/10 text-teal-800 dark:text-teal-300 border border-teal-700/20">
+                Featured NCERT History · Classes 6–8
+              </span>
+              <span className="font-mono text-[11px] px-2 py-0.5 rounded-md border" style={{ borderColor: 'var(--border-warm)', color: 'var(--text-secondary)' }}>
+                #{SCRIPTURES.indus_valley.uniqueCode}
+              </span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+              The Indus Valley Civilization
+            </h2>
+            <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              Discover the cities, people, technology, trade, and mysteries of one of the world&apos;s earliest urban civilizations. Includes 16 textbook sections, 7 interactive diagrams, glossary, and Vidya → Shravan → Manan → Pariksha integration.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={onOpenIndusValley}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white shadow-xs transition-all hover:opacity-95 cursor-pointer"
+              style={{ backgroundColor: '#1E293B' }}
+            >
+              <BookOpen className="w-4 h-4 text-amber-400" />
+              <span>Interactive Textbook</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenChapter(SCRIPTURES.indus_valley)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
+              style={{
+                borderColor: 'var(--border-warm)',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>Vidya Notes</span>
+            </button>
+
+            {onNavigatePariksha && (
+              <button
+                type="button"
+                onClick={() => onNavigatePariksha(SCRIPTURES.indus_valley)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-colors hover:bg-amber-100 dark:hover:bg-amber-950/60 cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--accent-saffron-light)',
+                  borderColor: 'var(--border-warm)',
+                  color: 'var(--accent-saffron-text)',
+                }}
+              >
+                <Trophy className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Pariksha</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Search Bar (if chapters exist) */}
       {chapters.length > 0 && (

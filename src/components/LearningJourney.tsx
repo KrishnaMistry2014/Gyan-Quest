@@ -97,11 +97,13 @@ const STAGES: StageData[] = [
 interface LearningJourneyProps {
   onNavigatePariksha?: () => void;
   onStartLearning?: () => void;
+  onOpenIndusValley?: () => void;
 }
 
 export const LearningJourney: React.FC<LearningJourneyProps> = ({
   onNavigatePariksha,
   onStartLearning,
+  onOpenIndusValley,
 }) => {
   const { recordStreakActivity } = useAuth();
   const { language, t } = useLanguage();
@@ -293,6 +295,47 @@ export const LearningJourney: React.FC<LearningJourneyProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Featured Interactive History Chapter Banner */}
+      {onOpenIndusValley && (
+        <div
+          id="featured-indus-valley-banner"
+          className="mt-6 rounded-3xl border p-5 sm:p-7 shadow-xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderColor: 'var(--border-warm)',
+          }}
+        >
+          <div className="space-y-2 max-w-2xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-mono uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-md bg-teal-900/10 dark:bg-teal-400/10 text-teal-800 dark:text-teal-300 border border-teal-700/20">
+                NCERT History · Classes 6–8
+              </span>
+              <span className="text-[11px] font-mono text-amber-700 dark:text-amber-400 font-semibold">
+                16 Sections · 7 Interactive Visuals · +100 XP Full Loop
+              </span>
+            </div>
+            <h3 className="text-lg sm:text-2xl font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+              The Indus Valley Civilization (Harappan Civilization)
+            </h3>
+            <p className="text-xs sm:text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              Discover the cities, people, technology, trade, and mysteries of one of the world&apos;s earliest urban civilizations (c. 2600–1900 BCE) with interactive diagrams, site comparisons, glossary cards, and instant quizzes.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenIndusValley}
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-xs sm:text-sm font-bold text-white shadow-xs transition-all hover:opacity-95 cursor-pointer shrink-0"
+            style={{ backgroundColor: '#1E293B' }}
+          >
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span>Explore Interactive Chapter</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </section>
   );
 };
+
