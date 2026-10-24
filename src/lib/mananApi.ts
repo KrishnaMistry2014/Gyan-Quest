@@ -348,103 +348,290 @@ export function preloadImage(url: string, timeoutMs = 25000, signal?: AbortSigna
 }
 
 /**
- * Direct call to Hugging Face Gradio Space (Krea 2 Turbo) via Server-Sent Events.
- * Used as a dependable failover if Render is asleep or returning 502.
+ * Timeout configuration: strictly 75 seconds per provider.
  */
-export async function generateViaDirectGradio(prompt: string, signal?: AbortSignal): Promise<string> {
-  // Step 1: Initiate job on Gradio Space
-  const initRes = await fetch(GRADIO_SPACE_CALL_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      data: [
-        prompt,
-        'text, watermark, blurry, words, letters, labels, typography',
-        'Turbo',
-        8,
-        0.0,
-        1024,
-        1024,
-        Math.floor(Math.random() * 100000),
-        true,
-      ],
-    }),
-    signal,
-  });
+export const TIMEOUT_PER_PROVIDER_MS = 75000;
 
-  if (!initRes.ok) {
-    throw new MananImageError({
-      statusCode: initRes.status,
-      errorCode: `HTTP_${initRes.status}_GRADIO_INIT_FAILED`,
-      message: `Hugging Face Space returned status ${initRes.status}`,
-      endpoint: GRADIO_SPACE_CALL_URL,
-      promptSent: prompt,
-    });
+/**
+ * Retrieves configured Cloudflare Workers AI credentials.
+ */
+export function getCloudflareCredentials(): { apiToken: string; accountId: string } {
+  let apiToken = '';
+  let accountId = '';
+
+  try {
+    const metaEnv = (import.meta as any)?.env;
+    if (metaEnv) {
+      apiToken =
+        metaEnv.VITE_CLOUDFLARE_API_KEY ||
+        metaEnv.VITE_CLOUDFLARE_API_TOKEN ||
+        metaEnv.CLOUDFLARE_API_KEY ||
+        metaEnv.CLOUDFLARE_API_TOKEN ||
+        '';
+      accountId = metaEnv.VITE_CLOUDFLARE_ACCOUNT_ID || metaEnv.CLOUDFLARE_ACCOUNT_ID || '';
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof window !== 'undefined') {
+      const win = window as any;
+      apiToken =
+        apiToken ||
+        win.VITE_CLOUDFLARE_API_KEY ||
+        win.CLOUDFLARE_API_KEY ||
+        win.CLOUDFLARE_API_TOKEN ||
+        '';
+      accountId = accountId || win.VITE_CLOUDFLARE_ACCOUNT_ID || win.CLOUDFLARE_ACCOUNT_ID || '';
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      apiToken =
+        apiToken ||
+        localStorage.getItem('CLOUDFLARE_API_KEY') ||
+        localStorage.getItem('CLOUDFLARE_API_TOKEN') ||
+        localStorage.getItem('cloudflare_api_key') ||
+        localStorage.getItem('cloudflare_api_token') ||
+        localStorage.getItem('cf_api_key') ||
+        '';
+      accountId =
+        accountId ||
+        localStorage.getItem('CLOUDFLARE_ACCOUNT_ID') ||
+        localStorage.getItem('cloudflare_account_id') ||
+        '';
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      apiToken =
+        apiToken ||
+        (process.env as any).CLOUDFLARE_API_KEY ||
+        (process.env as any).CLOUDFLARE_API_TOKEN ||
+        (process.env as any).VITE_CLOUDFLARE_API_KEY ||
+        '';
+      accountId =
+        accountId ||
+        (process.env as any).CLOUDFLARE_ACCOUNT_ID ||
+        (process.env as any).VITE_CLOUDFLARE_ACCOUNT_ID ||
+        '';
+    }
+  } catch (_) {}
+
+  return {
+    apiToken: apiToken.trim(),
+    accountId: accountId.trim(),
+  };
+}
+
+/**
+ * Generates an educational image via Cloudflare Workers AI with 75-second timeout.
+ */
+export async function generateViaCloudflare(prompt: string, signal?: AbortSignal): Promise<string> {
+  const { apiToken, accountId } = getCloudflareCredentials();
+  const controller = new AbortController();
+  const timeoutTimer = setTimeout(() => controller.abort(), TIMEOUT_PER_PROVIDER_MS);
+
+  const cleanup = () => {
+    clearTimeout(timeoutTimer);
+    if (signal) signal.removeEventListener('abort', onAbort);
+  };
+
+  const onAbort = () => {
+    controller.abort();
+  };
+
+  if (signal) {
+    signal.addEventListener('abort', onAbort, { once: true });
   }
 
-  const { event_id } = await initRes.json();
-  if (!event_id) {
-    throw new MananImageError({
-      statusCode: 502,
-      errorCode: 'ERR_NO_EVENT_ID',
-      message: 'Hugging Face Space did not return an event ID.',
-      endpoint: GRADIO_SPACE_CALL_URL,
-      promptSent: prompt,
-    });
-  }
+  try {
+    // First try the server-side proxy route to avoid CORS restrictions
+    const proxyRes = await fetch('/api/generate-image-cloudflare', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, apiToken, accountId }),
+      signal: controller.signal,
+    }).catch(() => null);
 
-  // Step 2: Stream SSE events until 'complete'
-  const eventRes = await fetch(`${GRADIO_SPACE_CALL_URL}/${event_id}`, { signal });
-  if (!eventRes.ok || !eventRes.body) {
-    throw new MananImageError({
-      statusCode: eventRes.status,
-      errorCode: `HTTP_${eventRes.status}_GRADIO_STREAM_FAILED`,
-      message: 'Failed to open event stream from Hugging Face Space.',
-      endpoint: `${GRADIO_SPACE_CALL_URL}/${event_id}`,
-      promptSent: prompt,
-    });
-  }
-
-  const reader = eventRes.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    if (buffer.includes('event: complete')) {
-      const match = buffer.match(/data:\s*(\[[\s\S]*?\])(?:\n|$)/);
-      if (match) {
-        try {
-          const parsed = JSON.parse(match[1]);
-          const fileData = parsed[0];
-          if (fileData?.url) {
-            return fileData.url;
-          }
-        } catch (_) {}
+    if (proxyRes && proxyRes.ok) {
+      const data = await proxyRes.json();
+      if (data?.imageUrl) {
+        cleanup();
+        return data.imageUrl;
       }
     }
 
-    if (buffer.includes('event: error')) {
+    // Direct browser call fallback if server proxy was unavailable and credentials exist
+    if (apiToken) {
+      const targetAccountId = accountId || 'default';
+      const cfModel = '@cf/bytedance/stable-diffusion-xl-lightning';
+      const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${targetAccountId}/ai/run/${cfModel}`;
+
+      const directRes = await fetch(cfUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
+        signal: controller.signal,
+      });
+
+      if (directRes.ok) {
+        const contentType = directRes.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const json = await directRes.json();
+          if (json?.result?.image) {
+            cleanup();
+            return `data:image/png;base64,${json.result.image}`;
+          }
+        }
+        const blob = await directRes.blob();
+        cleanup();
+        return URL.createObjectURL(blob);
+      }
+    }
+
+    throw new Error('Cloudflare Image generation returned no valid image payload');
+  } catch (err: any) {
+    cleanup();
+    const isTimeout = err?.name === 'AbortError' || controller.signal.aborted;
+    const msg = isTimeout ? 'Cloudflare image generation timed out after 75s' : err?.message || String(err);
+    console.warn(`[Model Failure Log] Cloudflare Image error: ${msg}`);
+    throw new MananImageError({
+      statusCode: 504,
+      errorCode: 'ERR_CLOUDFLARE_FAILED',
+      message: msg,
+      endpoint: 'Cloudflare Workers AI',
+      promptSent: prompt,
+    });
+  }
+}
+
+/**
+ * Direct call to Hugging Face Gradio Space (Krea 2 Turbo) via Server-Sent Events with 75-second timeout.
+ */
+export async function generateViaDirectGradio(prompt: string, signal?: AbortSignal): Promise<string> {
+  const controller = new AbortController();
+  const timeoutTimer = setTimeout(() => controller.abort(), TIMEOUT_PER_PROVIDER_MS);
+
+  const cleanup = () => {
+    clearTimeout(timeoutTimer);
+    if (signal) signal.removeEventListener('abort', onAbort);
+  };
+
+  const onAbort = () => {
+    controller.abort();
+  };
+
+  if (signal) {
+    signal.addEventListener('abort', onAbort, { once: true });
+  }
+
+  try {
+    // Step 1: Initiate job on Gradio Space
+    const initRes = await fetch(GRADIO_SPACE_CALL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: [
+          prompt,
+          'text, watermark, blurry, words, letters, labels, typography',
+          'Turbo',
+          8,
+          0.0,
+          1024,
+          1024,
+          Math.floor(Math.random() * 100000),
+          true,
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!initRes.ok) {
       throw new MananImageError({
-        statusCode: 500,
-        errorCode: 'ERR_GRADIO_JOB_ERROR',
-        message: 'Hugging Face Space encountered an error during image generation.',
+        statusCode: initRes.status,
+        errorCode: `HTTP_${initRes.status}_GRADIO_INIT_FAILED`,
+        message: `Hugging Face Space returned status ${initRes.status}`,
+        endpoint: GRADIO_SPACE_CALL_URL,
+        promptSent: prompt,
+      });
+    }
+
+    const { event_id } = await initRes.json();
+    if (!event_id) {
+      throw new MananImageError({
+        statusCode: 502,
+        errorCode: 'ERR_NO_EVENT_ID',
+        message: 'Hugging Face Space did not return an event ID.',
+        endpoint: GRADIO_SPACE_CALL_URL,
+        promptSent: prompt,
+      });
+    }
+
+    // Step 2: Stream SSE events until 'complete'
+    const eventRes = await fetch(`${GRADIO_SPACE_CALL_URL}/${event_id}`, { signal: controller.signal });
+    if (!eventRes.ok || !eventRes.body) {
+      throw new MananImageError({
+        statusCode: eventRes.status,
+        errorCode: `HTTP_${eventRes.status}_GRADIO_STREAM_FAILED`,
+        message: 'Failed to open event stream from Hugging Face Space.',
         endpoint: `${GRADIO_SPACE_CALL_URL}/${event_id}`,
         promptSent: prompt,
       });
     }
-  }
 
-  throw new MananImageError({
-    statusCode: 502,
-    errorCode: 'ERR_STREAM_ENDED_WITHOUT_IMAGE',
-    message: 'Hugging Face Space finished stream without returning an image URL.',
-    endpoint: `${GRADIO_SPACE_CALL_URL}/${event_id}`,
-    promptSent: prompt,
-  });
+    const reader = eventRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      if (buffer.includes('event: complete')) {
+        const match = buffer.match(/data:\s*(\[[\s\S]*?\])(?:\n|$)/);
+        if (match) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            const fileData = parsed[0];
+            if (fileData?.url) {
+              cleanup();
+              return fileData.url;
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (buffer.includes('event: error')) {
+        throw new MananImageError({
+          statusCode: 500,
+          errorCode: 'ERR_GRADIO_JOB_ERROR',
+          message: 'Hugging Face Space encountered an error during image generation.',
+          endpoint: `${GRADIO_SPACE_CALL_URL}/${event_id}`,
+          promptSent: prompt,
+        });
+      }
+    }
+
+    throw new MananImageError({
+      statusCode: 502,
+      errorCode: 'ERR_STREAM_ENDED_WITHOUT_IMAGE',
+      message: 'Hugging Face Space finished stream without returning an image URL.',
+      endpoint: `${GRADIO_SPACE_CALL_URL}/${event_id}`,
+      promptSent: prompt,
+    });
+  } catch (err: any) {
+    cleanup();
+    const isTimeout = err?.name === 'AbortError' || controller.signal.aborted;
+    const msg = isTimeout ? 'Hugging Face image generation timed out after 75s' : err?.message || String(err);
+    console.warn(`[Model Failure Log] Hugging Face Gradio error: ${msg}`);
+    throw err;
+  }
 }
 
 /**
@@ -542,10 +729,13 @@ export function getFallbackIllustrationUrl(chapter?: SavedChapter | null): strin
 }
 
 /**
- * Calls the original Gyan Quest Render image-generation pipeline (gyanquest-image-api)
- * and preloads the resulting image.
- * Never calls Nano Banana, Gemini image models, or paid image APIs directly.
- * If generation fails, throws a clear diagnostic error.
+ * Calls the multi-provider image-generation pipeline with strict 75-second timeout per provider:
+ * 1. Cloudflare Workers AI (75s timeout)
+ * 2. Hugging Face Gradio Space (75s timeout)
+ * 3. Gyan Quest Render backend (75s timeout)
+ * 4. Curated educational illustration fallback
+ *
+ * If any model fails, updates the logs and proceeds to the next provider.
  */
 export async function generateChapterImage(
   prompt: string,
@@ -563,9 +753,51 @@ export async function generateChapterImage(
   }
 
   const cleanPrompt = prompt.trim();
+  const errors: string[] = [];
 
-  // Call the existing Render backend at https://gyanquest-image-api.onrender.com/generate
+  // Provider 1: Cloudflare Workers AI (75s timeout)
   try {
+    const cfImageUrl = await generateViaCloudflare(cleanPrompt, signal);
+    if (cfImageUrl) {
+      await preloadImage(cfImageUrl, TIMEOUT_PER_PROVIDER_MS, signal);
+      return {
+        imageUrl: cfImageUrl,
+        isAiGenerated: true,
+        message: 'Generated via Cloudflare Workers AI',
+      };
+    }
+  } catch (cfErr: any) {
+    if (signal?.aborted) throw cfErr;
+    const msg = cfErr?.message || String(cfErr);
+    console.warn(`[Model Failure Log] Cloudflare Image Model failed: ${msg}`);
+    errors.push(`Cloudflare: ${msg}`);
+  }
+
+  // Provider 2: Hugging Face Gradio Space (75s timeout)
+  try {
+    const hfImageUrl = await generateViaDirectGradio(cleanPrompt, signal);
+    if (hfImageUrl) {
+      await preloadImage(hfImageUrl, TIMEOUT_PER_PROVIDER_MS, signal);
+      return {
+        imageUrl: hfImageUrl,
+        isAiGenerated: true,
+        message: 'Generated via Hugging Face Space',
+      };
+    }
+  } catch (hfErr: any) {
+    if (signal?.aborted) throw hfErr;
+    const msg = hfErr?.message || String(hfErr);
+    console.warn(`[Model Failure Log] Hugging Face Gradio Model failed: ${msg}`);
+    errors.push(`Hugging Face: ${msg}`);
+  }
+
+  // Provider 3: Gyan Quest Render Backend (75s timeout)
+  try {
+    const renderController = new AbortController();
+    const renderTimeout = setTimeout(() => renderController.abort(), TIMEOUT_PER_PROVIDER_MS);
+    const onAbort = () => renderController.abort();
+    if (signal) signal.addEventListener('abort', onAbort, { once: true });
+
     const res = await fetch(GYANQUEST_IMAGE_API_URL, {
       method: 'POST',
       headers: {
@@ -573,64 +805,40 @@ export async function generateChapterImage(
         Accept: 'application/json',
       },
       body: JSON.stringify({ prompt: cleanPrompt }),
-      signal,
+      signal: renderController.signal,
+    }).finally(() => {
+      clearTimeout(renderTimeout);
+      if (signal) signal.removeEventListener('abort', onAbort);
     });
 
     if (res.ok) {
       const data = await res.json().catch(() => null);
       if (data?.imageUrl && typeof data.imageUrl === 'string' && (data.imageUrl.startsWith('http') || data.imageUrl.startsWith('data:'))) {
         const imageUrl = data.imageUrl.trim();
-        await preloadImage(imageUrl, 15000, signal);
+        await preloadImage(imageUrl, TIMEOUT_PER_PROVIDER_MS, signal);
         return {
           imageUrl,
           isAiGenerated: true,
           message: 'Generated via Gyan Quest Image API',
         };
-      } else {
-        throw new MananImageError({
-          statusCode: res.status,
-          errorCode: 'ERR_INVALID_IMAGE_PAYLOAD',
-          message: 'Server returned HTTP 200 OK but response payload did not contain a valid image URL.',
-          backendMessage: JSON.stringify(data || 'Empty or invalid response body'),
-          endpoint: GYANQUEST_IMAGE_API_URL,
-          promptSent: cleanPrompt,
-        });
       }
-    } else {
-      let backendMsg = `HTTP ${res.status}: ${res.statusText}`;
-      try {
-        const errJson = await res.json();
-        backendMsg = errJson?.error || errJson?.message || errJson?.detail || backendMsg;
-      } catch (_) {
-        try {
-          const text = await res.text();
-          if (text) backendMsg = text.slice(0, 300);
-        } catch (_) {}
-      }
-
-      throw new MananImageError({
-        statusCode: res.status,
-        errorCode: `HTTP_${res.status}_RENDER_FAILED`,
-        message: `Image generation server error (${res.status}): ${backendMsg}`,
-        backendMessage: backendMsg,
-        endpoint: GYANQUEST_IMAGE_API_URL,
-        promptSent: cleanPrompt,
-      });
     }
-  } catch (err: any) {
-    if (signal?.aborted) {
-      throw err;
-    }
-    if (err instanceof MananImageError) {
-      throw err;
-    }
-    throw new MananImageError({
-      statusCode: 0,
-      errorCode: 'ERR_RENDER_CONNECT_FAILED',
-      message: err?.message || 'Failed to connect to primary image generation service.',
-      backendMessage: err?.message || 'Connection failed',
-      endpoint: GYANQUEST_IMAGE_API_URL,
-      promptSent: cleanPrompt,
-    });
+  } catch (renderErr: any) {
+    if (signal?.aborted) throw renderErr;
+    const msg = renderErr?.name === 'AbortError' ? 'Render image API timed out after 75s' : renderErr?.message || String(renderErr);
+    console.warn(`[Model Failure Log] Render Image backend failed: ${msg}`);
+    errors.push(`Render: ${msg}`);
   }
+
+  // Fallback: Return curated chapter illustration so the presentation always succeeds seamlessly
+  const fallbackUrl = getFallbackIllustrationUrl(chapter);
+  try {
+    await preloadImage(fallbackUrl, 10000, signal);
+  } catch (_) {}
+
+  return {
+    imageUrl: fallbackUrl,
+    isAiGenerated: false,
+    message: 'Loaded high-fidelity educational illustration for jigsaw reflection',
+  };
 }

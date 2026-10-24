@@ -773,6 +773,75 @@ Return only the single descriptive visual prompt string under 60 words. No intro
   });
 
   // =========================================================================
+  // CLOUDFLARE WORKERS AI IMAGE GENERATOR (75s Timeout)
+  // =========================================================================
+  app.post('/api/generate-image-cloudflare', async (req, res) => {
+    try {
+      const { prompt, accountId: bodyAccountId, apiToken: bodyApiToken } = req.body || {};
+      const accountId = (bodyAccountId || process.env.CLOUDFLARE_ACCOUNT_ID || process.env.VITE_CLOUDFLARE_ACCOUNT_ID || '').trim();
+      const apiToken = (bodyApiToken || process.env.CLOUDFLARE_API_KEY || process.env.CLOUDFLARE_API_TOKEN || process.env.VITE_CLOUDFLARE_API_KEY || process.env.VITE_CLOUDFLARE_API_TOKEN || '').trim();
+
+      if (!apiToken) {
+        return res.status(400).json({ error: 'No Cloudflare API key / token provided.' });
+      }
+
+      const cleanPrompt = (prompt || '').trim();
+      if (!cleanPrompt) {
+        return res.status(400).json({ error: 'Prompt is required.' });
+      }
+
+      // 75-second timeout controller
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 75000);
+
+      // Default to common Cloudflare AI account or configured account
+      const targetAccountId = accountId || 'default';
+      const cfModel = '@cf/bytedance/stable-diffusion-xl-lightning';
+      const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${targetAccountId}/ai/run/${cfModel}`;
+
+      const cfRes = await fetch(cfUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: cleanPrompt }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      if (!cfRes.ok) {
+        const errText = await cfRes.text().catch(() => '');
+        console.warn(`[Model Failure Log] Cloudflare Image API HTTP ${cfRes.status}: ${errText.slice(0, 200)}`);
+        return res.status(cfRes.status).json({
+          error: `Cloudflare Image API HTTP ${cfRes.status}`,
+          details: errText.slice(0, 300),
+        });
+      }
+
+      const contentType = cfRes.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const json = await cfRes.json();
+        if (json?.result?.image) {
+          const dataUrl = `data:image/png;base64,${json.result.image}`;
+          return res.json({ imageUrl: dataUrl, isAiGenerated: true, provider: 'cloudflare' });
+        }
+      }
+
+      // Raw binary image response
+      const arrayBuffer = await cfRes.arrayBuffer();
+      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      const mime = contentType.includes('jpeg') ? 'image/jpeg' : 'image/png';
+      const dataUrl = `data:${mime};base64,${base64}`;
+
+      return res.json({ imageUrl: dataUrl, isAiGenerated: true, provider: 'cloudflare' });
+    } catch (err: any) {
+      const msg = err?.name === 'AbortError' ? 'Cloudflare image generation timed out after 75s' : err?.message || String(err);
+      console.warn('[Model Failure Log] Cloudflare image error:', msg);
+      return res.status(500).json({ error: msg });
+    }
+  });
+
+  // =========================================================================
   // WORDLE QUESTIONS GENERATOR (Text model: 3.5 flash-lite -> 3.1 flash-lite)
   // =========================================================================
   app.post(['/api/wordle-questions', '/api/generate-questions'], async (req, res) => {

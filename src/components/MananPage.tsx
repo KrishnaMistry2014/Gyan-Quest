@@ -64,13 +64,36 @@ export const MananPage: React.FC<MananPageProps> = ({
   const { showToast } = useToast();
   const { t } = useLanguage();
 
-  // Active contemplation activity: Jigsaw -> Wordle -> Standard Crossword / Chronological Crossword
-  const [activeActivity, setActiveActivity] = useState<
-    'jigsaw' | 'wordle' | 'crossword' | 'chronological_crossword'
-  >('jigsaw');
+  const chapterId = (chapter.id || '').toLowerCase();
+  const chapterTitle = (chapter.title || '').toLowerCase();
+  const scriptureKey = chapter.scriptureKey || scripture?.scriptureKey || '';
+
+  const isIndusValley =
+    chapterId.includes('indus') ||
+    chapterTitle.includes('indus') ||
+    chapterTitle.includes('harappa') ||
+    scriptureKey === 'indus_valley';
+
+  const isMahabharata =
+    chapterId.includes('mahabharata') ||
+    chapterTitle.includes('mahabharata') ||
+    scriptureKey === 'mahabharata';
+
+  const isRamayana =
+    chapterId.includes('ramayana') ||
+    chapterTitle.includes('ramayana') ||
+    scriptureKey === 'ramayana';
+
+  const videoSrc = isMahabharata
+    ? '/assets/aistudio/Mahabharata_d3a6c9a6.mp4'
+    : isRamayana
+    ? '/assets/aistudio/Ramayana_f9a6a980.mp4'
+    : null;
+
+  // Active contemplation activity: Jigsaw -> Wordle -> Crossword (Chronological for Indus Valley, Standard for others)
+  const [activeActivity, setActiveActivity] = useState<'jigsaw' | 'wordle' | 'crossword'>('jigsaw');
   const [wordleCompleted, setWordleCompleted] = useState<boolean>(false);
   const [crosswordCompleted, setCrosswordCompleted] = useState<boolean>(false);
-  const [chronoCrosswordCompleted, setChronoCrosswordCompleted] = useState<boolean>(false);
 
   const handleAdvanceToWordle = async () => {
     let ch = { ...chapter };
@@ -117,11 +140,6 @@ export const MananPage: React.FC<MananPageProps> = ({
       console.warn('Error claiming wordle reward:', err);
     }
     setActiveActivity('crossword');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleAdvanceToChronologicalCrossword = () => {
-    setActiveActivity('chronological_crossword');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -722,7 +740,57 @@ export const MananPage: React.FC<MananPageProps> = ({
         </div>
       </header>
 
-      {/* Guided Sequential Flow: Jigsaw > Wordle > Crossword > Chronological Crossword */}
+      {/* Mahabharata / Ramayana Epic Contemplation Video */}
+      {videoSrc && (
+        <div
+          id="manan-epic-video-container"
+          className="w-full rounded-3xl border p-4 sm:p-6 shadow-xs space-y-3"
+          style={{
+            backgroundColor: 'var(--bg-card)',
+            borderColor: 'var(--border-warm)',
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span
+                className="w-7 h-7 rounded-lg flex items-center justify-center border shadow-2xs"
+                style={{
+                  backgroundColor: 'var(--accent-saffron-light)',
+                  borderColor: 'var(--border-warm)',
+                  color: 'var(--accent-saffron)',
+                }}
+              >
+                <Sparkles className="w-4 h-4 text-amber-500" />
+              </span>
+              <h3 className="text-sm sm:text-base font-bold font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+                {isMahabharata ? 'Mahabharata Epic Contemplation' : 'Ramayana Epic Contemplation'}
+              </h3>
+            </div>
+            <span
+              className="text-[11px] font-mono px-2.5 py-0.5 rounded-full border font-semibold"
+              style={{
+                backgroundColor: 'var(--bg-main)',
+                borderColor: 'var(--border-warm)',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              Curriculum Video
+            </span>
+          </div>
+
+          <video
+            controls
+            preload="metadata"
+            className="w-full max-h-[440px] rounded-2xl bg-black shadow-inner object-contain border"
+            style={{ borderColor: 'var(--border-warm)' }}
+            src={videoSrc}
+          >
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      )}
+
+      {/* Guided Sequential Flow: Jigsaw > Wordle > Crossword (Chronological for Indus Valley, Standard for others) */}
       <div className="flex items-center justify-between gap-4 flex-wrap border-b pb-4 pt-1" style={{ borderColor: 'var(--border-warm)' }}>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Activity 1: Jigsaw */}
@@ -781,50 +849,33 @@ export const MananPage: React.FC<MananPageProps> = ({
 
           <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
 
-          {/* Activity 3: Standard Crossword */}
+          {/* Activity 3: Crossword (Chronological for Indus Valley, Standard for others) */}
           <button
             type="button"
-            onClick={() => window.open('https://gyanquest-pariksha.ai.studio', '_blank')}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer opacity-75 hover:opacity-100"
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              color: 'var(--text-primary)',
-              borderColor: 'var(--border-warm)',
-            }}
-          >
-            <LayoutGrid className="w-4 h-4" />
-            <span>3. Crossword (External)</span>
-          </button>
-
-          <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
-
-          {/* Activity 4: Chronological Crossword */}
-          <button
-            type="button"
-            data-testid="manan-tab-chronological-crossword"
-            onClick={handleAdvanceToChronologicalCrossword}
+            data-testid="manan-tab-crossword"
+            onClick={() => setActiveActivity('crossword')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-              activeActivity === 'chronological_crossword'
+              activeActivity === 'crossword'
                 ? 'shadow-xs'
-                : chronoCrosswordCompleted
+                : crosswordCompleted
                 ? 'opacity-90'
                 : 'opacity-75 hover:opacity-100'
             }`}
             style={{
-              backgroundColor:
-                activeActivity === 'chronological_crossword' ? 'var(--accent-saffron)' : 'var(--bg-card)',
-              color:
-                activeActivity === 'chronological_crossword' ? '#FFFFFF' : 'var(--text-primary)',
+              backgroundColor: activeActivity === 'crossword' ? 'var(--accent-saffron)' : 'var(--bg-card)',
+              color: activeActivity === 'crossword' ? '#FFFFFF' : 'var(--text-primary)',
               borderColor: 'var(--border-warm)',
             }}
           >
-            {chronoCrosswordCompleted ? (
+            {crosswordCompleted ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            ) : (
+            ) : isIndusValley ? (
               <ListOrdered className="w-4 h-4" />
+            ) : (
+              <LayoutGrid className="w-4 h-4" />
             )}
-            <span>4. Chronological Crossword</span>
-            {chronoCrosswordCompleted && (
+            <span>{isIndusValley ? '3. Chronological Crossword' : '3. Crossword Quest'}</span>
+            {crosswordCompleted && (
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
                 100%
               </span>
@@ -837,24 +888,21 @@ export const MananPage: React.FC<MananPageProps> = ({
             ? 'Assemble all puzzle pieces (100%) to unlock Next Activity'
             : activeActivity === 'wordle'
             ? 'Solve all words with 100% accuracy against the 60s timer to advance'
-            : activeActivity === 'chronological_crossword'
+            : isIndusValley
             ? 'Order the lesson timeline chronologically & solve the crossword to master sequence'
             : 'Solve Crossword 100% correctly to unlock Stage 04: Pariksha'}
         </div>
       </div>
 
-      {activeActivity === 'crossword' || activeActivity === 'chronological_crossword' ? (
+      {activeActivity === 'crossword' ? (
         <div className="my-6">
           <GyanQuestCrossword
             initialChapter={chapter}
-            initialMode={activeActivity === 'chronological_crossword' ? 'chronological' : 'standard'}
+            initialMode={isIndusValley ? 'chronological' : 'standard'}
             isPariksha={false}
             onExit={() => onNavigateDashboard?.()}
             onComplete={() => {
               setCrosswordCompleted(true);
-              if (activeActivity === 'chronological_crossword') {
-                setChronoCrosswordCompleted(true);
-              }
             }}
             onGoToPariksha={handleGoToPariksha}
           />
@@ -886,7 +934,7 @@ export const MananPage: React.FC<MananPageProps> = ({
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-md text-white transition-all hover:opacity-90 active:scale-95 cursor-pointer"
                 style={{ backgroundColor: 'var(--accent-saffron)' }}
               >
-                <span>Next Activity: Crossword</span>
+                <span>Next Activity: {isIndusValley ? 'Chronological Crossword' : 'Crossword'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

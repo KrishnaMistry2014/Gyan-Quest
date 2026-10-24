@@ -36,6 +36,7 @@ import { Menu, BookOpenText, Sun, Moon, Flame, Zap } from 'lucide-react';
 const RAMAYANA_CHAPTER: SavedChapter = SCRIPTURES.ramayana;
 const GITA_CHAPTER: SavedChapter = SCRIPTURES.gita;
 const MAHABHARATA_CHAPTER: SavedChapter = SCRIPTURES.mahabharata;
+const INDUS_VALLEY_CHAPTER: SavedChapter = SCRIPTURES.indus_valley;
 
 const pathToView = (path: string): AppView => {
   const cleanPath = path.replace(/\/$/, '');
@@ -617,7 +618,12 @@ const MainAppContent: React.FC = () => {
           setCurrentView('vidya');
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        onSelectIndusValley={handleOpenIndusValley}
+        onSelectIndusValley={() => {
+          setSelectedChapter(INDUS_VALLEY_CHAPTER);
+          setUploadedPdf(null);
+          setCurrentView('vidya');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         onUploadCustomPdf={() => {
           setSelectedChapter(null);
           setUploadedPdf(null);

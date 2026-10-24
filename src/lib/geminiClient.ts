@@ -50,9 +50,19 @@ function isValidApiKey(val: unknown): val is string {
 }
 
 /**
+ * Scrub sensitive API keys and tokens from messages before logging or surfacing.
+ */
+export function sanitizeLogMessage(msg: string): string {
+  if (!msg) return '';
+  return msg
+    .replace(/AIza[0-9A-Za-z-_]{35}/g, '[REDACTED_GEMINI_KEY]')
+    .replace(/(?:key|token|auth|password)=([a-zA-Z0-9_\-\.]{8,})/gi, '$1=[REDACTED]');
+}
+
+/**
  * Retrieves all valid browser-injected Gemini API keys.
- * Supports both VITE_GEMINI_API_KEY and VITE_GURU_GEMINI_API_KEY across import.meta.env,
- * window runtime globals, and build-time process.env definitions.
+ * Supports VITE_GEMINI_API_KEY, VITE_GURU_GEMINI_API_KEY, and GEMINI_API_KEY across
+ * import.meta.env, window runtime globals, localStorage/sessionStorage, and build-time env.
  */
 export function getBrowserGeminiApiKeys(): string[] {
   const candidates: unknown[] = [];
@@ -62,6 +72,7 @@ export function getBrowserGeminiApiKeys(): string[] {
     if (metaEnv) {
       candidates.push(metaEnv.VITE_GEMINI_API_KEY);
       candidates.push(metaEnv.VITE_GURU_GEMINI_API_KEY);
+      candidates.push(metaEnv.GEMINI_API_KEY);
     }
   } catch (_) {}
 
@@ -70,10 +81,30 @@ export function getBrowserGeminiApiKeys(): string[] {
       const win = window as any;
       candidates.push(win.VITE_GEMINI_API_KEY);
       candidates.push(win.VITE_GURU_GEMINI_API_KEY);
+      candidates.push(win.GEMINI_API_KEY);
       if (win.__ENV__) {
         candidates.push(win.__ENV__.VITE_GEMINI_API_KEY);
         candidates.push(win.__ENV__.VITE_GURU_GEMINI_API_KEY);
+        candidates.push(win.__ENV__.GEMINI_API_KEY);
       }
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      candidates.push(localStorage.getItem('VITE_GEMINI_API_KEY'));
+      candidates.push(localStorage.getItem('VITE_GURU_GEMINI_API_KEY'));
+      candidates.push(localStorage.getItem('GEMINI_API_KEY'));
+      candidates.push(localStorage.getItem('gemini_api_key'));
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      candidates.push(sessionStorage.getItem('VITE_GEMINI_API_KEY'));
+      candidates.push(sessionStorage.getItem('VITE_GURU_GEMINI_API_KEY'));
+      candidates.push(sessionStorage.getItem('GEMINI_API_KEY'));
+      candidates.push(sessionStorage.getItem('gemini_api_key'));
     }
   } catch (_) {}
 
@@ -81,6 +112,7 @@ export function getBrowserGeminiApiKeys(): string[] {
     if (typeof process !== 'undefined' && process.env) {
       candidates.push((process.env as any).VITE_GEMINI_API_KEY);
       candidates.push((process.env as any).VITE_GURU_GEMINI_API_KEY);
+      candidates.push((process.env as any).GEMINI_API_KEY);
     }
   } catch (_) {}
 
@@ -161,7 +193,9 @@ export async function generateBrowserGeminiContent(params: {
           return { text, modelUsed: model };
         }
       } catch (err: any) {
-        errors.push(`${model}: ${err?.message || String(err)}`);
+        const sanitizedErr = sanitizeLogMessage(err?.message || String(err));
+        console.warn(`[Model Failure Log] ${model} failed: ${sanitizedErr}`);
+        errors.push(`${model}: ${sanitizedErr}`);
       }
     }
   }
@@ -1274,5 +1308,299 @@ ${requirementsBlock}`;
   }
 
   return summary.trim();
+}
+
+export interface ParikshaMcqQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+const CURATED_PARIKSHA_FALLBACKS: Record<string, ParikshaMcqQuestion[]> = {
+  gita: [
+    {
+      id: 'gita_q1',
+      question: 'According to Bhagavad Gita Verse 6.17, what mitigates all material suffering (duhkha-ha)?',
+      options: ['Extreme fasting', 'Regulated habits in eating, sleeping, work, and recreation', 'Abandoning all worldly duties', 'Performing complicated rituals'],
+      correctIndex: 1,
+      explanation: 'Verse 6.17 teaches "yuktahara-viharasya" — regulated habits of lifestyle and moderation extinguish suffering.',
+    },
+    {
+      id: 'gita_q2',
+      question: 'What does the Sanskrit term "yukta" specifically mean in Dhyana Yoga?',
+      options: ['Unrestrained or free', 'Regulated, balanced, and harmonized', 'Detached from life', 'Swift and hasty'],
+      correctIndex: 1,
+      explanation: '"Yukta" signifies disciplined moderation and balance in daily habits.',
+    },
+    {
+      id: 'gita_q3',
+      question: 'How does consistent daily rest of 8–10 hours benefit a dedicated student according to the text?',
+      options: ['It guarantees highest marks without studying', 'It provides mental calmness, sharp memory recall, and physical vitality', 'It prevents all physical illnesses completely', 'It replaces exercise'],
+      correctIndex: 1,
+      explanation: 'Sufficient restorative rest replenishes brain focus, sharp memory retention, and inner peace.',
+    },
+    {
+      id: 'gita_q4',
+      question: 'What is "Nishkama Karma" as emphasized in the teachings of the Gita?',
+      options: ['Working without any goal', 'Performing duty with full dedication without anxiety over rewards', 'Working only for monetary incentives', 'Avoiding difficult school projects'],
+      correctIndex: 1,
+      explanation: 'Nishkama Karma means dedicating 100% effort to your duties without being paralyzed by anxiety over fruits or outcomes.',
+    },
+    {
+      id: 'gita_q5',
+      question: 'What metaphor is used to describe approaching academic studies with purpose (Sankalp)?',
+      options: ['Treating study like an accidental event', 'Treating the mind as a focused chariot guided by discerning intellect', 'Waiting until the final night before exams', 'Relying purely on luck'],
+      correctIndex: 1,
+      explanation: 'The Gita illustrates the intellect as the chariot driver steering the senses with calm determination.',
+    },
+  ],
+  ramayana: [
+    {
+      id: 'ram_q1',
+      question: 'Who is the author/composer of the foundational epic Ramayana?',
+      options: ['Sage Vyasa', 'Sage Valmiki', 'Sage Agastya', 'Sage Vishwamitra'],
+      correctIndex: 1,
+      explanation: 'Sage Valmiki is revered as the Adi Kavi who composed the Valmiki Ramayana.',
+    },
+    {
+      id: 'ram_q2',
+      question: 'Why did Sri Rama willingly accept fourteen years of exile into the Dandaka forest?',
+      options: ['He wanted to explore distant kingdoms', 'To honor his father King Dasharatha\'s given word and uphold Satya (Truth)', 'Because he was defeated in battle', 'To find Sage Bharadwaja'],
+      correctIndex: 1,
+      explanation: 'Rama prioritised Satya and Dharma above personal kingdom or comfort to uphold Dasharatha\'s word to Kaikeyi.',
+    },
+    {
+      id: 'ram_q3',
+      question: 'What ideal does Sri Rama embody throughout Indian literature and ethics?',
+      options: ['A conqueror of wealthy empires', 'Maryada Purushottama — the supreme embodiment of righteous duty, humility, and moral boundaries', 'A reclusive hermit detached from all human affairs', 'An absolute monarch who obeyed no laws'],
+      correctIndex: 1,
+      explanation: 'Sri Rama is celebrated as Maryada Purushottama for unwavering devotion to truth and justice.',
+    },
+    {
+      id: 'ram_q4',
+      question: 'Which virtue is best demonstrated by Hanuman when crossing the vast ocean to Lanka?',
+      options: ['Boastful pride in power', 'Selfless devotion (Bhakti), humility, and single-minded courage', 'Desire for royal recognition', 'Hesitation and fear of failure'],
+      correctIndex: 1,
+      explanation: 'Hanuman tackled immense obstacles through humility, devotion to Rama, and steadfast valor.',
+    },
+    {
+      id: 'ram_q5',
+      question: 'What lesson does brotherly loyalty (Bhratru-prema) in the Ramayana teach young scholars?',
+      options: ['Competing against siblings for status', 'Supporting family with selflessness, mutual respect, and sacrifice', 'Ignoring difficult familial responsibilities', 'Demanding rewards for every favor'],
+      correctIndex: 1,
+      explanation: 'The selfless bond between Rama, Lakshmana, and Bharata exemplifies unshakeable mutual support.',
+    },
+  ],
+  mahabharata: [
+    {
+      id: 'mb_q1',
+      question: 'What is the sacred Sanskrit adage defining the core moral victory in the Mahabharata?',
+      options: ['Ahimsa Paramo Dharmah', 'Yato Dharmas Tato Jayah (Where there is Dharma, there is victory)', 'Satyam Eva Jayate', 'Vasudhaiva Kutumbakam'],
+      correctIndex: 1,
+      explanation: '"Yato Dharmas Tato Jayah" highlights that righteous integrity ultimately triumphs over unrighteousness.',
+    },
+    {
+      id: 'mb_q2',
+      question: 'How did Arjuna demonstrate supreme concentration during Dronacharya\'s bird-target archery test?',
+      options: ['He saw the entire tree, leaves, and sky', 'He saw only the eye of the wooden bird', 'He focused on his fellow princes', 'He shot blindly without aiming'],
+      correctIndex: 1,
+      explanation: 'Arjuna focused exclusively on the eye of the bird, illustrating laser-focused academic concentration.',
+    },
+    {
+      id: 'mb_q3',
+      question: 'Who composed the epic Mahabharata, and who transcribed it according to traditional tradition?',
+      options: ['Composed by Valmiki, written by Narada', 'Composed by Sage Vyasa, inscribed by Lord Ganesha', 'Composed by Kalidasa, written by Bhartrihari', 'Composed by Tulsidas, written by Lakshmana'],
+      correctIndex: 1,
+      explanation: 'Sage Krishna Dvaipayana Vyasa dictated the verses, and Lord Ganesha inscribed them without pause.',
+    },
+    {
+      id: 'mb_q4',
+      question: 'What was the solemn vow taken by Devavrata (Bhishma) that earned him the name "Bhishma"?',
+      options: ['A vow to conquer all neighboring lands', 'A vow of lifelong celibacy and selfless service to the throne of Hastinapura', 'A vow never to enter any battle', 'A vow to live as a wandering ascetic'],
+      correctIndex: 1,
+      explanation: 'Devavrata made the terrible, unwavering vow (Bhishma Pratigya) for his father King Shantanu\'s happiness.',
+    },
+    {
+      id: 'mb_q5',
+      question: 'What crucial quality did Yudhisthira uphold throughout his exile and tests by the Yaksha?',
+      options: ['Aggressive military strategy', 'Steadfast adherence to truth (Satya) and righteous wisdom', 'Desire for immediate revenge', 'Amassing wealth through covert means'],
+      correctIndex: 1,
+      explanation: 'Yudhisthira is known as Dharmaraja for his commitment to truth and righteousness even during crisis.',
+    },
+  ],
+  indus_valley: [
+    {
+      id: 'iv_q1',
+      question: 'In which year and under whose leadership was Harappa first excavated?',
+      options: ['1911 by Alexander Cunningham', '1921 by Daya Ram Sahni', '1924 by John Marshall', '1935 by Mortimer Wheeler'],
+      correctIndex: 1,
+      explanation: 'Daya Ram Sahni led the initial excavations at Harappa in 1921, revealing the ancient civilization.',
+    },
+    {
+      id: 'iv_q2',
+      question: 'What distinctive water-architecture feature was unearthed on the citadel mound of Mohenjo-daro?',
+      options: ['The Stepwell of Rani ki Vav', 'The Great Bath, sealed with natural tar / bitumen', 'A giant aqueduct from the Himalayas', 'An irrigation canal system across Sindh'],
+      correctIndex: 1,
+      explanation: 'The Great Bath at Mohenjo-daro was lined with fired bricks and sealed with bitumen mortar for ritual bathing.',
+    },
+    {
+      id: 'iv_q3',
+      question: 'Which Harappan coastal site in Gujarat had a bead-making factory and a large brick basin identified as a dockyard?',
+      options: ['Kalibangan', 'Lothal', 'Banawali', 'Rakhigarhi'],
+      correctIndex: 1,
+      explanation: 'Lothal possessed a tidal dockyard connected to the Gulf of Khambhat and an active carnelian bead industry.',
+    },
+    {
+      id: 'iv_q4',
+      question: 'What unique feature was discovered at Dholavira in the Rann of Kutch, Gujarat?',
+      options: ['Iron sword foundries', 'Rock-cut water reservoirs and a large 10-symbol wooden signboard', 'Royal stone pyramids', 'A coin mint with stamped currency'],
+      correctIndex: 1,
+      explanation: 'Dholavira featured monumental stone masonry reservoirs and an ancient inscription signboard.',
+    },
+    {
+      id: 'iv_q5',
+      question: 'What standard brick proportion was used across Harappan cities for resilient construction?',
+      options: ['1:1:2', '1:2:4 (thickness:width:length)', '2:3:5', '1:3:6'],
+      correctIndex: 1,
+      explanation: 'Harappan bricks remarkably maintained a standardized 1:2:4 ratio across hundreds of settlement sites.',
+    },
+  ],
+};
+
+/**
+ * Generates unique, curriculum-grounded Multiple Choice Questions (MCQs) for Stage 04: Pariksha
+ * using gemini-3.5-flash-lite via browser API keys.
+ */
+export async function generateParikshaMcqsForChapter(params: {
+  chapter?: SavedChapter | null;
+  topic?: string;
+  summary?: string;
+  count?: number;
+}): Promise<ParikshaMcqQuestion[]> {
+  const count = params.count || 5;
+  const scripture = getScriptureDefinition(params.chapter);
+  const effectiveTopic = scripture
+    ? scripture.title
+    : (params.topic || params.chapter?.title || 'Chapter Assessment').trim();
+  const effectiveSummary = scripture
+    ? scripture.summary
+    : (params.summary || params.chapter?.summary || '').trim();
+
+  // Try dynamic generation using gemini-3.5-flash-lite
+  try {
+    const prompt = `You are an elite educational assessment psychometrician.
+Generate exactly ${count} UNIQUE, high-quality multiple choice assessment questions for a student final chapter exam titled "Pariksha".
+Topic: ${effectiveTopic}
+---
+Chapter Content / Study Summary:
+${effectiveSummary.slice(0, 30000)}
+---
+
+REQUIREMENTS:
+1. Every question must be directly grounded in the facts, concepts, definitions, and lessons above.
+2. Provide exactly 4 distinct answer choices per question ("options").
+3. Indicate the index (0, 1, 2, or 3) of the single correct answer ("correctIndex"). Ensure the correct answer is well-distributed (not always option A or B).
+4. Provide a 1-2 sentence educational explanation of why the correct answer is right ("explanation").
+5. Return ONLY a valid JSON array matching this format (no markdown code fences):
+[
+  {
+    "id": "q1",
+    "question": "What is ...?",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctIndex": 1,
+    "explanation": "Because..."
+  }
+]`;
+
+    const { text } = await generateBrowserGeminiContent({
+      contents: [prompt],
+      preferredModel: KEYWORD_EXTRACTION_MODEL,
+      timeoutMs: 35000,
+      responseMimeType: 'application/json',
+    });
+
+    const clean = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim();
+    const parsed = JSON.parse(clean);
+    const questionsArray = Array.isArray(parsed) ? parsed : parsed?.questions;
+
+    if (Array.isArray(questionsArray) && questionsArray.length >= 3) {
+      const validQuestions: ParikshaMcqQuestion[] = [];
+      for (let i = 0; i < questionsArray.length; i++) {
+        const item = questionsArray[i];
+        if (
+          item &&
+          typeof item.question === 'string' &&
+          Array.isArray(item.options) &&
+          item.options.length === 4 &&
+          typeof item.correctIndex === 'number' &&
+          item.correctIndex >= 0 &&
+          item.correctIndex <= 3
+        ) {
+          validQuestions.push({
+            id: `pariksha_q_${i + 1}_${Date.now()}`,
+            question: item.question.trim(),
+            options: item.options.map((opt: any) => String(opt).trim()),
+            correctIndex: item.correctIndex,
+            explanation: typeof item.explanation === 'string' ? item.explanation.trim() : 'Correct answer based on chapter text.',
+          });
+        }
+      }
+
+      if (validQuestions.length >= 3) {
+        return validQuestions;
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Model Failure Log] Pariksha MCQ generation fallback triggered:', sanitizeLogMessage(err?.message || String(err)));
+  }
+
+  // Curated Fallbacks for zero latency or offline situations
+  const key = scripture?.scriptureKey || '';
+  if (key === 'gita' && CURATED_PARIKSHA_FALLBACKS.gita) return CURATED_PARIKSHA_FALLBACKS.gita;
+  if (key === 'ramayana' && CURATED_PARIKSHA_FALLBACKS.ramayana) return CURATED_PARIKSHA_FALLBACKS.ramayana;
+  if (key === 'mahabharata' && CURATED_PARIKSHA_FALLBACKS.mahabharata) return CURATED_PARIKSHA_FALLBACKS.mahabharata;
+  if (key === 'indus_valley' && CURATED_PARIKSHA_FALLBACKS.indus_valley) return CURATED_PARIKSHA_FALLBACKS.indus_valley;
+
+  // General chapter fallback
+  return [
+    {
+      id: 'gen_q1',
+      question: `What is the primary conceptual focus of "${effectiveTopic}"?`,
+      options: [
+        'Fundamental concepts and knowledge principles explored in the lesson',
+        'Fictional myths with no factual basis',
+        'Unverified personal opinions',
+        'Random unrelated trivia',
+      ],
+      correctIndex: 0,
+      explanation: 'The chapter establishes core conceptual foundations and factual principles.',
+    },
+    {
+      id: 'gen_q2',
+      question: 'How does active synthesis (Manan) reinforce knowledge learned in Vidya?',
+      options: [
+        'By skipping revision entirely',
+        'By testing vocabulary, timelines, and conceptual puzzles to deepen neural connections',
+        'By memorizing answers without understanding',
+        'By avoiding practice assessments',
+      ],
+      correctIndex: 1,
+      explanation: 'Reflective synthesis and contextual puzzles cement concepts in long-term memory.',
+    },
+    {
+      id: 'gen_q3',
+      question: 'What is the most effective approach to mastering new academic subject matter?',
+      options: [
+        'Cramming right before tests with sleep deprivation',
+        'Consistent daily practice, deep reading, audio immersion, and structured self-quizzing',
+        'Relying solely on external hints',
+        'Skimming headings and ignoring definitions',
+      ],
+      correctIndex: 1,
+      explanation: 'Multi-modal learning (reading, listening, solving, quizzing) yields enduring mastery.',
+    },
+  ];
 }
 

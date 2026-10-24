@@ -56,37 +56,6 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
 
         {/* Learning Options */}
         <div className="space-y-3.5">
-          {/* Featured Option: The Indus Valley Civilization (NCERT Classes 6-8) */}
-          <button
-            type="button"
-            onClick={() => {
-              onSelectIndusValley?.();
-              onClose();
-            }}
-            className="w-full p-4 rounded-2xl border text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center gap-4 shadow-2xs group"
-            style={{
-              backgroundColor: 'var(--bg-main)',
-              borderColor: '#0F766E',
-            }}
-          >
-            <div
-              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform bg-teal-800 text-white"
-            >
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              <div className="text-[11px] font-mono text-teal-800 dark:text-teal-300 font-semibold">
-                NCERT Classes 6–8 · Complete Interactive History Chapter
-              </div>
-              <h4 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
-                The Indus Valley Civilization
-              </h4>
-              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-                16 Sections · Maps, Timelines, Dholavira Reservoirs, Great Bath &amp; Quizzes
-              </p>
-            </div>
-          </button>
-
           {/* Option 1: Learn Bhagavad Gita */}
           <button
             type="button"
@@ -183,7 +152,39 @@ export const StartLearningModal: React.FC<StartLearningModalProps> = ({
             </div>
           </button>
 
-          {/* Option 4: Custom PDF Upload */}
+          {/* Option 4: The Indus Valley Civilization (NCERT Classes 6-8) */}
+          <button
+            type="button"
+            onClick={() => {
+              onSelectIndusValley?.();
+              onClose();
+            }}
+            className="w-full p-4 rounded-2xl border text-left transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center gap-4 shadow-2xs group"
+            style={{
+              backgroundColor: 'var(--bg-main)',
+              borderColor: 'var(--border-warm)',
+            }}
+          >
+            <div
+              className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform"
+              style={{
+                backgroundColor: 'var(--accent-saffron-light)',
+                color: 'var(--accent-saffron-text)',
+              }}
+            >
+              <BookOpen className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-bold text-base font-serif-heading" style={{ color: 'var(--text-primary)' }}>
+                The Indus Valley Civilization
+              </h4>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                Ancient History · Cities, water engineering, crafts &amp; trade
+              </p>
+            </div>
+          </button>
+
+          {/* Option 5: Custom PDF Upload */}
           <button
             type="button"
             onClick={() => {

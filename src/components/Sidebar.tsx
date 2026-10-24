@@ -407,7 +407,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* 2. Scrollable Navigation Menu Items */}
       <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-1">
         {renderNavItem('home', t.navHome, Home, isHomeActive)}
-        {renderNavItem('indus-valley', 'Indus Valley (History)', BookOpen, isIndusActive)}
         {renderNavItem('bhagavad-gita', t.navLearnScriptures, Scroll, isGitaActive)}
         {renderNavItem(
           'guru-ai',
