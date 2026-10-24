@@ -773,16 +773,95 @@ Return only the single descriptive visual prompt string under 60 words. No intro
   });
 
   // =========================================================================
-  // CLOUDFLARE WORKERS AI IMAGE GENERATOR (75s Timeout)
+  // CLOUDFLARE WORKERS AI INTEGRATION (Server-Side Only - 75s Timeout)
   // =========================================================================
+  let cachedCloudflareAccountId: string | null = null;
+
+  async function getCloudflareAccountId(apiToken: string): Promise<string | null> {
+    const envAccountId = (process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+    if (envAccountId) {
+      return envAccountId;
+    }
+    if (cachedCloudflareAccountId) {
+      return cachedCloudflareAccountId;
+    }
+    try {
+      const accountsRes = await fetch('https://api.cloudflare.com/client/v4/accounts', {
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (accountsRes.ok) {
+        const data = await accountsRes.json();
+        if (Array.isArray(data?.result) && data.result.length > 0 && data.result[0]?.id) {
+          cachedCloudflareAccountId = data.result[0].id;
+          return cachedCloudflareAccountId;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Harmless verification endpoint for testing the Cloudflare API integration
+  app.get('/api/cloudflare/verify', async (_req, res) => {
+    const apiToken = (process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_API_KEY || '').trim();
+    if (!apiToken) {
+      return res.status(200).json({
+        configured: false,
+        status: 'missing_token',
+        message: 'CLOUDFLARE_API_TOKEN is not configured on the server.',
+      });
+    }
+
+    try {
+      const verifyRes = await fetch('https://api.cloudflare.com/client/v4/user/tokens/verify', {
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await verifyRes.json().catch(() => null);
+
+      if (verifyRes.ok && data?.success) {
+        const accountId = await getCloudflareAccountId(apiToken);
+        return res.json({
+          configured: true,
+          valid: true,
+          status: 'active',
+          message: 'Cloudflare API token is valid and active.',
+          accountConfigured: Boolean(accountId),
+        });
+      } else {
+        return res.status(200).json({
+          configured: true,
+          valid: false,
+          status: 'invalid_or_expired',
+          httpStatus: verifyRes.status,
+          message: 'Cloudflare rejected the token. Please verify token permissions and validity.',
+        });
+      }
+    } catch (err: any) {
+      return res.status(500).json({
+        configured: true,
+        valid: false,
+        status: 'network_error',
+        message: 'Failed to reach Cloudflare API: ' + (err?.message || String(err)),
+      });
+    }
+  });
+
+  // Server-side Cloudflare Workers AI image generation endpoint
   app.post('/api/generate-image-cloudflare', async (req, res) => {
     try {
-      const { prompt, accountId: bodyAccountId, apiToken: bodyApiToken } = req.body || {};
-      const accountId = (bodyAccountId || process.env.CLOUDFLARE_ACCOUNT_ID || process.env.VITE_CLOUDFLARE_ACCOUNT_ID || '').trim();
-      const apiToken = (bodyApiToken || process.env.CLOUDFLARE_API_KEY || process.env.CLOUDFLARE_API_TOKEN || process.env.VITE_CLOUDFLARE_API_KEY || process.env.VITE_CLOUDFLARE_API_TOKEN || '').trim();
+      const { prompt } = req.body || {};
+      const apiToken = (process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_API_KEY || '').trim();
 
       if (!apiToken) {
-        return res.status(400).json({ error: 'No Cloudflare API key / token provided.' });
+        return res.status(503).json({
+          error: 'CLOUDFLARE_API_TOKEN is not configured on the server. Please add CLOUDFLARE_API_TOKEN to your environment.',
+        });
       }
 
       const cleanPrompt = (prompt || '').trim();
@@ -790,14 +869,19 @@ Return only the single descriptive visual prompt string under 60 words. No intro
         return res.status(400).json({ error: 'Prompt is required.' });
       }
 
+      const accountId = await getCloudflareAccountId(apiToken);
+      if (!accountId) {
+        return res.status(502).json({
+          error: 'Could not determine Cloudflare Account ID. Please set CLOUDFLARE_ACCOUNT_ID in the environment or ensure the token has Account Settings Read permission.',
+        });
+      }
+
       // 75-second timeout controller
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 75000);
 
-      // Default to common Cloudflare AI account or configured account
-      const targetAccountId = accountId || 'default';
       const cfModel = '@cf/bytedance/stable-diffusion-xl-lightning';
-      const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${targetAccountId}/ai/run/${cfModel}`;
+      const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${cfModel}`;
 
       const cfRes = await fetch(cfUrl, {
         method: 'POST',
@@ -810,11 +894,14 @@ Return only the single descriptive visual prompt string under 60 words. No intro
       }).finally(() => clearTimeout(timeoutId));
 
       if (!cfRes.ok) {
-        const errText = await cfRes.text().catch(() => '');
-        console.warn(`[Model Failure Log] Cloudflare Image API HTTP ${cfRes.status}: ${errText.slice(0, 200)}`);
+        console.warn(`[Model Failure Log] Cloudflare Image API HTTP ${cfRes.status}`);
         return res.status(cfRes.status).json({
-          error: `Cloudflare Image API HTTP ${cfRes.status}`,
-          details: errText.slice(0, 300),
+          error: `Cloudflare Image API error (HTTP ${cfRes.status})`,
+          details: cfRes.status === 401
+            ? 'Unauthorized: Check CLOUDFLARE_API_TOKEN validity'
+            : cfRes.status === 403
+            ? 'Forbidden: Check Workers AI permissions on token'
+            : 'Cloudflare API call failed',
         });
       }
 

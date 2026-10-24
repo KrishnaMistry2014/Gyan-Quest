@@ -1,0 +1,15 @@
+{
+  "name": "gyanquest-image-proxy",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker proxy for Workers AI SDXL Lightning with CORS for Gyan Quest",
+  "main": "worker.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node test-worker.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^3.109.0"
+  }
+}

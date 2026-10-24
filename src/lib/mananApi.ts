@@ -353,83 +353,23 @@ export function preloadImage(url: string, timeoutMs = 25000, signal?: AbortSigna
 export const TIMEOUT_PER_PROVIDER_MS = 75000;
 
 /**
- * Retrieves configured Cloudflare Workers AI credentials.
+ * Cloudflare Worker proxy URL for production Firebase Hosting.
+ * Configured via VITE_CLOUDFLARE_WORKER_URL.
  */
-export function getCloudflareCredentials(): { apiToken: string; accountId: string } {
-  let apiToken = '';
-  let accountId = '';
-
-  try {
-    const metaEnv = (import.meta as any)?.env;
-    if (metaEnv) {
-      apiToken =
-        metaEnv.VITE_CLOUDFLARE_API_KEY ||
-        metaEnv.VITE_CLOUDFLARE_API_TOKEN ||
-        metaEnv.CLOUDFLARE_API_KEY ||
-        metaEnv.CLOUDFLARE_API_TOKEN ||
-        '';
-      accountId = metaEnv.VITE_CLOUDFLARE_ACCOUNT_ID || metaEnv.CLOUDFLARE_ACCOUNT_ID || '';
-    }
-  } catch (_) {}
-
-  try {
-    if (typeof window !== 'undefined') {
-      const win = window as any;
-      apiToken =
-        apiToken ||
-        win.VITE_CLOUDFLARE_API_KEY ||
-        win.CLOUDFLARE_API_KEY ||
-        win.CLOUDFLARE_API_TOKEN ||
-        '';
-      accountId = accountId || win.VITE_CLOUDFLARE_ACCOUNT_ID || win.CLOUDFLARE_ACCOUNT_ID || '';
-    }
-  } catch (_) {}
-
-  try {
-    if (typeof localStorage !== 'undefined') {
-      apiToken =
-        apiToken ||
-        localStorage.getItem('CLOUDFLARE_API_KEY') ||
-        localStorage.getItem('CLOUDFLARE_API_TOKEN') ||
-        localStorage.getItem('cloudflare_api_key') ||
-        localStorage.getItem('cloudflare_api_token') ||
-        localStorage.getItem('cf_api_key') ||
-        '';
-      accountId =
-        accountId ||
-        localStorage.getItem('CLOUDFLARE_ACCOUNT_ID') ||
-        localStorage.getItem('cloudflare_account_id') ||
-        '';
-    }
-  } catch (_) {}
-
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      apiToken =
-        apiToken ||
-        (process.env as any).CLOUDFLARE_API_KEY ||
-        (process.env as any).CLOUDFLARE_API_TOKEN ||
-        (process.env as any).VITE_CLOUDFLARE_API_KEY ||
-        '';
-      accountId =
-        accountId ||
-        (process.env as any).CLOUDFLARE_ACCOUNT_ID ||
-        (process.env as any).VITE_CLOUDFLARE_ACCOUNT_ID ||
-        '';
-    }
-  } catch (_) {}
-
-  return {
-    apiToken: apiToken.trim(),
-    accountId: accountId.trim(),
-  };
-}
+export const CLOUDFLARE_WORKER_URL = (
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_CLOUDFLARE_WORKER_URL) || ''
+).trim();
 
 /**
- * Generates an educational image via Cloudflare Workers AI with 75-second timeout.
+ * Calls the Cloudflare Workers AI image route.
+ * When deployed to Firebase Hosting, calls the standalone Cloudflare Worker directly via CLOUDFLARE_WORKER_URL.
+ * In local development, falls back to the local Express server endpoint /api/generate-image-cloudflare.
+ * The client sends ONLY the prompt string; credentials (CLOUDFLARE_API_TOKEN)
+ * are strictly stored and accessed server-side to prevent exposure in frontend code.
  */
 export async function generateViaCloudflare(prompt: string, signal?: AbortSignal): Promise<string> {
-  const { apiToken, accountId } = getCloudflareCredentials();
+  const endpoint = CLOUDFLARE_WORKER_URL || '/api/generate-image-cloudflare';
+
   const controller = new AbortController();
   const timeoutTimer = setTimeout(() => controller.abort(), TIMEOUT_PER_PROVIDER_MS);
 
@@ -447,64 +387,74 @@ export async function generateViaCloudflare(prompt: string, signal?: AbortSignal
   }
 
   try {
-    // First try the server-side proxy route to avoid CORS restrictions
-    const proxyRes = await fetch('/api/generate-image-cloudflare', {
+    const proxyRes = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, apiToken, accountId }),
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json, image/png, image/jpeg',
+      },
+      body: JSON.stringify({ prompt }),
       signal: controller.signal,
-    }).catch(() => null);
+    });
 
-    if (proxyRes && proxyRes.ok) {
+    if (!proxyRes.ok) {
+      const errJson = await proxyRes.json().catch(() => null);
+      const errMsg = errJson?.error || `Endpoint returned HTTP ${proxyRes.status}`;
+      throw new MananImageError({
+        statusCode: proxyRes.status,
+        errorCode: `HTTP_${proxyRes.status}_CLOUDFLARE_FAILED`,
+        message: errMsg,
+        endpoint,
+        promptSent: prompt,
+      });
+    }
+
+    const contentType = proxyRes.headers.get('content-type') || '';
+
+    // Handle JSON response
+    if (contentType.includes('application/json')) {
       const data = await proxyRes.json();
-      if (data?.imageUrl) {
+      if (data?.imageUrl && typeof data.imageUrl === 'string') {
         cleanup();
         return data.imageUrl;
       }
     }
 
-    // Direct browser call fallback if server proxy was unavailable and credentials exist
-    if (apiToken) {
-      const targetAccountId = accountId || 'default';
-      const cfModel = '@cf/bytedance/stable-diffusion-xl-lightning';
-      const cfUrl = `https://api.cloudflare.com/client/v4/accounts/${targetAccountId}/ai/run/${cfModel}`;
-
-      const directRes = await fetch(cfUrl, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt }),
-        signal: controller.signal,
-      });
-
-      if (directRes.ok) {
-        const contentType = directRes.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          const json = await directRes.json();
-          if (json?.result?.image) {
-            cleanup();
-            return `data:image/png;base64,${json.result.image}`;
-          }
-        }
-        const blob = await directRes.blob();
-        cleanup();
-        return URL.createObjectURL(blob);
-      }
+    // Handle binary image response
+    if (contentType.includes('image/')) {
+      const blob = await proxyRes.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      cleanup();
+      return objectUrl;
     }
 
-    throw new Error('Cloudflare Image generation returned no valid image payload');
+    // Fallback: check if body can be parsed as JSON
+    const data = await proxyRes.json().catch(() => null);
+    if (data?.imageUrl && typeof data.imageUrl === 'string') {
+      cleanup();
+      return data.imageUrl;
+    }
+
+    throw new MananImageError({
+      statusCode: 502,
+      errorCode: 'ERR_CLOUDFLARE_EMPTY_PAYLOAD',
+      message: 'Cloudflare endpoint returned success but no valid image payload.',
+      endpoint,
+      promptSent: prompt,
+    });
   } catch (err: any) {
     cleanup();
     const isTimeout = err?.name === 'AbortError' || controller.signal.aborted;
     const msg = isTimeout ? 'Cloudflare image generation timed out after 75s' : err?.message || String(err);
     console.warn(`[Model Failure Log] Cloudflare Image error: ${msg}`);
+    if (err instanceof MananImageError) {
+      throw err;
+    }
     throw new MananImageError({
-      statusCode: 504,
-      errorCode: 'ERR_CLOUDFLARE_FAILED',
+      statusCode: isTimeout ? 504 : 500,
+      errorCode: isTimeout ? 'ERR_CLOUDFLARE_TIMEOUT' : 'ERR_CLOUDFLARE_FAILED',
       message: msg,
-      endpoint: 'Cloudflare Workers AI',
+      endpoint,
       promptSent: prompt,
     });
   }

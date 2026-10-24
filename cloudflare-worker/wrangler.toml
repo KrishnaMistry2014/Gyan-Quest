@@ -1,0 +1,14 @@
+name = "gyanquest-image-proxy"
+main = "worker.js"
+compatibility_date = "2024-04-01"
+
+# Workers AI Native Binding
+# Grants the Worker native server-side access to run Cloudflare Workers AI models
+# without exposing or transmitting API tokens over HTTP.
+[ai]
+binding = "AI"
+
+# Non-sensitive configuration variables
+[vars]
+ALLOWED_ORIGIN = "https://gyanquest-edu.web.app"
+DEFAULT_MODEL = "@cf/bytedance/stable-diffusion-xl-lightning"

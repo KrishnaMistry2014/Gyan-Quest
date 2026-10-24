@@ -305,7 +305,7 @@ export const MananPage: React.FC<MananPageProps> = ({
       } catch (_) {
         controller.abort();
       }
-    }, 75000);
+    }, 240000);
 
     let activePrompt = '';
     try {
